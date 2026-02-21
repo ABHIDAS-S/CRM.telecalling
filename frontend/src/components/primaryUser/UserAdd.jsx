@@ -227,6 +227,7 @@ const UserAdd = ({
       setValue("email", User.email)
       setValue("mobile", User.mobile)
       setValue("privilegeleavestartsfrom", User.privilegeleavestartsfrom)
+console.log(User.casualleavestartsfrom)
       setValue("casualleavestartsfrom", User.casualleavestartsfrom)
       setValue("sickleavestartsfrom", User.sickleavestartsfrom)
       setValue("address", User.address)

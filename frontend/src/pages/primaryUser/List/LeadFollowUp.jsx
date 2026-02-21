@@ -22,7 +22,7 @@ import {
   BellRing, // Follow-up
   History, // Event Log,
   ChevronDown,
-ChevronRight,
+  ChevronRight,
   X
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
@@ -675,1211 +675,486 @@ const LeadFollowUp = () => {
     setShowModal(false)
     setHistoryList([])
   }
-  const renderTable = (data) => {
-    const LeadRow = ({ item, index }) => {
-      const [open, setOpen] = useState(false)
+// const renderTable = (data) => {
+//   const LeadRow = ({ item, index }) => {
+//     const [open, setOpen] = useState(false)
 
-      const lastLog = item.activityLog[item.activityLog.length - 1]
-      const followupDate =
-        pending && lastLog?.nextFollowUpDate
-          ? new Date(lastLog.nextFollowUpDate)
-              .toLocaleDateString("en-GB")
-              .split("/")
-              .join("-")
-          : "-"
+//     const lastLog = item.activityLog[item.activityLog.length - 1]
+//     const followupDate =
+//       pending && lastLog?.nextFollowUpDate
+//         ? new Date(lastLog.nextFollowUpDate)
+//             .toLocaleDateString("en-GB")
+//             .split("/")
+//             .join("-")
+//         : "-"
 
-      return (
-        <>
-          <tr
-            onClick={() => setOpen((v) => !v)}
-            className={`cursor-pointer select-none transition-colors duration-150 border-b border-gray-100
-            ${open ? "bg-blue-50" : index % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-gray-50/60 hover:bg-slate-100"}`}
-          >
-            <td className="pl-2 pr-1 py-1.5 w-5 border border-gray-300">
-              {open ? (
-                <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+//     const isAllocatedToeditable = item.activityLog.some(
+//       (it) =>
+//         it?.taskallocatedTo?._id === loggedUser._id &&
+//         it?.taskClosed === false
+//     )
+
+//     // Total columns = 1(chevron) + 1(name) + 1(mobile) + 1(remark) + 1(followup)
+//     //               + 1(eventlog) + 1(view) + (ownFollowUp?1:0) + 1(amount)
+//     const totalCols = ownFollowUp ? 9 : 8
+
+//     return (
+//       <>
+//         {/* ── Main row ── */}
+//         <tr
+//           onClick={() => setOpen((v) => !v)}
+//           className="cursor-pointer bg-white hover:bg-blue-50 transition-colors border border-gray-300"
+//         >
+//           <td className="pl-2 pr-1 py-2 w-5 border border-gray-300">
+//             {open
+//               ? <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+//               : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+//           </td>
+//           <td className="px-3 py-2 font-semibold text-gray-900 text-sm border border-gray-300 whitespace-nowrap">
+//             {item.customerName.customerName}
+//           </td>
+//           <td className="px-3 py-2 text-gray-700 text-sm border border-gray-300 whitespace-nowrap">
+//             {item?.mobile}
+//           </td>
+//           <td className="px-3 py-2 text-sm border border-gray-300 max-w-[200px]">
+//             <span className="text-red-600 font-medium truncate block" title={lastLog?.remarks}>
+//               {lastLog?.remarks || "-"}
+//             </span>
+//           </td>
+//           <td className="px-3 py-2 text-sm text-gray-700 border border-gray-300 whitespace-nowrap">
+//             {followupDate}
+//           </td>
+//           <td className="px-2 py-2 border border-gray-300" onClick={(e) => e.stopPropagation()}>
+//             <button
+//               type="button"
+//               onClick={() => handleHistory(item?.activityLog, item.leadId, item?._id, item?.allocatedTo?._id, item?.taskfromFollowup)}
+//               className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors w-full justify-center"
+//             >
+//               <BellRing className="w-3.5 h-3.5" />
+//             </button>
+//           </td>
+//           <td className="px-2 py-2 border border-gray-300" onClick={(e) => e.stopPropagation()}>
+//             <button
+//               type="button"
+//               onClick={() =>
+//                 loggedUser.role === "Admin"
+//                   ? navigate("/admin/transaction/lead/leadEdit", { state: { leadId: item._id, isReadOnly: !isAllocatedToeditable } })
+//                   : navigate("/staff/transaction/lead/leadEdit", { state: { leadId: item._id, isReadOnly: !isAllocatedToeditable } })
+//               }
+//               className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors w-full justify-center"
+//             >
+//               <Eye className="w-3.5 h-3.5" /> 
+//             </button>
+//           </td>
+//           {ownFollowUp && (
+//             <td className="px-2 py-2 border border-gray-300" onClick={(e) => e.stopPropagation()}>
+//               <button
+//                 type="button"
+//                 onClick={() => handleFollowUp(item)}
+//                 className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors w-full justify-center"
+//               >
+//                 <History className="w-3.5 h-3.5" /> 
+//               </button>
+//             </td>
+//           )}
+//           <td className="px-3 py-2 text-sm font-semibold text-green-700 border border-gray-300 whitespace-nowrap text-right">
+//             <span className="inline-flex items-center gap-0.5 justify-end">
+//               <IndianRupee className="w-3.5 h-3.5" />
+//               {item.netAmount?.toLocaleString("en-IN")}
+//             </span>
+//           </td>
+//         </tr>
+
+//         {/* ── Expanded rows ── */}
+//         {open && (
+//           <>
+//             {/* Sub-header row */}
+//             {/* Columns: chevron | leadby | assignedto | assignedby | followups | leaddate | leadid(blue) | phone(blue) | email(blue) */}
+//             <tr className="text-xs font-medium border border-gray-300">
+//               <td className="border border-gray-300 bg-gray-100" />
+//               <td className="px-3 py-1 border border-gray-300 bg-gray-100 text-gray-600">
+//                 <div className="flex items-center gap-1">
+//                   <User className="w-3.5 h-3.5 text-blue-600" />
+//                   <span>Lead by</span>
+//                 </div>
+//               </td>
+//               <td className="px-3 py-1 border border-gray-300 bg-gray-100 text-gray-600">
+//                 <div className="flex items-center gap-1">
+//                   <UserCheck className="w-3.5 h-3.5 text-green-600" />
+//                   <span>Assigned to</span>
+//                 </div>
+//               </td>
+//               <td className="px-3 py-1 border border-gray-300 bg-gray-100 text-gray-600">
+//                 <div className="flex items-center gap-1">
+//                   <UserPlus className="w-3.5 h-3.5 text-purple-600" />
+//                   <span>Assigned by</span>
+//                 </div>
+//               </td>
+//               <td className="px-3 py-1 border border-gray-300 bg-gray-100 text-gray-600">
+//                 <div className="flex items-center gap-1">
+//                   <Clock className="w-3.5 h-3.5 text-orange-600" />
+//                   <span>No. of Followups</span>
+//                 </div>
+//               </td>
+//               <td className="px-3 py-1 border border-gray-300 bg-gray-100 text-gray-600">
+//                 <div className="flex items-center gap-1">
+//                   <Calendar className="w-3.5 h-3.5 text-blue-500" />
+//                   <span>Lead Date</span>
+//                 </div>
+//               </td>
+//               <td className="px-3 py-1 border border-gray-300 bg-blue-600 text-white">
+//                 <span>Lead ID</span>
+//               </td>
+//               <td className="px-3 py-1 border border-gray-300 bg-blue-600 text-white">
+//                 <div className="flex items-center gap-1">
+//                   <Phone className="w-3.5 h-3.5" />
+//                   <span>Phone</span>
+//                 </div>
+//               </td>
+//               <td className="px-3 py-1 border border-gray-300 bg-blue-600 text-white">
+//                 <div className="flex items-center gap-1">
+//                   <Mail className="w-3.5 h-3.5" />
+//                   <span>Email</span>
+//                 </div>
+//               </td>
+//             </tr>
+
+//             {/* Sub-data row */}
+//             <tr className="bg-white text-xs border border-b-2 border-gray-300 border-b-gray-400">
+//               <td className="border border-gray-300" />
+//               <td className="px-3 py-1.5 border border-gray-300 text-gray-800 font-medium">
+//                 {item?.leadBy?.name || "-"}
+//               </td>
+//               <td className="px-3 py-1.5 border border-gray-300 text-gray-700">
+//                 {item?.allocatedTo?.name || "-"}
+//               </td>
+//               <td className="px-3 py-1.5 border border-gray-300 text-gray-700">
+//                 {item?.allocatedBy?.name || "-"}
+//               </td>
+//               <td className="px-3 py-1.5 border border-gray-300 text-gray-700">
+//                 {item.activityLog.length}
+//               </td>
+//               <td className="px-3 py-1.5 border border-gray-300 text-gray-700">
+//                 {item.leadDate?.toString().split("T")[0] || "-"}
+//               </td>
+//               <td className="px-3 py-1.5 border border-gray-300 font-bold text-blue-700">
+//                 {item?.leadId}
+//               </td>
+//               <td className="px-3 py-1.5 border border-gray-300 text-gray-700">
+//                 {item?.phone || "-"}
+//               </td>
+//               <td className="px-3 py-1.5 border border-gray-300 text-gray-600">
+//                 {item?.email || "-"}
+//               </td>
+//             </tr>
+//           </>
+//         )}
+//       </>
+//     )
+//   }
+
+//   return (
+//     <table className="border-collapse border border-gray-300 w-full text-sm">
+//       <thead className="whitespace-nowrap bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-30 text-xs">
+//         <tr>
+//           <th className="border border-gray-300 w-5" />
+//           <th className="border border-gray-300 px-3 py-1 text-left">
+//             <div className="flex items-center gap-1.5"><User className="w-3 h-3" /><span>Name</span></div>
+//           </th>
+//           <th className="border border-gray-300 px-3 py-1 text-left min-w-[130px]">
+//             <div className="flex items-center gap-1.5"><Phone className="w-3 h-3" /><span>Mobile</span></div>
+//           </th>
+//           <th className="border border-gray-300 px-3 py-1 text-left">
+//             <span>Last Remark</span>
+//           </th>
+//           <th className="border border-gray-300 px-3 py-1 text-left">
+//             <div className="flex items-center gap-1.5"><Calendar className="w-3 h-3" /><span>Followup Date</span></div>
+//           </th>
+//           <th className="border border-gray-300 px-3 py-1 text-center">Event Log</th>
+//           <th className="border border-gray-300 px-3 py-1 text-center">View/Modify</th>
+//           {ownFollowUp && <th className="border border-gray-300 px-3 py-1 text-center">Follow Up</th>}
+//           <th className="border border-gray-300 px-3 py-1 text-right">
+//             <div className="flex items-center gap-1.5 justify-end"><IndianRupee className="w-3 h-3" /><span>Net Amount</span></div>
+//           </th>
+//         </tr>
+//       </thead>
+//       <tbody>
+//         {data?.length > 0 ? (
+//           data.map((item, index) => (
+//             <LeadRow key={item._id ?? index} item={item} index={index} />
+//           ))
+//         ) : (
+//           <tr>
+//             <td colSpan={9} className="text-center text-gray-500 py-6">
+//               {loading ? (
+//                 <div className="flex justify-center">
+//                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+//                 </div>
+//               ) : (
+//                 <div>No Leads</div>
+//               )}
+//             </td>
+//           </tr>
+//         )}
+//       </tbody>
+//     </table>
+//   )
+// }//selected wtih lead datae
+
+
+  
+
+  ///
+  const renderTable = (data) => (
+    <table className="border-collapse border border-gray-300 w-full text-sm">
+      <thead className="whitespace-nowrap bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-30 text-xs">
+        <tr>
+          <th className="border border-gray-300 px-3 py-1 text-left">
+            <div className="flex items-center gap-1.5">
+              <User className="w-3 h-3" />
+              <span>Name</span>
+            </div>
+          </th>
+          <th className="border border-gray-300 px-3 py-2 min-w-[140px] text-left">
+            <div className="flex items-center gap-1.5">
+              <Phone className="w-3 h-3" />
+              <span>Mobile</span>
+            </div>
+          </th>
+          <th className="border border-gray-300 px-3 py-2 text-left">
+            <div className="flex items-center gap-1.5">
+              <Phone className="w-3 h-3" />
+              <span>Phone</span>
+            </div>
+          </th>
+          <th className="border border-gray-300 px-3 py-1 text-left">
+            <div className="flex items-center gap-1.5">
+              <Mail className="w-3 h-3" />
+              <span>Email</span>
+            </div>
+          </th>
+          <th className="border border-gray-300 px-3 py-1 min-w-[90px] text-left">
+            Lead Id
+          </th>
+          <th className="border border-gray-300 px-3 py-1">
+            <div className="flex items-center gap-1.5 justify-center">
+              <Calendar className="w-3 h-3" />
+              <span>Followup Date</span>
+            </div>
+          </th>
+          <th className="border border-gray-300 px-3 py-1 min-w-[90px]">
+            Action
+          </th>
+          <th className="border border-gray-300 px-3 py-1">Net Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data?.length > 0 ? (
+          data.map((item, index) => (
+            <React.Fragment key={index}>
+              <tr className="bg-white border border-b-0 border-gray-300 hover:bg-blue-50 transition-colors">
+                <td
+                  onClick={() => setShowFullName(!showFullName)}
+                  className={`px-3 min-w-[120px] py-1 cursor-pointer overflow-hidden font-medium text-gray-900 ${
+                    showFullName
+                      ? "whitespace-normal max-h-[3em]"
+                      : "truncate whitespace-nowrap max-w-[120px]"
+                  }`}
+                  style={{ lineHeight: "1.5em" }}
+                >
+                  {item.customerName.customerName}
+                </td>
+                <td className="px-3 py-1 text-gray-700">{item?.mobile}</td>
+                <td className="px-3 py-1 text-gray-700">{item?.phone}</td>
+                <td className="px-3 py-1 text-gray-600 truncate max-w-[180px]">
+                  {item?.email}
+                </td>
+                <td className="px-3 py-1 font-medium text-blue-700">
+                  {item?.leadId}
+                </td>
+                <td className="border border-b-0 border-gray-300 px-3 py-1"></td>
+                <td className="border border-b-0 border-gray-300 px-2 py-1 text-center">
+                  <button
+                    // onClick={() => handleViewModify(item)}
+                    type="button"
+                    onClick={() =>
+                      handleHistory(
+                        item?.activityLog,
+                        item.leadId, //like 00001
+                        item?._id, //lead doc id
+                        item?.allocatedTo?._id,
+                        item?.taskfromFollowup
+                      )
+                    }
+                    className="inline-flex items-center gap-1 px-2  py-1 text-xs font-semibold text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors w-full justify-center"
+                  >
+                    <BellRing className="w-3.5 h-3.5" />
+                    Event Log
+                  </button>
+                </td>
+                <td className="border border-b-0 border-gray-300 px-3 py-1"></td>
+              </tr>
+
+              <tr className="font-medium bg-gradient-to-r from-gray-100 to-gray-50 text-xs text-gray-600">
+                <td className="px-3 py-1 border-t border-gray-200">
+                  <div className="flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Lead by</span>
+                  </div>
+                </td>
+                <td className="px-3 py-1 border-t border-gray-200">
+                  <div className="flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5 text-green-600" />
+                    <span>Assigned to</span>
+                  </div>
+                </td>
+                <td className="px-3 py-1 border-t border-gray-200 text-nowrap">
+                  <div className="flex items-center gap-1.5">
+                    <UserPlus className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Assigned by</span>
+                  </div>
+                </td>
+                <td className="px-3 py-1 border-t border-gray-200">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-orange-600" />
+                    <span>No. of Followups</span>
+                  </div>
+                </td>
+                <td className="px-3 py-1 border-t border-gray-200 min-w-[120px]">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Lead Date</span>
+                  </div>
+                </td>
+                <td className="border border-t-0 border-b-0 border-gray-300 px-3  bg-white text-center text-lg font-semibold">
+                  {pending &&
+                  item.activityLog[item.activityLog.length - 1]
+                    ?.nextFollowUpDate
+                    ? new Date(
+                        item.activityLog[
+                          item.activityLog.length - 1
+                        ]?.nextFollowUpDate
+                      )
+                        .toLocaleDateString("en-GB")
+                        .split("/")
+                        .join("-")
+                    : "-"}
+                </td>
+                <td className="border border-t-0 border-b-0 border-gray-300 px-2 py-1 bg-white">
+                  <button
+                    onClick={() => {
+                      const isAllocatedToeditable = item.activityLog.some(
+                        (it) =>
+                          it?.taskallocatedTo?._id === loggedUser._id &&
+                          it?.taskClosed === false
+                      )
+
+                      loggedUser.role === "Admin"
+                        ? navigate("/admin/transaction/lead/leadEdit", {
+                            state: {
+                              leadId: item._id,
+                              isReadOnly: !isAllocatedToeditable
+                            }
+                          })
+                        : navigate("/staff/transaction/lead/leadEdit", {
+                            state: {
+                              leadId: item._id,
+                              isReadOnly: !isAllocatedToeditable
+                            }
+                          })
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors w-full justify-center"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    View/Modify
+                  </button>
+                </td>
+                <td className="border border-t-0 border-b-0 border-gray-300 px-3  bg-white font-semibold">
+                  <div className="flex items-center justify-center">
+                    <IndianRupee className="w-4 h-3.5 text-green-600 mr-1" />
+                    <span className="text-lg font-semibold">
+                      {" "}
+                      {item.netAmount}
+                    </span>
+                  </div>
+                </td>
+              </tr>
+
+              <tr className="bg-white">
+                <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-900">
+                  {item?.leadBy?.name}
+                </td>
+                <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-700">
+                  {item?.allocatedTo?.name || "-"}
+                </td>
+                <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-700">
+                  {item.allocatedBy?.name || "-"}
+                </td>
+                <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-700"></td>
+                <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-900">
+                  {item.leadDate?.toString().split("T")[0]}
+                </td>
+                <td className="border border-t-0 border-b-0 border-gray-300 px-3 py-1.5"></td>
+                <td className="border border-t-0 border-b-0 border-gray-300 px-2 py-1.5">
+                  {ownFollowUp && (
+                    <button
+                      onClick={() => handleFollowUp(item)}
+                      className="inline-flex items-center gap-1 px-2  py-1 text-xs font-semibold text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors w-full justify-center"
+                    >
+                      <History className="w-3.5 h-3.5" />
+                      Follow Up
+                    </button>
+                  )}
+                </td>
+                <td className="border border-t-0 border-b-0 border-gray-300 px-3 py-1.5"></td>
+              </tr>
+              {pending && (
+                <tr className="font-medium bg-gradient-to-r from-gray-100 to-gray-50 text-xs text-gray-600">
+                  <td
+                    colSpan={5}
+                    className="px-3 py-1 border-t border-gray-200"
+                  >
+                    <span>Last Remark :</span>
+                    <span className="ml-2 text-red-600">
+                      {
+                        item?.activityLog[item?.activityLog?.length - 1]
+                          ?.remarks
+                      }
+                    </span>
+                  </td>
+
+                  <td className="border border-t-0 border-b-0 border-gray-300 px-3 bg-white"></td>
+                  <td className="border border-t-0 border-b-0 border-gray-300 px-2 py-1 bg-white"></td>
+                  <td className="border border-t-0 border-b-0 border-gray-300 px-3 bg-white"></td>
+                </tr>
+              )}
+
+              {index !== tableData.length - 1 && (
+                <tr>
+                  <td colSpan="8" className="bg-gray-300">
+                    <div className="h-[2px]"></div>
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          ))
+        ) : (
+          <tr>
+            <td colSpan={8} className="text-center text-gray-500 py-6">
+              {loading ? (
+                <div className="flex justify-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                </div>
               ) : (
-                <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                <div>No Leads</div>
               )}
             </td>
-            <td className="px-3 py-1.5 font-mono text-[11px] font-bold text-blue-700 whitespace-nowrap border border-gray-300">
-              #{item.leadId}
-            </td>
-            <td className="px-3 py-1.5 font-medium text-gray-900 text-xs truncate max-w-[140px] border border-gray-300">
-              {item.customerName.customerName}
-            </td>
-            <td className="px-3 py-1.5 text-gray-600 text-xs whitespace-nowrap border border-gray-300">
-              {item?.mobile}
-            </td>
-            <td className="px-3 py-1.5 text-gray-500 text-xs truncate max-w-[160px] border border-gray-300">
-              {item?.email}
-            </td>
-            <td className="px-3 py-1.5 text-xs border border-gray-300">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700">
-                {item?.allocatedTo?.name || "Unassigned"}
-              </span>
-            </td>
-            <td className="px-3 py-1.5 text-xs font-medium text-gray-700 whitespace-nowrap border border-gray-300">
-              {followupDate}
-            </td>
-            <td className="px-3 py-1.5 text-xs font-semibold text-green-700 whitespace-nowrap text-right border border-gray-300">
-              <span className="inline-flex items-center gap-0.5 justify-end">
-                <IndianRupee className="w-3 h-3" />
-                {item.netAmount?.toLocaleString("en-IN")}
-              </span>
-            </td>
-            <td
-              className="px-2 py-1.5 text-center border border-gray-300"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-center gap-1">
-                <button
-                  type="button"
-                  title="Event Log"
-                  onClick={() =>
-                    handleHistory(
-                      item?.activityLog,
-                      item.leadId,
-                      item?._id,
-                      item?.allocatedTo?._id,
-                      item?.taskfromFollowup
-                    )
-                  }
-                  className="p-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
-                >
-                  <BellRing className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  title="View/Modify"
-                  onClick={() => {
-                    const isAllocatedToeditable = item.activityLog.some(
-                      (it) =>
-                        it?.taskallocatedTo?._id === loggedUser._id &&
-                        it?.taskClosed === false
-                    )
-                    loggedUser.role === "Admin"
-                      ? navigate("/admin/transaction/lead/leadEdit", {
-                          state: {
-                            leadId: item._id,
-                            isReadOnly: !isAllocatedToeditable
-                          }
-                        })
-                      : navigate("/staff/transaction/lead/leadEdit", {
-                          state: {
-                            leadId: item._id,
-                            isReadOnly: !isAllocatedToeditable
-                          }
-                        })
-                  }}
-                  className="p-1 rounded bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-                >
-                  <Eye className="w-3 h-3" />
-                </button>
-                {ownFollowUp && (
-                  <button
-                    type="button"
-                    title="Follow Up"
-                    onClick={() => handleFollowUp(item)}
-                    className="p-1 rounded bg-amber-500 hover:bg-amber-600 text-white transition-colors"
-                  >
-                    <History className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </td>
           </tr>
-
-          {open && (
-            <tr className="bg-blue-50/60">
-              <td
-                colSpan={9}
-                className="px-3 py-1.5 border border-gray-300"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
-                  <span className="flex items-center gap-1 text-gray-500">
-                    <Phone className="w-3 h-3 text-gray-400" />
-                    <span className="text-gray-700 font-medium">
-                      {item?.phone || "-"}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1 text-gray-500">
-                    <Calendar className="w-3 h-3 text-blue-400" />
-                    Lead Date:{" "}
-                    <span className="text-gray-800 font-semibold ml-0.5">
-                      {item.leadDate?.toString().split("T")[0]}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1 text-gray-500">
-                    <User className="w-3 h-3 text-gray-400" />
-                    Lead by:{" "}
-                    <span className="text-gray-800 font-semibold ml-0.5">
-                      {item?.leadBy?.name || "-"}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1 text-gray-500">
-                    <UserPlus className="w-3 h-3 text-purple-400" />
-                    Assigned by:{" "}
-                    <span className="text-gray-800 font-semibold ml-0.5">
-                      {item.allocatedBy?.name || "-"}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1 text-gray-500">
-                    <Clock className="w-3 h-3 text-orange-400" />
-                    Followups:{" "}
-                    <span className="text-gray-800 font-semibold ml-0.5">
-                      {item.activityLog.length}
-                    </span>
-                  </span>
-                  {pending && lastLog?.remarks && (
-                    <span className="flex items-center gap-1 text-gray-500 min-w-0">
-                      <span className="shrink-0">Remark:</span>
-                      <span
-                        className="text-red-600 font-medium truncate max-w-[220px]"
-                        title={lastLog.remarks}
-                      >
-                        {lastLog.remarks}
-                      </span>
-                    </span>
-                  )}
-                  <span className="text-gray-300">|</span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleHistory(
-                          item?.activityLog,
-                          item.leadId,
-                          item?._id,
-                          item?.allocatedTo?._id,
-                          item?.taskfromFollowup
-                        )
-                      }
-                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors"
-                    >
-                      <BellRing className="w-3 h-3" /> Event Log
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const isAllocatedToeditable = item.activityLog.some(
-                          (it) =>
-                            it?.taskallocatedTo?._id === loggedUser._id &&
-                            it?.taskClosed === false
-                        )
-                        loggedUser.role === "Admin"
-                          ? navigate("/admin/transaction/lead/leadEdit", {
-                              state: {
-                                leadId: item._id,
-                                isReadOnly: !isAllocatedToeditable
-                              }
-                            })
-                          : navigate("/staff/transaction/lead/leadEdit", {
-                              state: {
-                                leadId: item._id,
-                                isReadOnly: !isAllocatedToeditable
-                              }
-                            })
-                      }}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
-                    >
-                      <Eye className="w-3 h-3" /> View/Modify
-                    </button>
-                    {ownFollowUp && (
-                      <button
-                        type="button"
-                        onClick={() => handleFollowUp(item)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors"
-                      >
-                        <History className="w-3 h-3" /> Follow Up
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </td>
-            </tr>
-          )}
-        </>
-      )
-    }
-
-    return (
-      <table className="border-collapse border border-gray-300 w-full text-sm">
-        <thead className="whitespace-nowrap bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-30 text-xs">
-          <tr>
-            <th className="border border-gray-300 w-5" />
-            <th className="border border-gray-300 px-3 py-1 text-left min-w-[90px]">
-              Lead ID
-            </th>
-            <th className="border border-gray-300 px-3 py-1 text-left">
-              <div className="flex items-center gap-1.5">
-                <User className="w-3 h-3" />
-                <span>Name</span>
-              </div>
-            </th>
-            <th className="border border-gray-300 px-3 py-1 text-left min-w-[140px]">
-              <div className="flex items-center gap-1.5">
-                <Phone className="w-3 h-3" />
-                <span>Mobile</span>
-              </div>
-            </th>
-            <th className="border border-gray-300 px-3 py-1 text-left">
-              <div className="flex items-center gap-1.5">
-                <Mail className="w-3 h-3" />
-                <span>Email</span>
-              </div>
-            </th>
-            <th className="border border-gray-300 px-3 py-1 text-left">
-              <div className="flex items-center gap-1.5">
-                <UserCheck className="w-3 h-3" />
-                <span>Assigned To</span>
-              </div>
-            </th>
-            <th className="border border-gray-300 px-3 py-1 text-left">
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-3 h-3" />
-                <span>Followup Date</span>
-              </div>
-            </th>
-            <th className="border border-gray-300 px-3 py-1 text-right">
-              <div className="flex items-center gap-1.5 justify-end">
-                <IndianRupee className="w-3 h-3" />
-                <span>Net Amount</span>
-              </div>
-            </th>
-            <th className="border border-gray-300 px-3 py-1 text-center min-w-[90px]">
-              Action
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {data?.length > 0 ? (
-            data.map((item, index) => (
-              <LeadRow key={item._id ?? index} item={item} index={index} />
-            ))
-          ) : (
-            <tr>
-              <td colSpan={9} className="text-center text-gray-500 py-6">
-                {loading ? (
-                  <div className="flex justify-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
-                  </div>
-                ) : (
-                  <div>No Leads</div>
-                )}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    )
-  }
-
-  ///
-  // const renderTable = (data) => (
-  //   <table className="border-collapse border border-gray-300 w-full text-sm">
-  //     <thead className="whitespace-nowrap bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-30 text-xs">
-  //       <tr>
-  //         <th className="border border-gray-300 px-3 py-1 text-left">
-  //           <div className="flex items-center gap-1.5">
-  //             <User className="w-3 h-3" />
-  //             <span>Name</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-2 min-w-[140px] text-left">
-  //           <div className="flex items-center gap-1.5">
-  //             <Phone className="w-3 h-3" />
-  //             <span>Mobile</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-2 text-left">
-  //           <div className="flex items-center gap-1.5">
-  //             <Phone className="w-3 h-3" />
-  //             <span>Phone</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-1 text-left">
-  //           <div className="flex items-center gap-1.5">
-  //             <Mail className="w-3 h-3" />
-  //             <span>Email</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-1 min-w-[90px] text-left">
-  //           Lead Id
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-1">
-  //           <div className="flex items-center gap-1.5 justify-center">
-  //             <Calendar className="w-3 h-3" />
-  //             <span>Followup Date</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-1 min-w-[90px]">
-  //           Action
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-1">Net Amount</th>
-  //       </tr>
-  //     </thead>
-  //     <tbody>
-  //       {data?.length > 0 ? (
-  //         data.map((item, index) => (
-  //           <React.Fragment key={index}>
-  //             <tr className="bg-white border border-b-0 border-gray-300 hover:bg-blue-50 transition-colors">
-  //               <td
-  //                 onClick={() => setShowFullName(!showFullName)}
-  //                 className={`px-3 min-w-[120px] py-1 cursor-pointer overflow-hidden font-medium text-gray-900 ${
-  //                   showFullName
-  //                     ? "whitespace-normal max-h-[3em]"
-  //                     : "truncate whitespace-nowrap max-w-[120px]"
-  //                 }`}
-  //                 style={{ lineHeight: "1.5em" }}
-  //               >
-  //                 {item.customerName.customerName}
-  //               </td>
-  //               <td className="px-3 py-1 text-gray-700">{item?.mobile}</td>
-  //               <td className="px-3 py-1 text-gray-700">{item?.phone}</td>
-  //               <td className="px-3 py-1 text-gray-600 truncate max-w-[180px]">
-  //                 {item?.email}
-  //               </td>
-  //               <td className="px-3 py-1 font-medium text-blue-700">
-  //                 {item?.leadId}
-  //               </td>
-  //               <td className="border border-b-0 border-gray-300 px-3 py-1"></td>
-  //               <td className="border border-b-0 border-gray-300 px-2 py-1 text-center">
-  //                 <button
-  //                   // onClick={() => handleViewModify(item)}
-  //                   type="button"
-  //                   onClick={() =>
-  //                     handleHistory(
-  //                       item?.activityLog,
-  //                       item.leadId, //like 00001
-  //                       item?._id, //lead doc id
-  //                       item?.allocatedTo?._id,
-  //                       item?.taskfromFollowup
-  //                     )
-  //                   }
-  //                   className="inline-flex items-center gap-1 px-2  py-1 text-xs font-semibold text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors w-full justify-center"
-  //                 >
-  //                   <BellRing className="w-3.5 h-3.5" />
-  //                   Event Log
-  //                 </button>
-  //               </td>
-  //               <td className="border border-b-0 border-gray-300 px-3 py-1"></td>
-  //             </tr>
-
-  //             <tr className="font-medium bg-gradient-to-r from-gray-100 to-gray-50 text-xs text-gray-600">
-  //               <td className="px-3 py-1 border-t border-gray-200">
-  //                 <div className="flex items-center gap-1.5">
-  //                   <User className="w-3.5 h-3.5 text-blue-600" />
-  //                   <span>Lead by</span>
-  //                 </div>
-  //               </td>
-  //               <td className="px-3 py-1 border-t border-gray-200">
-  //                 <div className="flex items-center gap-1.5">
-  //                   <UserCheck className="w-3.5 h-3.5 text-green-600" />
-  //                   <span>Assigned to</span>
-  //                 </div>
-  //               </td>
-  //               <td className="px-3 py-1 border-t border-gray-200 text-nowrap">
-  //                 <div className="flex items-center gap-1.5">
-  //                   <UserPlus className="w-3.5 h-3.5 text-purple-600" />
-  //                   <span>Assigned by</span>
-  //                 </div>
-  //               </td>
-  //               <td className="px-3 py-1 border-t border-gray-200">
-  //                 <div className="flex items-center gap-1.5">
-  //                   <Clock className="w-3.5 h-3.5 text-orange-600" />
-  //                   <span>No. of Followups</span>
-  //                 </div>
-  //               </td>
-  //               <td className="px-3 py-1 border-t border-gray-200 min-w-[120px]">
-  //                 <div className="flex items-center gap-1.5">
-  //                   <Calendar className="w-3.5 h-3.5 text-blue-600" />
-  //                   <span>Lead Date</span>
-  //                 </div>
-  //               </td>
-  //               <td className="border border-t-0 border-b-0 border-gray-300 px-3  bg-white text-center text-lg font-semibold">
-  //                 {pending &&
-  //                 item.activityLog[item.activityLog.length - 1]
-  //                   ?.nextFollowUpDate
-  //                   ? new Date(
-  //                       item.activityLog[
-  //                         item.activityLog.length - 1
-  //                       ]?.nextFollowUpDate
-  //                     )
-  //                       .toLocaleDateString("en-GB")
-  //                       .split("/")
-  //                       .join("-")
-  //                   : "-"}
-  //               </td>
-  //               <td className="border border-t-0 border-b-0 border-gray-300 px-2 py-1 bg-white">
-  //                 <button
-  //                   onClick={() => {
-  //                     const isAllocatedToeditable = item.activityLog.some(
-  //                       (it) =>
-  //                         it?.taskallocatedTo?._id === loggedUser._id &&
-  //                         it?.taskClosed === false
-  //                     )
-
-  //                     loggedUser.role === "Admin"
-  //                       ? navigate("/admin/transaction/lead/leadEdit", {
-  //                           state: {
-  //                             leadId: item._id,
-  //                             isReadOnly: !isAllocatedToeditable
-  //                           }
-  //                         })
-  //                       : navigate("/staff/transaction/lead/leadEdit", {
-  //                           state: {
-  //                             leadId: item._id,
-  //                             isReadOnly: !isAllocatedToeditable
-  //                           }
-  //                         })
-  //                   }}
-  //                   className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors w-full justify-center"
-  //                 >
-  //                   <Eye className="w-3.5 h-3.5" />
-  //                   View/Modify
-  //                 </button>
-  //               </td>
-  //               <td className="border border-t-0 border-b-0 border-gray-300 px-3  bg-white font-semibold">
-  //                 <div className="flex items-center justify-center">
-  //                   <IndianRupee className="w-4 h-3.5 text-green-600 mr-1" />
-  //                   <span className="text-lg font-semibold">
-  //                     {" "}
-  //                     {item.netAmount}
-  //                   </span>
-  //                 </div>
-  //               </td>
-  //             </tr>
-
-  //             <tr className="bg-white">
-  //               <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-900">
-  //                 {item?.leadBy?.name}
-  //               </td>
-  //               <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-700">
-  //                 {item?.allocatedTo?.name || "-"}
-  //               </td>
-  //               <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-700">
-  //                 {item.allocatedBy?.name || "-"}
-  //               </td>
-  //               <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-700"></td>
-  //               <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-900">
-  //                 {item.leadDate?.toString().split("T")[0]}
-  //               </td>
-  //               <td className="border border-t-0 border-b-0 border-gray-300 px-3 py-1.5"></td>
-  //               <td className="border border-t-0 border-b-0 border-gray-300 px-2 py-1.5">
-  //                 {ownFollowUp && (
-  //                   <button
-  //                     onClick={() => handleFollowUp(item)}
-  //                     className="inline-flex items-center gap-1 px-2  py-1 text-xs font-semibold text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors w-full justify-center"
-  //                   >
-  //                     <History className="w-3.5 h-3.5" />
-  //                     Follow Up
-  //                   </button>
-  //                 )}
-  //               </td>
-  //               <td className="border border-t-0 border-b-0 border-gray-300 px-3 py-1.5"></td>
-  //             </tr>
-  //             {pending && (
-  //               <tr className="font-medium bg-gradient-to-r from-gray-100 to-gray-50 text-xs text-gray-600">
-  //                 <td
-  //                   colSpan={5}
-  //                   className="px-3 py-1 border-t border-gray-200"
-  //                 >
-  //                   <span>Last Remark :</span>
-  //                   <span className="ml-2 text-red-600">
-  //                     {
-  //                       item?.activityLog[item?.activityLog?.length - 1]
-  //                         ?.remarks
-  //                     }
-  //                   </span>
-  //                 </td>
-
-  //                 <td className="border border-t-0 border-b-0 border-gray-300 px-3 bg-white"></td>
-  //                 <td className="border border-t-0 border-b-0 border-gray-300 px-2 py-1 bg-white"></td>
-  //                 <td className="border border-t-0 border-b-0 border-gray-300 px-3 bg-white"></td>
-  //               </tr>
-  //             )}
-
-  //             {index !== tableData.length - 1 && (
-  //               <tr>
-  //                 <td colSpan="8" className="bg-gray-300">
-  //                   <div className="h-[2px]"></div>
-  //                 </td>
-  //               </tr>
-  //             )}
-  //           </React.Fragment>
-  //         ))
-  //       ) : (
-  //         <tr>
-  //           <td colSpan={8} className="text-center text-gray-500 py-6">
-  //             {loading ? (
-  //               <div className="flex justify-center">
-  //                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-  //               </div>
-  //             ) : (
-  //               <div>No Leads</div>
-  //             )}
-  //           </td>
-  //         </tr>
-  //       )}
-  //     </tbody>
-  //   </table>
-  // )
-  //////////////888888
-
-  // const renderTable = (data) => (
-  //   <table className="border-collapse border border-gray-300 w-full text-sm">
-  //     <thead className="whitespace-nowrap bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-30 text-xs">
-  //       <tr>
-  //         <th className="border border-gray-300 px-3 py-1 text-left">
-  //           <div className="flex items-center gap-1.5">
-  //             <User className="w-3 h-3" />
-  //             <span>Name</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-1 min-w-[90px] text-left">
-  //           Lead Id
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-1">
-  //           <div className="flex items-center gap-1.5 justify-center">
-  //             <Calendar className="w-3 h-3" />
-  //             <span>Followup Date</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-1 min-w-[110px]">
-  //           <div className="flex items-center gap-1.5 justify-center text-xs">
-  //             <BellRing className="w-3 h-3" />
-  //             <span>Event Log</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-1 min-w-[120px]">
-  //           <div className="flex items-center gap-1.5 justify-center text-xs">
-  //             <Eye className="w-3 h-3" />
-  //             <span>View/Modify</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-1 text-right">
-  //           Net Amount
-  //         </th>
-  //       </tr>
-  //     </thead>
-  //     <tbody>
-  //       {data?.length > 0 ? (
-  //         data.map((item, index) => (
-  //           <React.Fragment key={index}>
-  //             {/* ROW 1: Name, Lead ID, Followup, Mobile, Phone, Email (truncated) */}
-  //             <tr className="bg-white border border-b-0 border-gray-300 hover:bg-blue-50 transition-colors">
-  //               <td
-  //                 onClick={() => setShowFullName(!showFullName)}
-  //                 className={`px-3 min-w-[120px] py-1 cursor-pointer overflow-hidden font-medium text-gray-900 ${
-  //                   showFullName
-  //                     ? "whitespace-normal max-h-[3em]"
-  //                     : "truncate whitespace-nowrap max-w-[120px]"
-  //                 }`}
-  //                 style={{ lineHeight: "1.5em" }}
-  //               >
-  //                 {item.customerName.customerName}
-  //               </td>
-  //               <td className="px-3 py-1 font-medium text-blue-700">
-  //                 {item?.leadId}
-  //               </td>
-  //               <td className="border border-b-0 border-gray-300 px-3 py-1 text-center text-sm">
-  //                 {pending &&
-  //                 item.activityLog[item.activityLog.length - 1]
-  //                   ?.nextFollowUpDate
-  //                   ? new Date(
-  //                       item.activityLog[item.activityLog.length - 1]
-  //                         ?.nextFollowUpDate
-  //                     )
-  //                       .toLocaleDateString("en-GB")
-  //                       .split("/")
-  //                       .join("-")
-  //                   : "-"}
-  //               </td>
-  //               <td className="px-3 py-1 text-gray-700 truncate max-w-[100px]">
-  //                 {item?.mobile}
-  //               </td>
-  //               <td className="px-3 py-1 text-gray-700 truncate max-w-[100px]">
-  //                 {item?.phone}
-  //               </td>
-  //               <td className="px-3 py-1 text-gray-600 truncate max-w-[140px]">
-  //                 {item?.email}
-  //               </td>
-  //             </tr>
-
-  //             {/* ROW 2: Action buttons in header positions */}
-  //             <tr className="bg-white border-b border-gray-300">
-  //               <td className="px-3 py-1"></td>
-  //               <td className="px-3 py-1"></td>
-  //               <td className="px-3 py-1"></td>
-  //               <td className="px-2 py-1 text-center border-l border-gray-300">
-  //                 <button
-  //                   type="button"
-  //                   onClick={() =>
-  //                     handleHistory(
-  //                       item?.activityLog,
-  //                       item.leadId,
-  //                       item?._id,
-  //                       item?.allocatedTo?._id,
-  //                       item?.taskfromFollowup
-  //                     )
-  //                   }
-  //                   className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors w-full justify-center"
-  //                 >
-  //                   <BellRing className="w-3.5 h-3.5" />
-  //                   Event Log
-  //                 </button>
-  //               </td>
-  //               <td className="px-2 py-1 text-center border-l border-gray-300">
-  //                 <button
-  //                   onClick={() => {
-  //                     const isAllocatedToeditable = item.activityLog.some(
-  //                       (it) =>
-  //                         it?.taskallocatedTo?._id === loggedUser._id &&
-  //                         it?.taskClosed === false
-  //                     )
-  //                     loggedUser.role === "Admin"
-  //                       ? navigate("/admin/transaction/lead/leadEdit", {
-  //                           state: {
-  //                             leadId: item._id,
-  //                             isReadOnly: !isAllocatedToeditable
-  //                           }
-  //                         })
-  //                       : navigate("/staff/transaction/lead/leadEdit", {
-  //                           state: {
-  //                             leadId: item._id,
-  //                             isReadOnly: !isAllocatedToeditable
-  //                           }
-  //                         })
-  //                   }}
-  //                   className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors w-full justify-center"
-  //                 >
-  //                   <Eye className="w-3.5 h-3.5" />
-  //                   View/Modify
-  //                 </button>
-  //               </td>
-  //               <td className="px-3 py-1 font-semibold text-right text-lg">
-  //                 <div className="flex items-center justify-end">
-  //                   <IndianRupee className="w-4 h-3.5 text-green-600 mr-1" />
-  //                   <span className="font-semibold">{item.netAmount}</span>
-  //                 </div>
-  //               </td>
-  //             </tr>
-
-  //             {/* ROW 3: Lead info headers */}
-  //             <tr className="font-medium bg-gradient-to-r from-gray-100 to-gray-50 text-xs text-gray-600">
-  //               <td className="px-3 py-1 border-t border-gray-200">
-  //                 <div className="flex items-center gap-1.5">
-  //                   <User className="w-3.5 h-3.5 text-blue-600" />
-  //                   <span>Lead by</span>
-  //                 </div>
-  //               </td>
-  //               <td className="px-3 py-1 border-t border-gray-200">
-  //                 <div className="flex items-center gap-1.5">
-  //                   <UserCheck className="w-3.5 h-3.5 text-green-600" />
-  //                   <span>Assigned to</span>
-  //                 </div>
-  //               </td>
-  //               <td className="px-3 py-1 border-t border-gray-200 text-nowrap">
-  //                 <div className="flex items-center gap-1.5">
-  //                   <UserPlus className="w-3.5 h-3.5 text-purple-600" />
-  //                   <span>Assigned by</span>
-  //                 </div>
-  //               </td>
-  //               <td className="px-3 py-1 border-t border-gray-200">
-  //                 <div className="flex items-center gap-1.5">
-  //                   <Clock className="w-3.5 h-3.5 text-orange-600" />
-  //                   <span>No. of Followups</span>
-  //                 </div>
-  //               </td>
-  //               <td className="px-3 py-1 border-t border-gray-200">
-  //                 <div className="flex items-center gap-1.5">
-  //                   <Calendar className="w-3.5 h-3.5 text-blue-600" />
-  //                   <span>Lead Date</span>
-  //                 </div>
-  //               </td>
-  //               <td colSpan="2" className="border-t border-gray-200"></td>
-  //             </tr>
-
-  //             {/* ROW 4: Lead info values + Follow Up */}
-  //             <tr className="bg-white">
-  //               <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-900">
-  //                 {item?.leadBy?.name}
-  //               </td>
-  //               <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-700">
-  //                 {item?.allocatedTo?.name || "-"}
-  //               </td>
-  //               <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-700">
-  //                 {item.allocatedBy?.name || "-"}
-  //               </td>
-  //               <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-700">
-  //                 {item.activityLog?.length || 0}
-  //               </td>
-  //               <td className="border border-t-0 border-gray-300 px-3 py-1.5 text-gray-900">
-  //                 {item.leadDate?.toString().split("T")[0]}
-  //               </td>
-  //               <td className="border border-t-0 border-b-0 border-gray-300 px-3 py-1.5"></td>
-  //               <td className="border border-t-0 border-b-0 border-gray-300 px-2 py-1.5 text-center">
-  //                 {ownFollowUp && (
-  //                   <button
-  //                     onClick={() => handleFollowUp(item)}
-  //                     className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors w-full justify-center"
-  //                   >
-  //                     <History className="w-3.5 h-3.5" />
-  //                     Follow Up
-  //                   </button>
-  //                 )}
-  //               </td>
-  //             </tr>
-
-  //             {/* Last Remark */}
-  //             {pending && (
-  //               <tr className="font-medium bg-gradient-to-r from-gray-100 to-gray-50 text-xs text-gray-600">
-  //                 <td
-  //                   colSpan={5}
-  //                   className="px-3 py-1 border-t border-gray-200"
-  //                 >
-  //                   <span>Last Remark :</span>
-  //                   <span className="ml-2 text-red-600">
-  //                     {
-  //                       item?.activityLog[item?.activityLog?.length - 1]
-  //                         ?.remarks
-  //                     }
-  //                   </span>
-  //                 </td>
-  //                 <td colSpan="2" className="border-t border-gray-200"></td>
-  //               </tr>
-  //             )}
-
-  //             {index !== tableData.length - 1 && (
-  //               <tr>
-  //                 <td colSpan="6" className="bg-gray-300">
-  //                   <div className="h-[2px]"></div>
-  //                 </td>
-  //               </tr>
-  //             )}
-  //           </React.Fragment>
-  //         ))
-  //       ) : (
-  //         <tr>
-  //           <td colSpan={6} className="text-center text-gray-500 py-6">
-  //             {loading ? (
-  //               <div className="flex justify-center">
-  //                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-  //               </div>
-  //             ) : (
-  //               <div>No Leads</div>
-  //             )}
-  //           </td>
-  //         </tr>
-  //       )}
-  //     </tbody>
-  //   </table>
-  // )
-
-  /////////////888888888888888
-  ////new
-
-  // const renderTable = (data) => (
-  //   <table className="border-collapse border border-gray-300 w-full text-sm">
-  //     <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-30 text-xs">
-  //       <tr>
-  //         {/* Headers with NO actions */}
-  //         <th className="border border-gray-300 px-3 py-2 text-left">
-  //           <div className="flex items-center gap-1.5">
-  //             <User className="w-3 h-3" />
-  //             <span>Name</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-2 text-left min-w-[90px]">
-  //           Mobile
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-2 text-center min-w-[100px]">
-  //           <div className="flex items-center gap-1.5 justify-center">
-  //             <Calendar className="w-3 h-3" />
-  //             <span>Followup Date</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-2 text-right min-w-[100px]">
-  //           Last Remark
-  //         </th>
-
-  //         {/* Headers WITH action buttons */}
-  //         <th className="border border-gray-300 px-3 py-2 text-center min-w-[110px]">
-  //           <div className="flex items-center gap-1.5 justify-center">
-  //             <BellRing className="w-3 h-3" />
-  //             <span>Event Log</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-2 text-center min-w-[120px]">
-  //           <div className="flex items-center gap-1.5 justify-center">
-  //             <Eye className="w-3 h-3" />
-  //             <span>View/Modify</span>
-  //           </div>
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-2 text-center min-w-[100px]">
-  //           <History className="w-3 h-3" />
-  //           <span>Followup</span>
-  //         </th>
-
-  //         {/* Headers with NO actions */}
-  //         <th className="border border-gray-300 px-3 py-2 text-right min-w-[100px]">
-  //           Net Amount
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-2 text-left min-w-[90px]">
-  //           Lead ID
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-2 text-left min-w-[120px]">
-  //           Phone
-  //         </th>
-  //         <th className="border border-gray-300 px-3 py-2 text-left min-w-[160px]">
-  //           Email
-  //         </th>
-  //       </tr>
-  //     </thead>
-  //     <tbody>
-  //       {data?.length > 0 ? (
-  //         data.map((item, index) => (
-  //           <tr
-  //             key={index}
-  //             className="bg-white border border-gray-300 hover:bg-blue-50 transition-colors"
-  //           >
-  //             {/* Name */}
-  //             <td className="border border-gray-300 px-3 py-2 font-medium text-gray-900 min-w-[140px]">
-  //               <div
-  //                 onClick={() => setShowFullName(!showFullName)}
-  //                 className={`cursor-pointer ${showFullName ? "whitespace-normal max-h-[3em]" : "truncate max-w-[140px]"}`}
-  //                 style={{ lineHeight: "1.5em" }}
-  //               >
-  //                 {item.customerName.customerName}
-  //               </div>
-  //             </td>
-
-  //             {/* Mobile */}
-  //             <td className="border border-gray-300 px-3 py-2 text-gray-700 font-mono">
-  //               {item?.mobile}
-  //             </td>
-
-  //             {/* Followup Date */}
-  //             <td className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-900">
-  //               {pending &&
-  //               item.activityLog?.[item.activityLog.length - 1]
-  //                 ?.nextFollowUpDate
-  //                 ? new Date(
-  //                     item.activityLog[item.activityLog.length - 1]
-  //                       ?.nextFollowUpDate
-  //                   )
-  //                     .toLocaleDateString("en-GB")
-  //                     .split("/")
-  //                     .join("-")
-  //                 : "-"}
-  //             </td>
-
-  //             {/* Last Remark */}
-  //             <td className="border border-gray-300 px-3 py-2 text-right text-red-600 font-medium pr-2">
-  //               {pending &&
-  //               item?.activityLog?.[item.activityLog.length - 1]?.remarks
-  //                 ? item.activityLog[item.activityLog.length - 1]?.remarks
-  //                 : "-"}
-  //             </td>
-
-  //             {/* Event Log BUTTON */}
-  //             <td className="border border-gray-300 px-2 py-2 text-center">
-  //               <button
-  //                 onClick={() =>
-  //                   handleHistory(
-  //                     item?.activityLog,
-  //                     item.leadId,
-  //                     item?._id,
-  //                     item?.allocatedTo?._id,
-  //                     item?.taskfromFollowup
-  //                   )
-  //                 }
-  //                 className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors w-full"
-  //               >
-  //                 <BellRing className="w-4 h-4" />
-  //                 <span>Event Log</span>
-  //               </button>
-  //             </td>
-
-  //             {/* View/Modify BUTTON */}
-  //             <td className="border border-gray-300 px-2 py-2 text-center">
-  //               <button
-  //                 onClick={() => {
-  //                   const isAllocatedToeditable = item.activityLog.some(
-  //                     (it) =>
-  //                       it?.taskallocatedTo?._id === loggedUser._id &&
-  //                       it?.taskClosed === false
-  //                   )
-  //                   loggedUser.role === "Admin"
-  //                     ? navigate("/admin/transaction/lead/leadEdit", {
-  //                         state: {
-  //                           leadId: item._id,
-  //                           isReadOnly: !isAllocatedToeditable
-  //                         }
-  //                       })
-  //                     : navigate("/staff/transaction/lead/leadEdit", {
-  //                         state: {
-  //                           leadId: item._id,
-  //                           isReadOnly: !isAllocatedToeditable
-  //                         }
-  //                       })
-  //                 }}
-  //                 className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors w-full"
-  //               >
-  //                 <Eye className="w-4 h-4" />
-  //                 <span>View/Modify</span>
-  //               </button>
-  //             </td>
-
-  //             {/* Followup BUTTON */}
-  //             <td className="border border-gray-300 px-2 py-2 text-center">
-  //               {ownFollowUp ? (
-  //                 <button
-  //                   onClick={() => handleFollowUp(item)}
-  //                   className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-amber-500 rounded hover:bg-amber-600 transition-colors w-full"
-  //                 >
-  //                   <History className="w-4 h-4" />
-  //                   <span>Follow Up</span>
-  //                 </button>
-  //               ) : (
-  //                 <span className="text-gray-500 text-xs">—</span>
-  //               )}
-  //             </td>
-
-  //             {/* Net Amount */}
-  //             <td className="border border-gray-300 px-3 py-2 text-right font-semibold text-lg text-green-700 pr-2">
-  //               <div className="flex items-center justify-end gap-1">
-  //                 <IndianRupee className="w-5 h-5" />
-  //                 {item.netAmount}
-  //               </div>
-  //             </td>
-
-  //             {/* Lead ID */}
-  //             <td className="border border-gray-300 px-3 py-2 font-medium text-blue-700 text-center">
-  //               {item?.leadId}
-  //             </td>
-
-  //             {/* Phone */}
-  //             <td className="border border-gray-300 px-3 py-2 text-gray-700 font-mono">
-  //               {item?.phone}
-  //             </td>
-
-  //             {/* Email */}
-  //             <td className="border border-gray-300 px-3 py-2 text-gray-600 max-w-[180px]">
-  //               <div className="truncate hover:whitespace-normal max-h-12 overflow-hidden">
-  //                 {item?.email}
-  //               </div>
-  //             </td>
-  //           </tr>
-  //         ))
-  //       ) : (
-  //         <tr>
-  //           <td colSpan={11} className="text-center text-gray-500 py-12">
-  //             {loading ? (
-  //               <div className="flex justify-center">
-  //                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-  //               </div>
-  //             ) : (
-  //               <div>No Leads</div>
-  //             )}
-  //           </td>
-  //         </tr>
-  //       )}
-  //     </tbody>
-  //   </table>
-  // )
-
-  ///new
-
-  // const renderTable = (data) => (
-  //   <table className="border-collapse border border-gray-300 w-full text-xs">
-  //     <thead className="bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-30">
-  //       <tr>
-  //         <th className="border px-1.5 py-1 text-left min-w-[80px]">
-  //           <div className="flex items-center gap-1">
-  //             <User className="w-2.5 h-2.5" />
-  //             <span>Name</span>
-  //           </div>
-  //         </th>
-  //         <th className="border px-1.5 py-1 text-left min-w-[70px]">Mobile</th>
-  //         <th className="border px-1.5 py-1 text-left min-w-[70px]">Phone</th>
-  //         <th className="border px-1.5 py-1 text-left min-w-[100px]">Email</th>
-  //         <th className="border px-1.5 py-1 min-w-[60px]">Lead ID</th>
-  //         <th className="border px-1.5 py-1 text-center min-w-[70px]">
-  //           Followup Date
-  //         </th>
-  //         <th className="border px-1.5 py-1 min-w-[60px]">Actions</th>
-  //         <th className="border px-1.5 py-1 text-right min-w-[70px]">
-  //           Net Amt
-  //         </th>
-  //       </tr>
-  //     </thead>
-  //     <tbody>
-  //       {data?.length > 0 ? (
-  //         data.map((item, index) => (
-  //           <React.Fragment key={index}>
-  //             {/* Main row - compressed */}
-  //             <tr className="hover:bg-blue-50 transition-colors border-b">
-  //               <td
-  //                 onClick={() => setShowFullName(!showFullName)}
-  //                 className={`border px-1.5 py-1 cursor-pointer font-medium text-gray-900 truncate max-w-[80px] ${
-  //                   showFullName
-  //                     ? "whitespace-normal max-h-[2.5em]"
-  //                     : "whitespace-nowrap"
-  //                 }`}
-  //                 style={{ lineHeight: "1.3em" }}
-  //               >
-  //                 {item.customerName.customerName}
-  //               </td>
-  //               <td className="border px-1.5 py-1 text-gray-700 truncate">
-  //                 {item?.mobile}
-  //               </td>
-  //               <td className="border px-1.5 py-1 text-gray-700 truncate">
-  //                 {item?.phone}
-  //               </td>
-  //               <td className="border px-1.5 py-1 text-gray-600 truncate max-w-[100px]">
-  //                 {item?.email}
-  //               </td>
-  //               <td className="border px-1.5 py-1 font-medium text-blue-700 text-center">
-  //                 {item?.leadId}
-  //               </td>
-  //               <td className="border px-1.5 py-1 text-center text-xs">
-  //                 {pending &&
-  //                 item.activityLog?.[item.activityLog.length - 1]
-  //                   ?.nextFollowUpDate
-  //                   ? new Date(
-  //                       item.activityLog[item.activityLog.length - 1]
-  //                         ?.nextFollowUpDate
-  //                     )
-  //                       .toLocaleDateString("en-GB")
-  //                       .split("/")
-  //                       .join("-")
-  //                   : "-"}
-  //               </td>
-  //               <td className="border px-1 py-0.5">
-  //                 <div className="flex gap-0.5 justify-center">
-  //                   <button
-  //                     onClick={() =>
-  //                       handleHistory(
-  //                         item?.activityLog,
-  //                         item.leadId,
-  //                         item?._id,
-  //                         item?.allocatedTo?._id,
-  //                         item?.taskfromFollowup
-  //                       )
-  //                     }
-  //                     className="px-1 py-0.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-  //                     title="Event Log"
-  //                   >
-  //                     <BellRing className="w-3 h-3" />
-  //                   </button>
-  //                   <button
-  //                     onClick={() => {
-  //                       const isAllocatedToeditable = item.activityLog.some(
-  //                         (it) =>
-  //                           it?.taskallocatedTo?._id === loggedUser._id &&
-  //                           it?.taskClosed === false
-  //                       )
-  //                       const path =
-  //                         loggedUser.role === "Admin"
-  //                           ? "/admin/transaction/lead/leadEdit"
-  //                           : "/staff/transaction/lead/leadEdit"
-  //                       navigate(path, {
-  //                         state: {
-  //                           leadId: item._id,
-  //                           isReadOnly: !isAllocatedToeditable
-  //                         }
-  //                       })
-  //                     }}
-  //                     className="px-1 py-0.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-  //                     title="View/Modify"
-  //                   >
-  //                     <Eye className="w-3 h-3" />
-  //                   </button>
-  //                   {ownFollowUp && (
-  //                     <button
-  //                       onClick={() => handleFollowUp(item)}
-  //                       className="px-1 py-0.5 text-xs bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors"
-  //                       title="Follow Up"
-  //                     >
-  //                       <History className="w-3 h-3" />
-  //                     </button>
-  //                   )}
-  //                 </div>
-  //               </td>
-  //               <td className="border px-1.5 py-1 text-right font-semibold text-green-700">
-  //                 <div className="flex items-center justify-end gap-0.5">
-  //                   <IndianRupee className="w-3 h-3" />
-  //                   <span>{item.netAmount}</span>
-  //                 </div>
-  //               </td>
-  //             </tr>
-
-  //             {/* Collapsible details row - only on hover/click */}
-  //             <tr className="h-0 overflow-hidden group-hover:table-row transition-all duration-200 bg-gray-50">
-  //               <td
-  //                 colSpan={8}
-  //                 className="px-2 py-1 text-xs text-gray-600 border-t bg-gradient-to-r from-gray-100 to-gray-50"
-  //               >
-  //                 <div className="grid grid-cols-6 gap-2 text-xs">
-  //                   <div>
-  //                     <User className="w-3 h-3 text-blue-600 inline mr-1" />
-  //                     Lead: {item?.leadBy?.name}
-  //                   </div>
-  //                   <div>
-  //                     <UserCheck className="w-3 h-3 text-green-600 inline mr-1" />
-  //                     Assigned: {item?.allocatedTo?.name || "-"}
-  //                   </div>
-  //                   <div>
-  //                     <UserPlus className="w-3 h-3 text-purple-600 inline mr-1" />
-  //                     By: {item.allocatedBy?.name || "-"}
-  //                   </div>
-  //                   <div>
-  //                     <Calendar className="w-3 h-3 text-blue-600 inline mr-1" />
-  //                     Date: {item.leadDate?.toString().split("T")[0]}
-  //                   </div>
-  //                   {pending &&
-  //                     item?.activityLog?.[item.activityLog.length - 1]
-  //                       ?.remarks && (
-  //                       <div className="col-span-2 text-red-600">
-  //                         Last:{" "}
-  //                         {
-  //                           item.activityLog[item.activityLog.length - 1]
-  //                             ?.remarks
-  //                         }
-  //                       </div>
-  //                     )}
-  //                 </div>
-  //               </td>
-  //             </tr>
-
-  //             {index !== tableData.length - 1 && (
-  //               <tr>
-  //                 <td colSpan="8" className="h-[1px] bg-gray-200"></td>
-  //               </tr>
-  //             )}
-  //           </React.Fragment>
-  //         ))
-  //       ) : (
-  //         <tr>
-  //           <td colSpan={8} className="text-center text-gray-500 py-8">
-  //             {loading ? (
-  //               <div className="flex justify-center">
-  //                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-  //               </div>
-  //             ) : (
-  //               <div>No Leads</div>
-  //             )}
-  //           </td>
-  //         </tr>
-  //       )}
-  //     </tbody>
-  //   </table>
-  // )
-  ///
-  //enlarge
+        )}
+      </tbody>
+    </table>
+  )
+  
 
   return (
     <div className="h-full flex flex-col ">

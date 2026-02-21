@@ -61,6 +61,7 @@ function LeaveApplication() {
   const userData = localStorage.getItem("user")
   const tabs = ["Leave", "Onsite"]
   const user = JSON.parse(userData)
+console.log(user)
   const { data: leaves, refreshHook } = UseFetch(
     user && `/auth/getallLeave?userid=${user._id}`
   )
@@ -155,7 +156,7 @@ function LeaveApplication() {
 
     setPastDate(isPastDate)
   }, [formData])
-
+console.log(allleaves)
   useEffect(() => {
     if (
       allleaves &&
@@ -174,15 +175,18 @@ function LeaveApplication() {
       const privileageDate = new Date(user?.privilegeleavestartsfrom)
       const privileagestartYear = privileageDate.getFullYear()
       const privileagestartmonth = privileageDate.getMonth() + 1 // 1-based month
-      const casualstartDate = new Date(user?.privilegeleavestartsfrom)
+      const casualstartDate = new Date(user?.casualleavestartsfrom)
       const casualstartYear = casualstartDate.getFullYear()
       const casualstartmonth = casualstartDate.getMonth() + 1 // 1-based month
+console.log(casualstartDate)
       const totalprivilegeLeave = leavemasterleavecount?.totalprivilegeLeave
       const privilegePerMonth = totalprivilegeLeave / 12
       const totalcasualLeave = leavemasterleavecount?.totalcasualleave
       const casualPerMonth = totalcasualLeave / 12
       let ownedprivilegeCount = 0
       let ownedcasualCount = 0
+console.log(casualstartYear)
+console.log(currentYear)
       if (casualstartYear < currentYear) {
         let casualCount
 
@@ -195,6 +199,8 @@ function LeaveApplication() {
         }
         ownedcasualCount = casualCount
       } else if (casualstartYear === currentYear) {
+console.log(currentmonth)
+console.log(casualstartmonth)
         // If privilege started this year, give leaves from start month to current month
         if (currentmonth >= casualstartmonth) {
           ownedcasualCount = casualPerMonth
@@ -273,7 +279,7 @@ function LeaveApplication() {
 
         return count
       }, 0)
-
+console.log(ownedcasualCount)
       const balancecasualcount = ownedcasualCount - usedCasualCount
       const balanceprivilege = ownedprivilegeCount - takenPrivilegeCount
 
