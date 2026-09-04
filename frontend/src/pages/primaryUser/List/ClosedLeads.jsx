@@ -582,7 +582,7 @@ export default function ClosedLeads() {
                 </span>
 
                 {shouldShowTooltipCustomer && (
-                  <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 w-max max-w-xs rounded-xl bg-gray-900 px-3 py-2 text-xs font-medium text-white opacity-0 shadow-xl ring-1 ring-white/10 transition-all duration-200 translate-y-1 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+                  <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 w-max  rounded-xl bg-gray-900 px-3 py-2 text-xs font-medium text-white opacity-0 shadow-xl ring-1 ring-white/10 transition-all duration-200 translate-y-1 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
                     {customerName}
                     <div className="absolute -top-1 left-4 h-2 w-2 rotate-45 bg-gray-900"></div>
                   </div>
@@ -909,19 +909,7 @@ export default function ClosedLeads() {
                 }
                 className="min-w-0 bg-transparent text-[11px] text-slate-700 outline-none"
               />
-              {(closedDateRange.startDate || closedDateRange.endDate) && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setClosedDateRange({ startDate: "", endDate: "" })
-                  }
-                  className="rounded px-1 text-sm leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                  aria-label="Clear closed date range"
-                  title="Clear date range"
-                >
-                  ×
-                </button>
-              )}
+             
             </div>
 
             

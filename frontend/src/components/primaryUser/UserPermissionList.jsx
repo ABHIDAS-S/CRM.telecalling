@@ -126,7 +126,7 @@ const UserPermissionList = ({ user, closeModal, refresh }) => {
               { key: "LeadFollowUp", label: "In Follow-Up" },
               { key: "OwnLead", label: "Own Lead" },
               { key: "LostLeads", label: "Lost Leads" },
-              // { key: "ClosedLeads", label: "Closed Leads" }
+              { key: "ClosedLeads", label: "Closed Leads" }
             ]
           },
           {
