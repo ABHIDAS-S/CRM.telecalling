@@ -21,6 +21,7 @@ export const StaticSidebar = ({
   selectedCompanyBranch,
   selectedMonths,
   yearSelected,
+  onYearChange,
   setcategoryId,
   onselectedPeriodChange,
   setselectedCategory,
@@ -209,6 +210,19 @@ export const StaticSidebar = ({
     console.log(yearSelected)
     setSelectedYear(yearSelected)
   }, [yearSelected])
+
+  useEffect(() => {
+    const defaultPeriod = data?.selectedPeriodName
+    if (defaultPeriod && defaultPeriod !== selectedPeriod) {
+      setselectedPeriod(defaultPeriod)
+      onselectedPeriodChange?.(defaultPeriod, selectedMonth)
+    }
+  }, [
+    data?.selectedPeriodName,
+    onselectedPeriodChange,
+    selectedMonth,
+    selectedPeriod
+  ])
 
   useEffect(() => {
     setSelectedMonth(selectedMonths)
@@ -420,7 +434,10 @@ console.log(names)
                 onperformanceModalClick={onperformanceModalClick}
                 onLogoutClick={logout}
                 selectedYear={selectedYear}
-                setSelectedYear={setSelectedYear}
+                setSelectedYear={(value) => {
+                  setSelectedYear(value)
+                  onYearChange?.(value)
+                }}
                 targetData={targetData}
                 onselectedPeriodChange={onselectedPeriodChange}
                 onavataropenClick={onavataropenClick}

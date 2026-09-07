@@ -193,6 +193,7 @@ const Layout = () => {
             targetData={targetData}
             selectedMonths={selectedMonth}
             yearSelected={selectedYear}
+            onYearChange={setSelectedYear}
             setselectedCategory={setselectedCategory}
             selectedCategory={selectedCategory}
             setproductList={setproductList}
@@ -230,7 +231,10 @@ const Layout = () => {
           {/* <Header /> */}
 
           <main className="flex-1 overflow-auto">
-            <Mainrouter />
+            <Mainrouter
+              selectedYear={selectedYear}
+              selectedPeriod={selectedPeriod}
+            />
           </main>
         </div>
       </div>

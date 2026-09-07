@@ -1,87 +1,10 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, TrendingUp, Users } from "lucide-react";
 import { useSelector } from "react-redux";
 import IncentiveLeadsModal from "./IncentiveLeadsModal";
-
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-/* Change to false when the real incentive-summary API is ready. */
-const USE_DEMO_DATA = true;
-
-const DEMO_BRANCHES = [
-  {
-    branchId: "demo-branch-1",
-    branchName: "CAMET",
-    users: [
-      {
-        userId: "demo-user-1",
-        name: "Preetha K.P",
-        designation: "General Manager",
-        allocations: [
-          { key: "coding", label: "Coding", achieved: 4500 },
-          { key: "implementation", label: "Implementation", achieved: 3200 },
-          { key: "testing", label: "Testing", achieved: 0 },
-          { key: "qc", label: "QC", achieved: 1800 },
-          { key: "lead", label: "Lead", achieved: 6000 },
-          { key: "closing", label: "Closing", achieved: 2000 },
-        ],
-      },
-      {
-        userId: "demo-user-2",
-        name: "Sreeraj Vijay",
-        designation: "Programmer",
-        allocations: [
-          { key: "coding", label: "Coding", achieved: 9000 },
-          { key: "implementation", label: "Implementation", achieved: 0 },
-          { key: "testing", label: "Testing", achieved: 1500 },
-          { key: "qc", label: "QC", achieved: 0 },
-          { key: "lead", label: "Lead", achieved: 0 },
-          { key: "closing", label: "Closing", achieved: 0 },
-        ],
-      },
-      {
-        userId: "demo-user-3",
-        name: "Ruksana Kasim",
-        designation: "Programmer",
-        allocations: [
-          { key: "coding", label: "Coding", achieved: 5200 },
-          { key: "implementation", label: "Implementation", achieved: 2800 },
-          { key: "testing", label: "Testing", achieved: 0 },
-          { key: "qc", label: "QC", achieved: 1200 },
-          { key: "lead", label: "Lead", achieved: 0 },
-          { key: "closing", label: "Closing", achieved: 3500 },
-        ],
-      },
-      {
-        userId: "demo-user-4",
-        name: "Abhidas S",
-        designation: "Marketing Executive",
-        allocations: [
-          { key: "coding", label: "Coding", achieved: 0 },
-          { key: "implementation", label: "Implementation", achieved: 2500 },
-          { key: "testing", label: "Testing", achieved: 0 },
-          { key: "qc", label: "QC", achieved: 0 },
-          { key: "lead", label: "Lead", achieved: 7400 },
-          { key: "closing", label: "Closing", achieved: 9800 },
-        ],
-      },
-    ],
-  },
-];
+import UseFetch from "../../hooks/useFetch";
+import PropTypes from "prop-types";
 
 const formatAmount = (value) =>
   `₹${Number(value || 0).toLocaleString("en-IN")}`;
@@ -120,95 +43,32 @@ function IncentiveTableSkeleton() {
   );
 }
 
-export default function IncentiveReport({
-  loggedUser,
-  fetchIncentiveSummary,
-  fetchUserAllocationBreakdown,
-  fetchIncentiveLeads,
-}) {
+export default function IncentiveReport({ selectedYear, selectedPeriod }) {
   const loggeduser = useSelector((state) => state.auth.user);
+  const selectedBranch = useSelector(
+    (state) => state.companyBranch.selectedBranch
+  );
   const isAdmin = loggeduser?.role === "Admin";
 
-  const now = new Date();
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
-  const [branchId, setBranchId] = useState("all");
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [branches, setBranches] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
   const [showLeadsModal, setShowLeadsModal] = useState(false);
 
-  const branchForRequest = isAdmin
-    ? branchId
-    : loggedUser?.branch?._id || loggeduser?.branch?._id || "all";
-
-  useEffect(() => {
-    let active = true;
-    let demoTimer = null;
-
-    const load = async () => {
-      setLoading(true);
-      setError("");
-
-      if (USE_DEMO_DATA) {
-        demoTimer = setTimeout(() => {
-          if (!active) return;
-          setBranches(DEMO_BRANCHES);
-          setLoading(false);
-        }, 450);
-
-        return;
-      }
-
-      if (typeof fetchIncentiveSummary !== "function") {
-        if (active) {
-          setBranches([]);
-          setLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const response = await fetchIncentiveSummary({
-          branchId: branchForRequest,
-          month,
-          year,
-          search: search.trim(),
-        });
-
-        const fetchedBranches = Array.isArray(response?.branches)
-          ? response.branches
-          : Array.isArray(response?.data?.branches)
-            ? response.data.branches
-            : [];
-
-        if (active) setBranches(fetchedBranches);
-      } catch (requestError) {
-        console.error("Failed to load incentive report:", requestError);
-
-        if (active) {
-          setBranches([]);
-          setError(
-            requestError?.response?.data?.message ||
-              requestError?.message ||
-              "Unable to load incentive report"
-          );
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    load();
-
-    return () => {
-      active = false;
-      if (demoTimer) clearTimeout(demoTimer);
-    };
-  }, [branchForRequest, fetchIncentiveSummary, month, search, year]);
+  const incentiveReportUrl =
+    selectedBranch && selectedYear && selectedPeriod
+      ? `/target/getIncentiveReport?year=${selectedYear}&period=${encodeURIComponent(selectedPeriod)}&selectedBranch=${selectedBranch}`
+      : null;
+  const {
+    data: incentiveData,
+    loading,
+    error,
+  } = UseFetch(incentiveReportUrl);
+  const branches = useMemo(
+    () =>
+      Array.isArray(incentiveData?.branches) ? incentiveData.branches : [],
+    [incentiveData]
+  );
 
   const filteredBranches = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -262,19 +122,21 @@ export default function IncentiveReport({
               <p className="text-xs text-gray-500">
                 {isAdmin ? "Staff-wise achievement" : "Your branch achievement"}
                 <span className="mx-1.5 text-gray-300">•</span>
-                {MONTHS[month - 1]} {year}
+                {selectedPeriod || "Select a period"} {selectedYear || ""}
               </p>
             </div>
           </div>
 
-          <div className="relative w-full sm:w-56 lg:w-64">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search staff..."
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
-            />
+          <div className="flex w-full flex-wrap gap-2 lg:w-auto">
+            <div className="relative min-w-48 flex-1 sm:w-56 lg:w-64">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search staff..."
+                className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -299,7 +161,7 @@ export default function IncentiveReport({
                 No incentive data found
               </p>
               <p className="mt-1 text-xs text-gray-400">
-                Try changing the selected month, branch, or staff search.
+                Try changing the selected period, branch, or staff search.
               </p>
             </div>
           </div>
@@ -460,15 +322,17 @@ export default function IncentiveReport({
         <IncentiveLeadsModal
           user={selectedUser}
           allocation={selectedAllocation}
-          month={month}
-          year={year}
-          monthLabel={MONTHS[month - 1]}
-          fetchIncentiveSummary={fetchIncentiveSummary}
-          fetchUserAllocationBreakdown={fetchUserAllocationBreakdown}
-          fetchIncentiveLeads={fetchIncentiveLeads}
+          year={Number(selectedYear)}
+          period={selectedPeriod}
+          selectedBranch={selectedBranch}
           onClose={closeLeadsModal}
         />
       )}
     </div>
   );
 }
+
+IncentiveReport.propTypes = {
+  selectedYear: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  selectedPeriod: PropTypes.string
+};

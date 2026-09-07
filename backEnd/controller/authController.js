@@ -6493,7 +6493,7 @@ const getAttendanceCoverageByPunch = ({ punchIn, punchOut, lateLimit, minOutTime
     afternoon: punchOut != null && punchOut >= minOutTime
   };
 };
-const recomputeDayFromCoverage = (day, user, dateKey,arr) => {
+const recomputeDayFromCoverage = (day, user, dateKey, arr) => {
   const workedMorning =
     day.coverage.attendance.morning || day.coverage.onsite.morning;
   const workedAfternoon =
@@ -6524,10 +6524,10 @@ const recomputeDayFromCoverage = (day, user, dateKey,arr) => {
   day.present = present;
   day.notMarked = Math.max(0, 1 - coveredTotal);
   if (user.name === "Abhishek EV") {
-    console.log("arr,date,converted",arr, dateKey,coveredTotal)
-//     console.log("coveredmorning", coveredMorning)
-//  console.log("coveredafter", coveredAfternoon)
-console.log("workedmorining",workedMorning)
+    console.log("arr,date,converted", arr, dateKey, coveredTotal)
+    //     console.log("coveredmorning", coveredMorning)
+    //  console.log("coveredafter", coveredAfternoon)
+    console.log("workedmorining", workedMorning)
   }
   if (coveredMorning && coveredAfternoon) {
     day.notMarked = 0;
@@ -6538,7 +6538,7 @@ console.log("workedmorining",workedMorning)
   }
 }
 
-const applyLeaveToDay = (day, leaveDoc,user,dateKey) => {
+const applyLeaveToDay = (day, leaveDoc, user, dateKey) => {
   if (!day || !leaveDoc || leaveDoc.onsite === true || !APPROVED(leaveDoc)) return;
 
   const bucket = normalizeLeaveCategory(leaveDoc.leaveCategory);
@@ -6577,8 +6577,8 @@ const applyLeaveToDay = (day, leaveDoc,user,dateKey) => {
       day.coverage.onsite.afternoon = false;
     }
   }
-const arr="applyleave"
-  recomputeDayFromCoverage(day,user,dateKey,arr);
+  const arr = "applyleave"
+  recomputeDayFromCoverage(day, user, dateKey, arr);
 };
 
 
@@ -6612,9 +6612,9 @@ const applyOnsiteToDay = (day, onsiteDoc, user, dateKey) => {
     day.coverage.onsite.afternoon = true;
   } else {
     const period = onsiteDoc.halfDayPeriod || "Afternoon";
-if(user.name===""){
-console.log("datekeyyyyyy",dateKey,period)
-}
+    if (user.name === "") {
+      console.log("datekeyyyyyy", dateKey, period)
+    }
     if (period === "Morning") {
       day.coverage.onsite.morning = true;
     }
@@ -6630,8 +6630,8 @@ console.log("datekeyyyyyy",dateKey,period)
       // }
     }
   }
-const arr="applyonsite"
-  recomputeDayFromCoverage(day, user, dateKey,arr);
+  const arr = "applyonsite"
+  recomputeDayFromCoverage(day, user, dateKey, arr);
 }
 
 
@@ -6737,8 +6737,8 @@ const classifyAttendanceDay = ({
 
   day.coverage.attendance.morning = attendanceCoverage.morning;
   day.coverage.attendance.afternoon = attendanceCoverage.afternoon;
-const arr="classifyattendance"
-  recomputeDayFromCoverage(day,user,dateKey,arr);
+  const arr = "classifyattendance"
+  recomputeDayFromCoverage(day, user, dateKey, arr);
 
   if (!attendanceCoverage.morning && !attendanceCoverage.afternoon) {
     day.cantchange = true;
@@ -7036,10 +7036,10 @@ export const GetsomeAll = async (req, res, yearParam = {}, monthParam = {}) => {
 
 
         for (const leave of dayLeaves) {
-          applyLeaveToDay(day, leave,user,dateKey);
+          applyLeaveToDay(day, leave, user, dateKey);
         }
 
-        recomputeDayFromCoverage(day,user,dateKey);
+        recomputeDayFromCoverage(day, user, dateKey);
 
         const leaveTotal = getLeaveTotal(day);
         if (leaveTotal === 0.5) stats.halfDayLeave += 0.5;
@@ -7561,6 +7561,8 @@ export const Login = async (req, res) => {
         message: "Your password has expired. Please change your password.",
         passwordExpired: true,
         userId: user._id,
+        department: user?.department,
+        role: user?.role,
         passwordExpiryAt
       })
     }
@@ -7570,7 +7572,7 @@ export const Login = async (req, res) => {
     if (token) {
       const { password, ...userwithoutpassword } = user
 
-      
+
       return res.status(200).json({
         message: "Login successful",
         token,
@@ -7592,11 +7594,13 @@ export const Login = async (req, res) => {
     })
   }
 }
-
 export const changePassword = async (req, res) => {
   try {
     const { userId, currentPassword, newPassword, confirmPassword } = req.body
-
+console.log("userid",userId)
+console.log("currentpassword",currentPassword)
+console.log("newpassword",newPassword)
+console.log("confirmPassword",confirmPassword)
     if (!currentPassword || !newPassword || !confirmPassword) {
       return res.status(400).json({ message: "All password fields are required" })
     }
@@ -7604,47 +7608,111 @@ export const changePassword = async (req, res) => {
     if (newPassword !== confirmPassword) {
       return res.status(400).json({ message: "Confirm password does not match" })
     }
+
     let user = null
 
+    // Remove .lean() - you need the full Mongoose document to call .save()
     user = await Staff.findById(userId)
     if (user) {
+
       true
     } else {
       user = await Admin.findById(userId)
-
     }
+
     if (!user) {
       return res.status(404).json({ message: "User not found" })
     }
-
+console.log("userrrrr",user?.password)
     const isMatch = await bcrypt.compare(currentPassword, user.password)
     if (!isMatch) {
       return res.status(400).json({ message: "Current password is incorrect" })
     }
 
-    // const hashedPassword = await bcrypt.hash(newPassword, 10)
-    console.log("newpaswword", newPassword)
-    console.log("currrentpasss", currentPassword)
-    // console.log("hashedpasss",hashedPassword)
-    console.log("user", user)
     const expiryDate = new Date()
     expiryDate.setMonth(expiryDate.getMonth() + 2)
 
+    // Hash the new password before saving
+    // const hashedPassword = await bcrypt.hash(newPassword, 10)
     user.password = newPassword
     user.passwordExpiryAt = expiryDate
     await user.save()
 
+    const token = generateToken(res, user)
+    const leavemasterdata = await Leavemaster.find({})
+    const { password, ...userwithoutpassword } = user.toObject()
+
     return res.status(200).json({
       message: "Password updated successfully",
+      token,
+      user: userwithoutpassword,
+      leavemasterdata,
       passwordExpiryAt: expiryDate
     })
   } catch (error) {
+    console.log("error", error?.message)
+    console.log("errorrrrrrrrrrrr", error)
     return res.status(500).json({
       message: "Failed to update password",
       error: error.message
     })
   }
 }
+
+// export const changePassword = async (req, res) => {
+//   try {
+//     const { userId, currentPassword, newPassword, confirmPassword } = req.body
+
+//     if (!currentPassword || !newPassword || !confirmPassword) {
+//       return res.status(400).json({ message: "All password fields are required" })
+//     }
+
+//     if (newPassword !== confirmPassword) {
+//       return res.status(400).json({ message: "Confirm password does not match" })
+//     }
+//     let user = null
+
+//     user = await Staff.findById(userId).lean()
+//     if (user) {
+//       true
+//     } else {
+//       user = await Admin.findById(userId).lean()
+
+//     }
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" })
+//     }
+
+//     const isMatch = await bcrypt.compare(currentPassword, user.password)
+//     if (!isMatch) {
+//       return res.status(400).json({ message: "Current password is incorrect" })
+//     }
+
+//     const expiryDate = new Date()
+//     expiryDate.setMonth(expiryDate.getMonth() + 2)
+
+//     user.password = newPassword
+//     user.passwordExpiryAt = expiryDate
+//     await user.save()
+//     const token = generateToken(res, user)
+//     const leavemasterdata = await Leavemaster.find({})
+//     const { password, ...userwithoutpassword } = user
+//     return res.status(200).json({
+//       message: "Password updated successfully",
+//       token,
+//       user: userwithoutpassword,
+//       leavemasterdata,
+//       passwordExpiryAt: expiryDate
+//     })
+//   } catch (error) {
+// console.log("error",error?.message)
+// console.log("errorrrrrrrrrrrr",error)
+//     return res.status(500).json({
+//       message: "Failed to update password",
+//       error: error.message
+//     })
+//   }
+// }
 
 export const Logout = (req, res) => {
   try {
@@ -13223,7 +13291,7 @@ export const GetsomeAllsummary = async (
           applyLeaveToDay(day, leave);
         }
 
-        recomputeDayFromCoverage(day,user,dateKey);
+        recomputeDayFromCoverage(day, user, dateKey);
 
         const leaveTotal = getLeaveTotal(day);
         if (leaveTotal === 0.5) stats.halfDayLeave += 0.5;

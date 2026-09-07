@@ -70,6 +70,46 @@ export const GetallfollowupList = async (req, res) => {
       header,
       from = null,
     } = req.query;
+// await Customer.updateMany(
+//   {
+//     "selected.product_id": ObjectId("66fbcf92461da9401f1cb821")
+//   },
+//   {
+//     $set: {
+//       "selected.$[product].product_id": ObjectId(67777960368e039b61196ef2)
+//     }
+//   },
+//   {
+//     arrayFilters: [
+//       {
+//         "product.product_id": ObjectId("66fbcf92461da9401f1cb821")
+//       }
+//     ]
+//   }
+// )
+await Customer.updateMany(
+  {
+    "selected.product_id": new mongoose.Types.ObjectId(
+      "66fbcfb7461da9401f1cb836"
+    ),
+  },
+  {
+    $set: {
+      "selected.$[product].product_id": new mongoose.Types.ObjectId(
+        "67777960368e039b61196ef2"
+      ),
+    },
+  },
+  {
+    arrayFilters: [
+      {
+        "product.product_id": new mongoose.Types.ObjectId(
+          "66fbcfb7461da9401f1cb836"
+        ),
+      },
+    ],
+  }
+);
 
     if (!isValidObjectId(loggeduserid) || !isValidObjectId(branchSelected)) {
       return res.status(400).json({

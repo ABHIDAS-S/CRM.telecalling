@@ -1,36 +1,32 @@
 // import { X } from "lucide-react"
 // import { useSelector } from "react-redux"
-// // import PasswordField from "./PasswordField"
 // import PasswordField from "./PasswordField"
-// import { useState,useEffect,useMemo } from "react"
+// import { useNavigate } from "react-router-dom"
+// import { useState, useMemo, useEffect } from "react"
+// import { toast } from "react-toastify"
+// import api from "../../api/api"
 // export default function ChangePasswordModal({
 //   open,
 //   onClose,
-  
+//   navigateurl = null
 // }) {
-// console.log(open)
-// console.log("hhhh")
-//   if (!open) return null
-//  const loggeduser=useSelector((user)=>user.auth.user)
-// console.log(loggeduser)
+//   console.log(navigateurl)
+//   const loggeduser = useSelector((state) => state.auth.user)
 
-//   const [modalOpen, setModalOpen] = useState(false)
-//   const [selectedCategory, setSelectedCategory] = useState(null)
-
-//   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
 //   const [savingPassword, setSavingPassword] = useState(false)
 //   const [passwordForm, setPasswordForm] = useState({
 //     currentPassword: "",
 //     newPassword: "",
 //     confirmPassword: ""
 //   })
-// console.log(passwordForm)
+
 //   const [passwordErrors, setPasswordErrors] = useState({})
 //   const [showPassword, setShowPassword] = useState({
 //     current: false,
 //     next: false,
 //     confirm: false
 //   })
+//   const navigate = useNavigate()
 
 //   const expiryDate = useMemo(() => {
 //     const now = new Date()
@@ -43,43 +39,42 @@
 //     })
 //   }, [])
 
-//   const handleCategoryClick = (categoryId, categoryName) => {
-//     const category = categorylist.find(
-//       (cat) => String(cat.categoryId) === String(categoryId)
-//     )
+//   useEffect(() => {
+//     if (!open) return
 
-//     setSelectedCategory(category)
-//     setModalOpen(true)
-
-//     if (handleMoreClick) {
-//       handleMoreClick(categoryId, categoryName)
+//     const handleKeyDown = (e) => {
+//       if (e.key === "Escape") {
+//         e.stopPropagation()
+//         onClose?.()
+//       }
 //     }
-//   }
 
-//   const openPasswordModal = () => {
-//     setPasswordForm({
-//       currentPassword: "",
-//       newPassword: "",
-//       confirmPassword: ""
-//     })
-//     setPasswordErrors({})
-//     setPasswordModalOpen(true)
-//   }
-
-//   const closePasswordModal = () => {
-//     setPasswordModalOpen(false)
-//     setPasswordErrors({})
-//     setShowPassword({
-//       current: false,
-//       next: false,
-//       confirm: false
-//     })
-//   }
+//     window.addEventListener("keydown", handleKeyDown)
+//     return () => window.removeEventListener("keydown", handleKeyDown)
+//   }, [open, onClose])
 
 //   const sanitizePasswordValue = (value) => {
-//     return value.trim().replace(/\s/g, "")
+//     return String(value ?? "")
+//       .replace(/\s/g, "")
+//       .trim()
 //   }
+//   const handlepasswordChange = async (payload) => {
+//     try {
+//       const updatepassword = await api.put("/auth/updatepassword", payload)
 
+//       if (updatepassword.status === 200) {
+//         toast.success(updatepassword.data.message)
+//         if (navigateurl) {
+//           navigate(navigateurl)
+//         }
+//       } else {
+//         toast.error("Something went wrong")
+//       }
+//     } catch (error) {
+//       toast.error(error?.response?.data?.message || "Failed to update password")
+//       throw error
+//     }
+//   }
 //   const handlePasswordInput = (field, value) => {
 //     const cleaned = sanitizePasswordValue(value)
 //     setPasswordForm((prev) => ({
@@ -88,7 +83,8 @@
 //     }))
 //     setPasswordErrors((prev) => ({
 //       ...prev,
-//       [field]: ""
+//       [field]: "",
+//       submit: ""
 //     }))
 //   }
 
@@ -125,7 +121,8 @@
 //     }
 
 //     if (currentPassword && newPassword && currentPassword === newPassword) {
-//       errors.newPassword = "New password must be different from current password"
+//       errors.newPassword =
+//         "New password must be different from current password"
 //     }
 
 //     setPasswordErrors(errors)
@@ -151,16 +148,25 @@
 //           return d.toISOString()
 //         })()
 //       }
-// console.log(onPasswordChange)
-// console.log(payload)
-//       if (onPasswordChange) {
-//         await onPasswordChange(payload)
-//       } else {
-//         console.log("Password payload:", payload)
-//       }
 
-//       closePasswordModal()
+//       handlepasswordChange(payload)
+
+//       setPasswordForm({
+//         currentPassword: "",
+//         newPassword: "",
+//         confirmPassword: ""
+//       })
+//       setPasswordErrors({})
+//       setShowPassword({
+//         current: false,
+//         next: false,
+//         confirm: false
+//       })
+//       toast.success("Password Updated Successfully")
+//       onClose?.()
 //     } catch (error) {
+//       console.log(error)
+//       toast.error(error.message)
 //       setPasswordErrors((prev) => ({
 //         ...prev,
 //         submit:
@@ -192,7 +198,9 @@
 //     },
 //     {
 //       label: "One special character",
-//       valid: /[!@#$%^&*(),.?":{}|<>_\-\\[\]/+=~`]/.test(passwordForm.newPassword)
+//       valid: /[!@#$%^&*(),.?":{}|<>_\-\\[\]/+=~`]/.test(
+//         passwordForm.newPassword
+//       )
 //     },
 //     {
 //       label: "No spaces",
@@ -201,6 +209,9 @@
 //         !/\s/.test(passwordForm.newPassword)
 //     }
 //   ]
+
+//   if (!open) return null
+
 //   return (
 //     <div
 //       className="fixed inset-0 z-[70] bg-slate-950/55 p-2 sm:p-3"
@@ -236,7 +247,10 @@
 //             </button>
 //           </div>
 
-//           <form onSubmit={handlePasswordSubmit} className="flex min-h-0 flex-1 flex-col">
+//           <form
+//             onSubmit={handlePasswordSubmit}
+//             className="flex min-h-0 flex-1 flex-col"
+//           >
 //             <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
 //               <div className="space-y-3">
 //                 <PasswordField
@@ -352,10 +366,27 @@
 import { X } from "lucide-react"
 import { useSelector } from "react-redux"
 import PasswordField from "./PasswordField"
+import { useNavigate } from "react-router-dom"
 import { useState, useMemo, useEffect } from "react"
-import {toast} from "react-toastify"
+import { toast } from "react-toastify"
 import api from "../../api/api"
-export default function ChangePasswordModal({ open, onClose }) {
+import { useDispatch } from "react-redux"
+import { loginSuccess } from "../../../slices/authSlice"
+import {
+  setsliceselectedBranch,
+  selectedCompany as setSelectedCompany,
+  setloggeduserBranchOptions,
+  loggeduserBranches,
+  setBranches
+} from "../../../slices/companyBranchSlice"
+import { setLocalStorageItem } from "../../helper/localstorage"
+export default function ChangePasswordModal({
+  open,
+  onClose,
+  navigateurl = null,
+  pendingData
+}) {
+  console.log(pendingData)
   const loggeduser = useSelector((state) => state.auth.user)
 
   const [savingPassword, setSavingPassword] = useState(false)
@@ -371,7 +402,8 @@ export default function ChangePasswordModal({ open, onClose }) {
     next: false,
     confirm: false
   })
-
+  const navigate = useNavigate()
+const dispatch = useDispatch()
   const expiryDate = useMemo(() => {
     const now = new Date()
     const next = new Date(now)
@@ -398,22 +430,92 @@ export default function ChangePasswordModal({ open, onClose }) {
   }, [open, onClose])
 
   const sanitizePasswordValue = (value) => {
-    return String(value ?? "").replace(/\s/g, "").trim()
+    return String(value ?? "")
+      .replace(/\s/g, "")
+      .trim()
   }
- const handlepasswordChange = async (payload) => {
+
+  const handlepasswordChange = async (payload) => {
     try {
       const updatepassword = await api.put("/auth/updatepassword", payload)
 
       if (updatepassword.status === 200) {
         toast.success(updatepassword.data.message)
+        if (navigateurl) {
+          console.log(updatepassword?.data)
+          const datas = updatepassword.data
+          console.log(datas)
+          const { token, user, passwordExpiryWarning, leavemasterdata } = datas
+          console.log(token)
+          console.log(user)
+          console.log(leavemasterdata)
+          const selectedCompany = user?.selected[0]
+          const res = await api.get("/branch/getBranch")
+
+          const allcompanybranches = res.data?.data?.map((b) => b._id) || []
+          const loggeduserbranches = user?.selected?.map((a) => a.branch_id)
+          localStorage.setItem("authToken", token)
+          localStorage.setItem("user", JSON.stringify(user))
+          const uniqueBranches = (user?.selected || []).map((branch) => ({
+            id: branch.branch_id,
+            label: branch.branchName
+          }))
+          console.log(leavemasterdata[0]?.checkIn)
+          // Save to localStorage
+          setLocalStorageItem("selectedCompany", selectedCompany)
+          setLocalStorageItem("selectedBranch", selectedCompany.branch_id)
+          setLocalStorageItem("loggeduserbranches", loggeduserbranches)
+          setLocalStorageItem("companybranches", allcompanybranches)
+          setLocalStorageItem("loggeduserBranchOptions", uniqueBranches)
+          setLocalStorageItem("checkinTime", leavemasterdata[0]?.checkIn)
+
+          dispatch(setSelectedCompany(selectedCompany))
+          dispatch(setsliceselectedBranch(selectedCompany.branch_id))
+          dispatch(loggeduserBranches(loggeduserbranches))
+          dispatch(setBranches(allcompanybranches))
+          dispatch(setloggeduserBranchOptions(uniqueBranches))
+          dispatch(
+            loginSuccess({
+              token,
+              user: user,
+              activeCompany: {
+                company_id: selectedCompany.company_id,
+                branch_id: selectedCompany.branch_id
+              },
+              checkInTime: leavemasterdata[0]?.checkIn
+            })
+          )
+
+          console.log("hh")
+          toast.success(updatepassword.data.message, {
+            icon: "🚀",
+            style: {
+              backgroundColor: "#fff", // White background
+              color: "#000", // Black text for better contrast
+              boxShadow:
+                "0px 4px 10px rgba(0, 0, 0, 0.3), 0px 1px 3px rgba(0, 0, 0, 0.1)", // 3D shadow effect
+              borderRadius: "8px", // Rounded corners for a polished look
+              padding: "10px 15px", // Comfortable padding
+              fontWeight: "bold" // Bold text for prominence
+            }
+          })
+          if (passwordExpiryWarning) {
+            toast.warn(passwordExpiryWarning)
+          }
+
+          navigate(navigateurl)
+        }
+        return true
       } else {
         toast.error("Something went wrong")
+        return false
       }
     } catch (error) {
       toast.error(error?.response?.data?.message || "Failed to update password")
       throw error
     }
   }
+
   const handlePasswordInput = (field, value) => {
     const cleaned = sanitizePasswordValue(value)
     setPasswordForm((prev) => ({
@@ -460,7 +562,8 @@ export default function ChangePasswordModal({ open, onClose }) {
     }
 
     if (currentPassword && newPassword && currentPassword === newPassword) {
-      errors.newPassword = "New password must be different from current password"
+      errors.newPassword =
+        "New password must be different from current password"
     }
 
     setPasswordErrors(errors)
@@ -474,9 +577,11 @@ export default function ChangePasswordModal({ open, onClose }) {
 
     try {
       setSavingPassword(true)
-
+console.log(loggeduser)
+console.log(pendingData)
+console.log(passwordForm)
       const payload = {
-        userId: loggeduser?.id || loggeduser?._id,
+        userId: loggeduser?.id || loggeduser?._id || pendingData?.userId,
         currentPassword: passwordForm.currentPassword.trim(),
         newPassword: passwordForm.newPassword.trim(),
         confirmPassword: passwordForm.confirmPassword.trim(),
@@ -487,10 +592,10 @@ export default function ChangePasswordModal({ open, onClose }) {
         })()
       }
 
-  handlepasswordChange(payload)
-        
-    
+      // Await the password change before proceeding
+      await handlepasswordChange(payload)
 
+      // Clear form and close modal
       setPasswordForm({
         currentPassword: "",
         newPassword: "",
@@ -502,11 +607,9 @@ export default function ChangePasswordModal({ open, onClose }) {
         next: false,
         confirm: false
       })
-toast.success("Password Updated Successfully")
       onClose?.()
     } catch (error) {
-console.log(error)
-toast.error(error.message)
+      console.log(error?.response?.data?.message)
       setPasswordErrors((prev) => ({
         ...prev,
         submit:
@@ -538,7 +641,9 @@ toast.error(error.message)
     },
     {
       label: "One special character",
-      valid: /[!@#$%^&*(),.?":{}|<>_\-\\[\]/+=~`]/.test(passwordForm.newPassword)
+      valid: /[!@#$%^&*(),.?":{}|<>_\-\\[\]/+=~`]/.test(
+        passwordForm.newPassword
+      )
     },
     {
       label: "No spaces",
@@ -585,7 +690,10 @@ toast.error(error.message)
             </button>
           </div>
 
-          <form onSubmit={handlePasswordSubmit} className="flex min-h-0 flex-1 flex-col">
+          <form
+            onSubmit={handlePasswordSubmit}
+            className="flex min-h-0 flex-1 flex-col"
+          >
             <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
               <div className="space-y-3">
                 <PasswordField
