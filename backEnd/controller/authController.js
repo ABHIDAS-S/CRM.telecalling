@@ -7426,56 +7426,172 @@ export const StaffRegister = async (req, res) => {
 //   }
 // }
 
+// export const UpdateUserandAdmin = async (req, res) => {
+//   const { userId, userData, tabledata, imageData = {} } = req.body   // ✅ default imageData too, avoids a crash if it's ever missing entirely
+//   const { profileUrl, documentUrl } = imageData                       // ✅ no default here — undefined vs "" vs real value are now distinguishable
+//   const { role } = userData
+//   console.log("pffff", profileUrl)
+//   console.log(typeof profileUrl === "string")
+
+//   const { assignedto, profileUrl: _ignoredProfileUrl, documentUrl: _ignoredDocumentUrl, ...filteredUserData } = userData
+
+//   const { password } = filteredUserData
+//   const assignedtoId = assignedto
+
+//   let assignedtoModel
+//   const isStaff = await Staff.exists({ _id: assignedtoId })
+//   const isAdmin = await Admin.exists({ _id: assignedtoId })
+//   if (isStaff) {
+//     assignedtoModel = "Staff"
+//   } else if (isAdmin) {
+//     assignedtoModel = "Admin"
+//   }
+
+//   try {
+//     const updateQuery = {
+//       $set: {
+//         assignedtoModel,
+//         assignedto,
+//         ...filteredUserData
+//       }
+//     }
+
+//     if (tabledata.length === 0) {
+//       updateQuery.$set.selected = []
+//     } else {
+//       updateQuery.$set.selected = tabledata
+//     }
+
+//     if (updateQuery.$set.password) {
+//       const salt = await bcrypt.genSalt(10)
+//       const hashedPassword = await bcrypt.hash(password, salt)
+//       updateQuery.$set.password = hashedPassword
+//     } else {
+//       delete updateQuery.$set.password
+//     }
+
+//     // Only write these fields when a real, non-empty new value came through.
+//     // typeof check + truthy check together handle: key missing entirely,
+//     // key present but "", and key present with a real URL — all correctly.
+//     if (typeof profileUrl === "string") {
+//       updateQuery.$set.profileUrl = profileUrl
+//     }
+//     if (typeof documentUrl === "string" && documentUrl.length > 0) {
+//       updateQuery.$set.documentUrl = documentUrl
+//     }
+
+//     const updateStaff = await Staff.findByIdAndUpdate(
+//       userId,
+//       updateQuery,
+//       { new: true }
+//     )
+
+//     if (!updateStaff) {
+//       return res.status(404).json({ message: "Not found" })
+//     }
+
+//     return res.status(200).json({ message: "updated succesfully" })
+//   } catch (error) {
+//     console.log("error:", error.message)
+//     res.status(500).json({ message: "Internal servor error" })
+//   }
+// }
 export const UpdateUserandAdmin = async (req, res) => {
-  const { userId, userData, tabledata, imageData = {} } = req.body   // ✅ default imageData too, avoids a crash if it's ever missing entirely
-  const { profileUrl, documentUrl } = imageData                       // ✅ no default here — undefined vs "" vs real value are now distinguishable
+  const { userId, userData, tabledata = [], imageData = {} } = req.body
+
+  const { profileUrl, documentUrl } = imageData
   const { role } = userData
+
   console.log("pffff", profileUrl)
   console.log(typeof profileUrl === "string")
 
-  const { assignedto, profileUrl: _ignoredProfileUrl, documentUrl: _ignoredDocumentUrl, ...filteredUserData } = userData
+  const {
+    assignedto,
+    profileUrl: _ignoredProfileUrl,
+    documentUrl: _ignoredDocumentUrl,
+    ...filteredUserData
+  } = userData
 
   const { password } = filteredUserData
   const assignedtoId = assignedto
 
-  let assignedtoModel
-  const isStaff = await Staff.exists({ _id: assignedtoId })
-  const isAdmin = await Admin.exists({ _id: assignedtoId })
-  if (isStaff) {
-    assignedtoModel = "Staff"
-  } else if (isAdmin) {
-    assignedtoModel = "Admin"
-  }
-
   try {
+    let assignedtoModel
+
+    /*
+      Avoid querying with undefined/null assignedto.
+      This prevents unnecessary or invalid `exists()` calls.
+    */
+    if (assignedtoId) {
+      const isStaff = await Staff.exists({ _id: assignedtoId })
+      const isAdmin = await Admin.exists({ _id: assignedtoId })
+
+      if (isStaff) {
+        assignedtoModel = "Staff"
+      } else if (isAdmin) {
+        assignedtoModel = "Admin"
+      }
+    }
+
     const updateQuery = {
       $set: {
-        assignedtoModel,
-        assignedto,
         ...filteredUserData
       }
     }
 
-    if (tabledata.length === 0) {
-      updateQuery.$set.selected = []
-    } else {
-      updateQuery.$set.selected = tabledata
+    /*
+      Only update assignedto fields if the frontend included assignedto.
+      If it is absent, the existing assigned-to user/model remains unchanged.
+    */
+    if (assignedto !== undefined) {
+      updateQuery.$set.assignedto = assignedto
+      updateQuery.$set.assignedtoModel = assignedtoModel
     }
 
-    if (updateQuery.$set.password) {
-      const salt = await bcrypt.genSalt(10)
-      const hashedPassword = await bcrypt.hash(password, salt)
-      updateQuery.$set.password = hashedPassword
+    /*
+      Explicitly set the selected companies/branches.
+      [] clears all selections.
+    */
+    updateQuery.$set.selected = tabledata
+
+    /*
+      Update password + password expiry only when a usable new password exists.
+      Do not update passwordExpiryAt when editing unrelated user fields.
+    */
+    if (typeof password === "string" && password.trim().length > 0) {
+    
+
+      const expiryDate = new Date()
+      expiryDate.setMonth(expiryDate.getMonth() + 2)
+
+      updateQuery.$set.password = password
+      updateQuery.$set.passwordExpiryAt = expiryDate
     } else {
+      /*
+        Important: Prevent password: "" / undefined from overwriting
+        the existing stored password.
+      */
       delete updateQuery.$set.password
     }
 
-    // Only write these fields when a real, non-empty new value came through.
-    // typeof check + truthy check together handle: key missing entirely,
-    // key present but "", and key present with a real URL — all correctly.
+    /*
+      profileUrl:
+      - undefined => do not modify stored profile image.
+      - ""        => clear stored profile image.
+      - URL       => replace stored profile image.
+    */
     if (typeof profileUrl === "string") {
       updateQuery.$set.profileUrl = profileUrl
     }
+
+    /*
+      documentUrl:
+      - undefined => leave unchanged.
+      - ""        => leave unchanged with your current requirement.
+      - URL       => update.
+      
+      If you also want "" to clear the document, remove `&& documentUrl.length > 0`.
+    */
     if (typeof documentUrl === "string" && documentUrl.length > 0) {
       updateQuery.$set.documentUrl = documentUrl
     }
@@ -7483,17 +7599,26 @@ export const UpdateUserandAdmin = async (req, res) => {
     const updateStaff = await Staff.findByIdAndUpdate(
       userId,
       updateQuery,
-      { new: true }
+      {
+        new: true,
+        runValidators: true
+      }
     )
 
     if (!updateStaff) {
       return res.status(404).json({ message: "Not found" })
     }
 
-    return res.status(200).json({ message: "updated succesfully" })
+    return res.status(200).json({
+      message: "Updated successfully",
+      passwordExpiryAt: updateStaff.passwordExpiryAt
+    })
   } catch (error) {
-    console.log("error:", error.message)
-    res.status(500).json({ message: "Internal servor error" })
+    console.error("UpdateUserandAdmin error:", error)
+
+    return res.status(500).json({
+      message: "Internal server error"
+    })
   }
 }
 export const Login = async (req, res) => {

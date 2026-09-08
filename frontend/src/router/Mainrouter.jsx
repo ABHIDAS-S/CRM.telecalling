@@ -44,6 +44,7 @@ const Mainrouter = ({ selectedYear, selectedPeriod }) => {
     <div className="overflow-auto h-full">
       <Routes>
         <Route path="/" element={<Login />} />
+<Route path="/login" element={<Login />} />
         <Route path="/change-password" element={<ChangePassword />} />
         {/* <Route path="/admin/productlist" element={<ProductList />} /> */}
         {/* <Route path="/admin/home" element={<CallregistrationList />} /> */}
