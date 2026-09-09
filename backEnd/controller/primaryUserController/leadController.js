@@ -4358,6 +4358,12 @@ export const Leadclosing = async (req, res) => {
     String(item?.productorservicetype || "").toLowerCase() ===
     "primaryproduct";
 
+  // Enhanced services are lead-only charges. They must stay on the lead and
+  // must not create Customer Master products, tagged licenses, or License docs.
+  const isEnhancedService = (item) =>
+    String(item?.productorservicetype || "").toLowerCase() ===
+    "enhancedservice";
+
   const normalizeLicenseNumberValue = (value) => {
     if (!isNonEmpty(value)) return null;
     const n = Number(value);
@@ -4803,7 +4809,15 @@ export const Leadclosing = async (req, res) => {
         throw new Error("Customer not found");
       }
 
-      const directLicenseNumbers = leadData
+      const customerMasterLeadData = leadData.filter(
+        (item) => !isEnhancedService(item)
+      );
+
+      const customerMasterProductData = mappedproductData.filter(
+        (item) => !isEnhancedService(item)
+      );
+
+      const directLicenseNumbers = customerMasterLeadData
         .filter((item) => isNonEmpty(item?.licenseNumber))
         .map((item) => ({
           licensenumber: normalizeLicenseNumberValue(item.licenseNumber),
@@ -4824,6 +4838,8 @@ export const Leadclosing = async (req, res) => {
 
       const uniqueLicenses = Array.from(uniqueLicenseMap.values());
       const licenseNumbers = uniqueLicenses.map((item) => item.licensenumber);
+
+      let updatedcustomer = null;
 
       if (licenseNumbers.length > 0) {
         const existingLicenses = await License.find({
@@ -4852,89 +4868,91 @@ export const Leadclosing = async (req, res) => {
         }
       }
 
-      const customerDoc = await Customer.findById(data.customerName).session(
-        session
-      );
+      if (customerMasterProductData.length > 0) {
+        const customerDoc = await Customer.findById(data.customerName).session(
+          session
+        );
 
-      if (!customerDoc) {
-        throw new Error("Customer not found while saving selected products");
-      }
-
-      const selected = Array.isArray(customerDoc.selected)
-        ? customerDoc.selected.map((item) =>
-          item?.toObject ? item.toObject() : item
-        )
-        : [];
-
-      for (const item of mappedproductData) {
-        if (!isAdditionalService(item)) {
-          selected.push(item);
-          continue;
+        if (!customerDoc) {
+          throw new Error("Customer not found while saving selected products");
         }
 
-        const existingIndex = selected.findIndex(
-          (s) =>
-            String(s?.product_id || "") === String(item?.product_id || "") &&
-            String(s?.productorservicetype || "").toLowerCase() ===
-            "additionalservice"
-        );
-
-        if (existingIndex === -1) {
-          // Brand new additional service for this customer: nothing was
-          // overwritten yet, so previousTaggedData stays empty (already
-          // initialized to [] in mappedproductData above).
-          selected.push(item);
-          continue;
-        }
-
-        const existing = selected[existingIndex];
-
-        const mergedLicenseNumbers = mergeLicenseNumbers(
-          existing?.licenseNumbers,
-          item?.licenseNumbers
-        );
-
-        const { taggeddata: mergedTagged, overwritten } = mergeTaggedData(
-          existing?.taggeddata,
-          item?.taggeddata
-        );
-
-        // Preserve whatever previousTaggedData already existed, and append
-        // only the records that were actually overwritten in this pass
-        // (matched by licensenumber). Existing history is never dropped or
-        // rewritten wholesale.
-        const existingPreviousTaggedData = Array.isArray(
-          existing?.previousTaggedData
-        )
-          ? existing.previousTaggedData.map((p) =>
-            p?.toObject ? p.toObject() : p
+        const selected = Array.isArray(customerDoc.selected)
+          ? customerDoc.selected.map((item) =>
+            item?.toObject ? item.toObject() : item
           )
           : [];
 
-        const mergedPreviousTaggedData = [
-          ...existingPreviousTaggedData,
-          ...overwritten,
-        ];
+        for (const item of customerMasterProductData) {
+          if (!isAdditionalService(item)) {
+            selected.push(item);
+            continue;
+          }
 
-        selected[existingIndex] = {
-          ...existing,
-          ...item,
-          licenseNumbers: mergedLicenseNumbers,
-          taggeddata: mergedTagged,
-          previousTaggedData: mergedPreviousTaggedData,
-        };
-      }
+          const existingIndex = selected.findIndex(
+            (s) =>
+              String(s?.product_id || "") === String(item?.product_id || "") &&
+              String(s?.productorservicetype || "").toLowerCase() ===
+              "additionalservice"
+          );
 
-      customerDoc.mobile = data.mobile;
-      customerDoc.email = data.email;
-      customerDoc.landline = data.phone;
-      customerDoc.partner = data.partner;
-      // customerDoc.createdFrom = "Lead";
-      customerDoc.selected = selected;
+          if (existingIndex === -1) {
+            // Brand new additional service for this customer: nothing was
+            // overwritten yet, so previousTaggedData stays empty (already
+            // initialized to [] in mappedproductData above).
+            selected.push(item);
+            continue;
+          }
 
-      const updatedcustomer = await customerDoc.save({ session });
-      if (!updatedcustomer) {
-        throw new Error("Customer update failed");
+          const existing = selected[existingIndex];
+
+          const mergedLicenseNumbers = mergeLicenseNumbers(
+            existing?.licenseNumbers,
+            item?.licenseNumbers
+          );
+
+          const { taggeddata: mergedTagged, overwritten } = mergeTaggedData(
+            existing?.taggeddata,
+            item?.taggeddata
+          );
+
+          // Preserve whatever previousTaggedData already existed, and append
+          // only the records that were actually overwritten in this pass
+          // (matched by licensenumber). Existing history is never dropped or
+          // rewritten wholesale.
+          const existingPreviousTaggedData = Array.isArray(
+            existing?.previousTaggedData
+          )
+            ? existing.previousTaggedData.map((p) =>
+              p?.toObject ? p.toObject() : p
+            )
+            : [];
+
+          const mergedPreviousTaggedData = [
+            ...existingPreviousTaggedData,
+            ...overwritten,
+          ];
+
+          selected[existingIndex] = {
+            ...existing,
+            ...item,
+            licenseNumbers: mergedLicenseNumbers,
+            taggeddata: mergedTagged,
+            previousTaggedData: mergedPreviousTaggedData,
+          };
+        }
+
+        customerDoc.mobile = data.mobile;
+        customerDoc.email = data.email;
+        customerDoc.landline = data.phone;
+        customerDoc.partner = data.partner;
+        // customerDoc.createdFrom = "Lead";
+        customerDoc.selected = selected;
+
+        updatedcustomer = await customerDoc.save({ session });
+        if (!updatedcustomer) {
+          throw new Error("Customer update failed");
+        }
       }
 
       responsePayload = {

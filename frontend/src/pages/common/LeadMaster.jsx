@@ -2929,12 +2929,12 @@ const LeadMaster = ({
           setsubmitLoading(false)
           return
         }
-        const validationMessage = validateSelectedLeadList(selectedleadlist)
-        console.log(validationMessage)
-        if (validationMessage) {
-          toast.warning(validationMessage)
-          return
-        }
+        // const validationMessage = validateSelectedLeadList(selectedleadlist)
+        // console.log(validationMessage)
+        // if (validationMessage) {
+        //   toast.warning(validationMessage)
+        //   return
+        // }
         seteditLoadingState(true)
         const updated = await handleEditData(
           data,
@@ -3366,10 +3366,7 @@ const LeadMaster = ({
                 item?.netAmount ??
                 0,
               hsn:
-                // existing?.hsn ??
-                // existingTag?.hsn ??
-                // item?.actualHsn ??
-                // item?.hsn,
+               
 
                 getPositiveInteger(
                   existing?.hsn,
@@ -3917,6 +3914,10 @@ convertexcel
                           String(
                             item?.productorservicetype || ""
                           ).toLowerCase() === "primaryproduct"
+                        const isEnhancedService =
+                          String(
+                            item?.productorservicetype || ""
+                          ).toLowerCase() === "enhancedservice"
                         console.log(item)
                         console.log(isPrimaryProduct)
                         const remainingAdditionalServicesCount =
@@ -4113,7 +4114,8 @@ convertexcel
                               </div>
                             </td>
                             {(process === "closing" ||
-                              from === "closedlead") && (
+                              from === "closedlead") &&
+                              !isEnhancedService && (
                               <td className="border border-gray-300 px-1 py-1 text-center">
                                 <div className="relative inline-block group">
                                   <button

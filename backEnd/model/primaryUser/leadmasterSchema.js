@@ -732,6 +732,10 @@ const leadForItemSchema = new mongoose.Schema(
 
 const activityLogItemSchema = new mongoose.Schema(
   {
+    assignmentRevision: { type: Number, default: 0 },
+    // Correct incentive ownership without rewriting who submitted the activity.
+    incentiveAssignedUser: { type: mongoose.Schema.Types.ObjectId, default: null },
+    incentiveAssignedUserModel: { type: String, enum: ["Staff", "Admin"], default: null },
     submissionDate: { type: Date, default: null },
     submittedUser: {
       type: mongoose.Schema.Types.ObjectId,
@@ -798,6 +802,18 @@ const activityLogItemSchema = new mongoose.Schema(
 
 const leadSchema = new mongoose.Schema(
   {
+    assignmentCorrections: [{
+      assignmentId: { type: mongoose.Schema.Types.ObjectId, required: true },
+      previousUser: mongoose.Schema.Types.ObjectId,
+      previousUserModel: { type: String, enum: ["Staff", "Admin"], default: null },
+      previousIncentiveUser: mongoose.Schema.Types.ObjectId,
+      previousIncentiveUserModel: { type: String, enum: ["Staff", "Admin"], default: null },
+      newUser: { type: mongoose.Schema.Types.ObjectId, required: true },
+      newUserModel: { type: String, enum: ["Staff", "Admin"], required: true },
+      changedBy: { type: mongoose.Schema.Types.ObjectId, required: true },
+      changedByModel: { type: String, enum: ["Staff", "Admin"], required: true },
+      changedAt: { type: Date, required: true },
+    }],
     leadId: { type: String, required: true, trim: true,unique: true, },
     leadDate: { type: Date, default: null },
     customerName: {

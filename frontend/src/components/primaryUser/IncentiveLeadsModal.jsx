@@ -298,6 +298,7 @@ import { useMemo, useState } from "react"
 import { X, Search, FileSpreadsheet } from "lucide-react"
 import UseFetch from "../../hooks/useFetch"
 import PropTypes from "prop-types"
+import LeadAssignmentEditor from "./LeadAssignmentEditor"
 
 export default function IncentiveLeadsModal({
   user,
@@ -305,14 +306,28 @@ export default function IncentiveLeadsModal({
   year,
   period,
   selectedBranch,
+  canEditAssignments = false,
+  onAssignmentUpdated = () => {},
   onClose = () => {}
 }) {
   const [search, setSearch] = useState("")
+  const [editingLead, setEditingLead] = useState(null)
+  const [success, setSuccess] = useState("")
   const detailsUrl =
     user?.userId && selectedBranch && period && year && allocation?.key
       ? `/target/getIncentiveLeads?userId=${user.userId}&year=${year}&period=${encodeURIComponent(period)}&selectedBranch=${selectedBranch}&allocationId=${allocation.key}`
       : null
-  const { data, loading, error } = UseFetch(detailsUrl)
+  const { data, loading, error, refreshHook } = UseFetch(detailsUrl)
+  // Older detail responses omit the capability flag. Use the logged-in user's
+  // permission in that case; an explicit server denial always takes precedence.
+  const editingAllowed = data?.canEditAssignments ?? canEditAssignments
+  const editButton = (lead) => (
+    <button type="button" onClick={() => { setSuccess(""); setEditingLead(lead) }}
+      disabled={!editingAllowed || !lead.leadMongoId}
+      title={!editingAllowed ? "Requires Admin or LeadReallocation permission" : !lead.leadMongoId ? "This lead has no assignment record ID" : "Change the assigned person"}
+      aria-label={`Edit assigned person for lead ${lead.leadId}`}
+      className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">Edit</button>
+  )
   const leads = useMemo(
     () => (Array.isArray(data?.leads) ? data.leads : []),
     [data]
@@ -381,6 +396,8 @@ export default function IncentiveLeadsModal({
               {formatAmount(total)} total
             </div>
           </div>
+          {success && <p role="status" className="mt-2 text-sm text-green-700">{success}</p>}
+          {!loading && !error && !editingAllowed && <p className="mt-2 text-xs text-gray-500">Editing assignments requires Admin or LeadReallocation permission.</p>}
         </div>
 
         {/* Table */}
@@ -445,6 +462,7 @@ export default function IncentiveLeadsModal({
                         )
                       })}
                     </div>
+                    <div className="mt-3 flex justify-end">{editButton(lead)}</div>
                   </article>
                 ))}
               </div>
@@ -473,6 +491,7 @@ export default function IncentiveLeadsModal({
                   <th className="px-6 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
                     Total
                   </th>
+                  <th className="sticky right-0 bg-gray-50 px-4 py-3 text-right text-xs text-gray-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -512,6 +531,7 @@ export default function IncentiveLeadsModal({
                     <td className="px-6 py-3.5 text-sm font-semibold text-gray-900 text-right">
                       {formatAmount(lead.totalAmount)}
                     </td>
+                    <td className="sticky right-0 bg-white px-4 py-3 text-right">{editButton(lead)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -521,6 +541,14 @@ export default function IncentiveLeadsModal({
           )}
         </div>
       </div>
+      {editingLead && <LeadAssignmentEditor key={editingLead.leadMongoId}
+        lead={editingLead} onClose={() => setEditingLead(null)}
+        onSaved={() => {
+          setEditingLead(null)
+          setSuccess("Assigned person updated. Incentive reports are refreshing.")
+          refreshHook()
+          onAssignmentUpdated()
+        }} />}
     </div>
   )
 }
@@ -537,5 +565,7 @@ IncentiveLeadsModal.propTypes = {
   year: PropTypes.number.isRequired,
   period: PropTypes.string.isRequired,
   selectedBranch: PropTypes.string.isRequired,
+  canEditAssignments: PropTypes.bool,
+  onAssignmentUpdated: PropTypes.func,
   onClose: PropTypes.func
 }

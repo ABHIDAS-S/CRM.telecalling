@@ -63,6 +63,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
     data: incentiveData,
     loading,
     error,
+    refreshHook,
   } = UseFetch(incentiveReportUrl);
   const branches = useMemo(
     () =>
@@ -320,12 +321,16 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
 
       {showLeadsModal && selectedUser && selectedAllocation && (
         <IncentiveLeadsModal
+          key={`${selectedBranch}:${selectedYear}:${selectedPeriod}:${selectedUser.userId}`}
           user={selectedUser}
           allocation={selectedAllocation}
           year={Number(selectedYear)}
           period={selectedPeriod}
           selectedBranch={selectedBranch}
+          canEditAssignments={isAdmin || (loggeduser?.role === "Staff" && loggeduser?.isVerified === true &&
+            loggeduser?.permissions?.some((permission) => permission.LeadReallocation === true)) || false}
           onClose={closeLeadsModal}
+          onAssignmentUpdated={refreshHook}
         />
       )}
     </div>

@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import { getAssignmentActor } from "./leadAssignmentController.js";
+import { incentiveOwnerId, incentiveOwnerModel } from "../../helper/incentiveOwner.js";
 import { TargetAchievement, Allocation, User, TargetCategory, TargetConfiguration } from "../../model/primaryUser/targetSchema.js";
 import { Category } from "../../model/primaryUser/productSubDetailsSchema.js";
 import Task from "../../model/primaryUser/taskSchema.js";
@@ -2322,6 +2324,10 @@ export const gettargetResult = async (req, res) => {
       }
 
       for (const activity of objects(lead.activityLog)) {
+        const correctedOwner = incentiveOwnerId(activity);
+        if (correctedOwner) {
+          (incentiveOwnerModel(activity) === "Admin" ? adminIds : staffIds).add(String(correctedOwner));
+        }
         if (!activity?.submittedUser) continue;
 
         if (activity.submissiondoneByModel === "Admin") {
@@ -2916,7 +2922,7 @@ export const gettargetResult = async (req, res) => {
           for (const [activityIndex, activity] of objects(
             lead.activityLog
           ).entries()) {
-            const userId = String(activity.submittedUser || "");
+            const userId = String(incentiveOwnerId(activity) || "");
 
             if (!userId) continue;
 
@@ -2996,7 +3002,7 @@ export const gettargetResult = async (req, res) => {
             const user = ensureUser(
               userId,
               null,
-              activity.submissiondoneByModel
+              incentiveOwnerModel(activity)
             );
 
             user.incentive += incentive;
@@ -3309,7 +3315,7 @@ const buildIncentiveReportData = async ({
       );
 
       for (const [activityIndex, activity] of objects(lead.activityLog).entries()) {
-        const userId = String(activity.submittedUser || "");
+        const userId = String(incentiveOwnerId(activity) || "");
         if (!userId) continue;
         const taskById = String(activity.taskBy || "");
         const taskId = String(activity.taskId || "");
@@ -3351,7 +3357,7 @@ const buildIncentiveReportData = async ({
         awarded.add(rewardKey);
         userModels.set(
           userId,
-          activity.submissiondoneByModel === "Admin" ? "Admin" : "Staff"
+          incentiveOwnerModel(activity) === "Admin" ? "Admin" : "Staff"
         );
 
         if (!earnedByBranch.has(branchId)) earnedByBranch.set(branchId, new Map());
@@ -3586,7 +3592,8 @@ export const getIncentiveLeads = async (req, res) => {
       };
     });
 
-    return res.status(200).json({ success: true, data: { leads } });
+    const canEditAssignments = Boolean(await getAssignmentActor(req));
+    return res.status(200).json({ success: true, data: { leads, canEditAssignments } });
   } catch (error) {
     console.error("getIncentiveLeads error:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
