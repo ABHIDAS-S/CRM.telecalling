@@ -31,6 +31,7 @@ export default function LeadAssignmentEditor({ lead, onClose, onSaved }) {
     api.get(`/target/leads/${lead.leadMongoId}/assignments`, { signal: controller.signal })
       .then(({ data }) => {
         if (controller.signal.aborted) return
+console.log(data?.data)
         setDetails(data.data)
         setAssignmentId("")
         setPerson("")
@@ -103,16 +104,23 @@ export default function LeadAssignmentEditor({ lead, onClose, onSaved }) {
               <option value="">Select a record</option>
               {details.assignments.map((item) => (
                 <option key={item.assignmentId} value={item.assignmentId}>
-                  {item.label} · {item.assignedUserName} · {item.date ? new Date(item.date).toLocaleString("en-GB") : "No date"} · {item.assignmentId}
+                  {item.isFollowupClosingRecord
+                    ? `Follow-up Closing · Closed by ${item.closedByName} · ${item.date ? new Date(item.date).toLocaleString("en-GB") : "No date"}`
+                    : `${item.label} · ${item.assignedUserName || "No assignee"} · ${item.date ? new Date(item.date).toLocaleString("en-GB") : "No date"}`}
                 </option>
               ))}
             </select>
             {!details.assignments.length && <p className="mt-2 text-sm text-gray-500">No editable task records found.</p>}
             {assignment && <div className="mt-3 rounded-lg bg-gray-50 p-3 text-sm">
-              <p className="mb-1 break-all text-xs text-gray-500">Record: {assignment.assignmentId}</p>
-              <p>Assigned person: {assignment.assignedUserName}</p>
-              <p>Incentive owner: {assignment.incentiveUserName}</p>
-              <p>Status: {assignment.completed ? "Completed" : "Open"}</p>
+              {assignment.isFollowupClosingRecord ? <>
+                <p>Follow-up closing</p>
+                <p>Closed by: {assignment.closedByName}</p>
+                <p>Date: {assignment.date ? new Date(assignment.date).toLocaleString("en-GB") : "No date"}</p>
+              </> : <>
+                <p>Assigned person: {assignment.assignedUserName || "No assignee"}</p>
+                <p>Incentive owner: {assignment.incentiveUserName}</p>
+                <p>Status: {assignment.completed ? "Completed" : "Open"}</p>
+              </>}
             </div>}
             <label className="mt-4 block text-sm font-medium" htmlFor="assignment-person">Replacement person</label>
             <select id="assignment-person" value={person} disabled={!assignment || saving || conflict}

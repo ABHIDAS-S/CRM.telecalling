@@ -137,12 +137,32 @@ test("company/branch scope is enforced on reads and writes", async () => {
 });
 
 test("editor exposes persistent duplicate task identities and only eligible users", async () => {
+  await Lead.updateOne({ _id: ids.lead }, { $set: {
+    "activityLog.1.followupClosed": true,
+    "activityLog.1.taskallocatedTo": null,
+    "activityLog.1.taskallocatedToModel": null,
+  } });
   const result = await request(path());
   assert.deepEqual(result.data.assignments.map((item) => item.assignmentId), [String(ids.first), String(ids.second)]);
   assert.equal(result.data.assignments[0].label, result.data.assignments[1].label);
+  assert.equal(result.data.assignments[1].assignedUserName, null);
+  assert.equal(result.data.assignments[1].isFollowupClosingRecord, false);
+  assert.equal(result.data.assignments[1].closedByName, "old");
   assert.ok(result.data.users.some((user) => user.userId === String(ids.replacement)));
   assert.ok(!result.data.users.some((user) => [String(ids.outsider), String(ids.inactive)].includes(user.userId)));
   assert.ok(result.data.users.every((user) => Object.keys(user).sort().join() === "model,name,userId"));
+});
+
+test("only the dedicated Follow-Up Closing task is marked as a closing event", async () => {
+  await Task.updateOne({ _id: ids.otherTask }, { $set: { taskName: "Follow-Up Closing" } });
+  await Lead.updateOne({ _id: ids.lead }, { $set: {
+    "activityLog.1.taskBy": ids.otherTask,
+    "activityLog.1.followupClosed": true,
+  } });
+  const result = await request(path());
+  assert.equal(result.data.assignments[0].isFollowupClosingRecord, false);
+  assert.equal(result.data.assignments[1].isFollowupClosingRecord, true);
+  assert.equal(result.data.assignments[1].closedByName, "old");
 });
 
 test("one duplicate allocation changes atomically with an audit; history and other tasks survive", async () => {

@@ -76,15 +76,22 @@ export async function getLeadAssignments(req, res) {
     const names = new Map([...staff, ...admins].map((user) => [id(user._id), user.name]));
     const taskNames = new Map(tasks.map((task) => [id(task._id), task.taskName]));
     return res.json({ success: true, data: {
-      assignments: records.map((record) => ({
-        assignmentId: id(record._id),
-        label: [taskNames.get(id(record.taskBy)), taskNames.get(id(record.taskId))].filter(Boolean).join(" → ") || "Allocation",
-        assignedUserName: names.get(id(record.taskallocatedTo)) || (record.taskallocatedTo ? "Unavailable user" : "Unassigned"),
-        incentiveUserName: names.get(id(record.incentiveAssignedUser || record.submittedUser)) || "Unassigned",
-        date: record.allocationDate || record.submissionDate,
-        completed: Boolean(record.taskClosed || record.followupClosed || record.allocatedClosed),
-        expected: snapshot(record),
-      })),
+      assignments: records.map((record) => {
+        const taskLabels = [taskNames.get(id(record.taskBy)), taskNames.get(id(record.taskId))].filter(Boolean);
+        return {
+          assignmentId: id(record._id),
+          label: taskLabels.join(" → ") || "Allocation",
+          assignedUserName: names.get(id(record.taskallocatedTo)) || (record.taskallocatedTo ? "Unavailable user" : null),
+          incentiveUserName: names.get(id(record.incentiveAssignedUser || record.submittedUser)) || "Unassigned",
+          date: record.allocationDate || record.submissionDate,
+          completed: Boolean(record.taskClosed || record.followupClosed || record.allocatedClosed),
+          // `followupClosed` is a status that may be copied to older activities.
+          // Only the dedicated Follow-Up Closing task gets the closing-event UI.
+          isFollowupClosingRecord: taskLabels.some((name) => name.trim().toLowerCase() === "follow-up closing"),
+          closedByName: names.get(id(record.submittedUser)) || "Unknown user",
+          expected: snapshot(record),
+        };
+      }),
       users: [...eligibleStaff.map((user) => ({ userId: id(user._id), name: user.name, model: "Staff" })),
         ...admins.map((user) => ({ userId: id(user._id), name: user.name, model: "Admin" }))],
     } });

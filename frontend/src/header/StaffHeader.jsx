@@ -1783,7 +1783,8 @@ import {
   FiClipboard,
   FiActivity,
   FiUserCheck,
-  FiUserX
+  FiUserX,
+  FiDollarSign
 } from "react-icons/fi"
 import {
   MessageSquareText,
@@ -2072,6 +2073,12 @@ export default function StaffHeader({
             label: "Closed Leads",
             icon: FiUserX,
             control: permissions.ClosedLeads ?? false
+          },
+          {
+            to: "/staff/reports/incentiveReport",
+            label: "Incentive",
+            icon: FiDollarSign,
+            control: permissions.IncentiveReport ?? false
           }
         ]
       },

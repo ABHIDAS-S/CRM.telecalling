@@ -128,9 +128,17 @@ const Layout = () => {
     "staff/transaction/lead/verifiedCollections"
   ]
 
-  const shouldshowSidebar = hideHeaderRoutes.some((route) =>
-    matchPath({ path: route, end: true }, location.pathname)
-  )
+  const isScoreBoardIncentiveReport =
+    location.state?.incentiveScope === "self" &&
+    [
+      "/admin/reports/incentiveReport",
+      "/staff/reports/incentiveReport"
+    ].includes(location.pathname)
+  const shouldshowSidebar =
+    isScoreBoardIncentiveReport ||
+    hideHeaderRoutes.some((route) =>
+      matchPath({ path: route, end: true }, location.pathname)
+    )
   console.log(shouldshowSidebar)
   //   useEffect(() => {
   // const a=localStorage.getItem("user")

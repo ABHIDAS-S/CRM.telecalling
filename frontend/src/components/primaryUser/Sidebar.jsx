@@ -257,6 +257,15 @@ console.log(normalizedCategories)
     }
   }
 
+  const handleScoreBoardClick = () => {
+    const reportPath =
+      user?.role === "Admin"
+        ? "/admin/reports/incentiveReport"
+        : "/staff/reports/incentiveReport"
+
+    navigate(reportPath, { state: { incentiveScope: "self" } })
+  }
+
   const companyName = user?.activeCompany?.companyName || "CAMET CRM"
   const companyShort = companyName?.slice(0, 1)?.toUpperCase() || "C"
 
@@ -370,7 +379,7 @@ console.log(normalizedCategories)
           </SidebarBlock>
 
           <div
-            onClick={()=> navigate("/admin//reports/incentiveReport")}
+            onClick={handleScoreBoardClick}
             className="rounded-[14px] bg-black px-2.5 py-2.5 shadow-sm hover:cursor-pointer"
           >
             <div className="flex items-center justify-between">

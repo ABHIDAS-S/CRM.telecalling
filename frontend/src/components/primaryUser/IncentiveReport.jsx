@@ -1,8 +1,10 @@
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, TrendingUp, Users } from "lucide-react";
 import { useSelector } from "react-redux";
+import { useLocation } from "react-router-dom";
 import IncentiveLeadsModal from "./IncentiveLeadsModal";
+import { BranchSelect } from "./BranchSelect";
 import UseFetch from "../../hooks/useFetch";
 import PropTypes from "prop-types";
 
@@ -45,19 +47,40 @@ function IncentiveTableSkeleton() {
 
 export default function IncentiveReport({ selectedYear, selectedPeriod }) {
   const loggeduser = useSelector((state) => state.auth.user);
+  const location = useLocation();
   const selectedBranch = useSelector(
     (state) => state.companyBranch.selectedBranch
   );
   const isAdmin = loggeduser?.role === "Admin";
 
   const [search, setSearch] = useState("");
+  const [reportBranch, setReportBranch] = useState(selectedBranch || "");
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
   const [showLeadsModal, setShowLeadsModal] = useState(false);
 
+  const isScoreBoardReport = location.state?.incentiveScope === "self";
+  const isSelfReport = isScoreBoardReport && Boolean(loggeduser?._id);
+
+  useEffect(() => {
+    setReportBranch(selectedBranch || "");
+  }, [selectedBranch]);
+
+  const branchOptions = useMemo(() => {
+    const options = (loggeduser?.selected || [])
+      .filter((branch) => branch?.branch_id)
+      .map((branch) => ({ id: branch.branch_id, label: branch.branchName }));
+
+    if (reportBranch && !options.some((branch) => String(branch.id) === String(reportBranch))) {
+      options.push({ id: reportBranch, label: "Selected branch" });
+    }
+
+    return [...new Map(options.map((branch) => [String(branch.id), branch])).values()];
+  }, [loggeduser?.selected, reportBranch]);
+
   const incentiveReportUrl =
-    selectedBranch && selectedYear && selectedPeriod
-      ? `/target/getIncentiveReport?year=${selectedYear}&period=${encodeURIComponent(selectedPeriod)}&selectedBranch=${selectedBranch}`
+    reportBranch && selectedYear && selectedPeriod
+      ? `/target/getIncentiveReport?year=${selectedYear}&period=${encodeURIComponent(selectedPeriod)}&selectedBranch=${reportBranch}`
       : null;
   const {
     data: incentiveData,
@@ -74,19 +97,23 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
   const filteredBranches = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
-    if (!keyword) return branches;
-
     return branches
       .map((branch) => ({
         ...branch,
-        users: (branch?.users || []).filter((user) =>
-          `${user?.name || ""} ${user?.designation || ""}`
-            .toLowerCase()
-            .includes(keyword)
-        ),
+        users: (branch?.users || []).filter((user) => {
+          const matchesLoggedUser =
+            !isSelfReport || String(user?.userId) === String(loggeduser?._id);
+          const matchesSearch =
+            !keyword ||
+            `${user?.name || ""} ${user?.designation || ""}`
+              .toLowerCase()
+              .includes(keyword);
+
+          return matchesLoggedUser && matchesSearch;
+        }),
       }))
       .filter((branch) => branch.users.length > 0);
-  }, [branches, search]);
+  }, [branches, isSelfReport, loggeduser?._id, search]);
 
   const handleOpenUserLeads = (user) => {
     const total = getUserTotal(user?.allocations);
@@ -121,7 +148,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                 Incentive Report
               </h1>
               <p className="text-xs text-gray-500">
-                {isAdmin ? "Staff-wise achievement" : "Your branch achievement"}
+                {isSelfReport ? "Your incentive achievement" : "Branch-wise incentive achievement"}
                 <span className="mx-1.5 text-gray-300">•</span>
                 {selectedPeriod || "Select a period"} {selectedYear || ""}
               </p>
@@ -129,14 +156,35 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
           </div>
 
           <div className="flex w-full flex-wrap gap-2 lg:w-auto">
+            {!isSelfReport && (
+              <div className="min-w-48 flex-1 sm:w-56 lg:w-64">
+                <BranchSelect
+                  value={reportBranch}
+                  onChange={setReportBranch}
+                  options={branchOptions}
+                  label="Branch"
+                  labletrue
+                  className="w-full"
+                />
+              </div>
+            )}
             <div className="relative min-w-48 flex-1 sm:w-56 lg:w-64">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search staff..."
-                className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
-              />
+              <label
+                htmlFor="incentive-staff-search"
+                className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-transparent select-none"
+              >
+                Search
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  id="incentive-staff-search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search staff..."
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -173,7 +221,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
 
             return (
               <section key={branch.branchId} className="mb-5 last:mb-0">
-                {isAdmin && (
+                {!isSelfReport && (
                   <div className="mb-2 flex items-center justify-between px-1">
                     <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-700">
                       {branch.branchName || "Unnamed branch"}
@@ -321,12 +369,12 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
 
       {showLeadsModal && selectedUser && selectedAllocation && (
         <IncentiveLeadsModal
-          key={`${selectedBranch}:${selectedYear}:${selectedPeriod}:${selectedUser.userId}`}
+          key={`${reportBranch}:${selectedYear}:${selectedPeriod}:${selectedUser.userId}`}
           user={selectedUser}
           allocation={selectedAllocation}
           year={Number(selectedYear)}
           period={selectedPeriod}
-          selectedBranch={selectedBranch}
+          selectedBranch={reportBranch}
           canEditAssignments={isAdmin || (loggeduser?.role === "Staff" && loggeduser?.isVerified === true &&
             loggeduser?.permissions?.some((permission) => permission.LeadReallocation === true)) || false}
           onClose={closeLeadsModal}

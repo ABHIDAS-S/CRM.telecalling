@@ -128,6 +128,7 @@ const staffSchema = new Schema(
         FollowupSummary: Boolean,
         ProductWiseReport: Boolean,
         SalesFunnel: Boolean,
+        IncentiveReport: { type: Boolean, default: false },
         ClosedLeads: Boolean,
         LeaveApplication: { type: Boolean, default: true },
         SignUpCustomer: Boolean,

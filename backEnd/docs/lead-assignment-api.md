@@ -16,7 +16,8 @@ Both routes use the existing `jwt_primary` cookie authentication:
 
 GET returns `{ success: true, data: { assignments, users } }`. Each assignment
 contains `assignmentId`, `label`, `assignedUserName`, `incentiveUserName`, `date`,
-`completed`, and `expected`. Each user contains only `userId`, `name`, and `model`.
+`completed`, `isFollowupClosingRecord`, `closedByName`, and `expected`. Each user contains
+only `userId`, `name`, and `model`.
 Send the selected record's **unchanged `expected` object** back in PATCH:
 
 ```json

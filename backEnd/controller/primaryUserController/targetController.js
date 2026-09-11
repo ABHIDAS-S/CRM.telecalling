@@ -2291,7 +2291,7 @@ export const gettargetResult = async (req, res) => {
       ),
     })
       .select(`
-        leadId leadDate leadClosed paymentVerified
+        leadId leadDate customerName mobile phone leadClosed paymentVerified
         netAmount balanceAmount totalPaidAmount
         forcefullyClosedTarget leadFor paymentHistory activityLog
       `)
@@ -2301,8 +2301,10 @@ export const gettargetResult = async (req, res) => {
     const serviceIds = new Set();
     const staffIds = new Set();
     const adminIds = new Set();
+    const customerIds = new Set();
 
     for (const lead of leads) {
+      if (lead.customerName) customerIds.add(String(lead.customerName));
       const leadItems = objects(lead.leadFor);
 
       const paymentEntries = objects(
@@ -2338,7 +2340,7 @@ export const gettargetResult = async (req, res) => {
       }
     }
 
-    const [products, services, staffs, admins] =
+    const [products, services, staffs, admins, customers] =
       await Promise.all([
         Product.find({
           _id: { $in: [...productIds] },
@@ -2365,6 +2367,10 @@ export const gettargetResult = async (req, res) => {
           _id: { $in: [...adminIds] },
         })
           .select("name designation")
+          .lean(),
+
+        Customer.find({ _id: { $in: [...customerIds] } })
+          .select("customerName name")
           .lean(),
       ]);
 
@@ -2410,6 +2416,12 @@ export const gettargetResult = async (req, res) => {
 
     const adminMap = new Map(
       admins.map((admin) => [String(admin._id), admin])
+    );
+    const customerMap = new Map(
+      customers.map((customer) => [
+        String(customer._id),
+        customer.customerName || customer.name || "",
+      ])
     );
 
     const resolveUser = (userId, userModel) => {
@@ -2486,6 +2498,7 @@ export const gettargetResult = async (req, res) => {
           id: String(item.productorServiceId),
           model: item.productorServicemodel,
           name: meta.name,
+          licenseNumber: item.licenseNumber || null,
         });
       }
 
@@ -2834,6 +2847,8 @@ export const gettargetResult = async (req, res) => {
                 leadId: lead.leadId || "",
                 leadMongoId: String(lead._id),
                 leadDate: lead.leadDate,
+                customerName: customerMap.get(String(lead.customerName || "")) || "",
+                mobile: lead.mobile || lead.phone || "",
 
                 achievedByUserId,
                 achievedByModel,
@@ -2864,6 +2879,7 @@ export const gettargetResult = async (req, res) => {
                   id: item.id,
                   model: item.model,
                   name: item.name,
+                  licenseNumber: item.licenseNumber,
                 })),
               },
             ],

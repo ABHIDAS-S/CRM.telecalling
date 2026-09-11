@@ -1498,6 +1498,7 @@ import {
   FiActivity,
   FiUserCheck,
   FiUserX,
+  FiDollarSign,
 } from "react-icons/fi"
 import {
   MessageSquareText,
@@ -1660,7 +1661,8 @@ onpasswordClick,
           { to: "/admin/transaction/lead/leadFollowUp", label: "In Follow-Up", icon: FiClock },
           { to: "/admin/transaction/lead/ownedLeadlist", label: "Own Lead", icon: FiUserCheck },
           { to: "/admin/transaction/lead/lostLeads", label: "Lost Leads", icon: FiUserX },
-{to:"/admin/reports/closed-leads",label:"Closed Leads",icon:FiUserCheck}
+{to:"/admin/reports/closed-leads",label:"Closed Leads",icon:FiUserCheck},
+          { to: "/admin/reports/incentiveReport", label: "Incentive", icon: FiDollarSign }
         ],
       },
       {

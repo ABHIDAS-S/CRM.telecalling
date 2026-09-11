@@ -11346,7 +11346,46 @@ export const GetselectedLeadData = async (req, res) => {
           },
         ],
       })
+      .populate({ path: "activityLog.taskBy", select: "taskName" })
+      .populate({ path: "activityLog.taskId", select: "taskName" })
       .lean();
+
+    // These references use dynamic Staff/Admin model names. Populate them
+    // explicitly, as is done for Own Lead List, so the timeline receives names
+    // instead of raw ObjectIds.
+    if (selectedLead?.activityLog?.length) {
+      selectedLead.activityLog = await Promise.all(
+        selectedLead.activityLog.map(async (activity) => {
+          const populatedActivity = { ...activity };
+
+          if (
+            activity?.submittedUser &&
+            isValidObjectId(activity.submittedUser) &&
+            mongoose.models[activity.submissiondoneByModel]
+          ) {
+            populatedActivity.submittedUser = await mongoose
+              .model(activity.submissiondoneByModel)
+              .findById(activity.submittedUser)
+              .select("name")
+              .lean();
+          }
+
+          if (
+            activity?.taskallocatedTo &&
+            isValidObjectId(activity.taskallocatedTo) &&
+            mongoose.models[activity.taskallocatedToModel]
+          ) {
+            populatedActivity.taskallocatedTo = await mongoose
+              .model(activity.taskallocatedToModel)
+              .findById(activity.taskallocatedTo)
+              .select("name")
+              .lean();
+          }
+
+          return populatedActivity;
+        })
+      );
+    }
 
     if (
       !selectedLead.leadByModel ||
