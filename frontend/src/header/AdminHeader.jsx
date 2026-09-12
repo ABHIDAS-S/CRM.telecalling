@@ -1662,7 +1662,7 @@ onpasswordClick,
           { to: "/admin/transaction/lead/ownedLeadlist", label: "Own Lead", icon: FiUserCheck },
           { to: "/admin/transaction/lead/lostLeads", label: "Lost Leads", icon: FiUserX },
 {to:"/admin/reports/closed-leads",label:"Closed Leads",icon:FiUserCheck},
-          { to: "/admin/reports/incentiveReport", label: "Incentive", icon: FiDollarSign }
+          { to: "/admin/reports/incentiveReport", label: "Incentive", icon: FiDollarSign, state: { incentiveEntry: "navbar" } }
         ],
       },
       {
@@ -1777,7 +1777,7 @@ onpasswordClick,
               <button
                 key={child.to}
                 type="button"
-                onClick={() => handleSafeNavigate(child.to)}
+                onClick={() => handleSafeNavigate(child.to, { state: child.state })}
                 className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] font-medium transition ${
                   isPathActive(child.to)
                     ? "bg-[#243145] text-white"
@@ -2128,7 +2128,7 @@ onpasswordClick,
                                     <button
                                       key={child.to}
                                       type="button"
-                                      onClick={() => handleSafeNavigate(child.to)}
+                                      onClick={() => handleSafeNavigate(child.to, { state: child.state })}
                                       className={`flex w-full items-center gap-1.5 rounded-xl px-3 py-2 text-left text-[13px] font-medium ${
                                         isPathActive(child.to)
                                           ? "bg-[#243145] text-white"

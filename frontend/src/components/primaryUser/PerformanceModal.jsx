@@ -1004,6 +1004,7 @@ function AchievedLeadsModal({ userName, leads, loggedUser, onClose, onEventLog, 
             </thead>
             <tbody className="divide-y divide-slate-100">
               {uniqueLeads.map((lead) => {
+console.log(lead)
                 const displayName = lead.customerName || lead.leadId || "—";
                 const showTooltip = displayName !== "—" && displayName.length > 20; // adjust threshold as needed
 

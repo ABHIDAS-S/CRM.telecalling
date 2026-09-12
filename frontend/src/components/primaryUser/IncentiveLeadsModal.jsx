@@ -352,7 +352,8 @@ export default function IncentiveLeadsModal({
   const filtered = leads.filter(
     (l) =>
       String(l.leadId || "").toLowerCase().includes(search.toLowerCase()) ||
-      String(l.partyName || "").toLowerCase().includes(search.toLowerCase())
+      String(l.partyName || "").toLowerCase().includes(search.toLowerCase()) ||
+      String(l.productName || "").toLowerCase().includes(search.toLowerCase())
   )
 
   const total = filtered.reduce(
@@ -434,6 +435,9 @@ export default function IncentiveLeadsModal({
                         <p className="truncate text-xs text-gray-700">
                           {lead.partyName || "—"}
                         </p>
+                        <p className="truncate text-[11px] text-gray-500">
+                          {lead.productName || "—"}
+                        </p>
                         <p className="mt-0.5 text-[11px] text-gray-400">
                           {lead.date
                             ? new Date(lead.date).toLocaleDateString("en-GB")
@@ -478,6 +482,9 @@ export default function IncentiveLeadsModal({
                     Party Name
                   </th>
                   <th className="px-6 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                    Product Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
                     Date
                   </th>
                   {allocationColumns.map((column) => (
@@ -504,7 +511,10 @@ export default function IncentiveLeadsModal({
                       {lead.leadId}
                     </td>
                     <td className="px-6 py-3.5 text-sm text-gray-800">
-                      {lead.partyName}
+                      {lead.partyName || "—"}
+                    </td>
+                    <td className="px-6 py-3.5 text-sm text-gray-700">
+                      {lead.productName || "—"}
                     </td>
                     <td className="px-6 py-3.5 text-sm text-gray-500">
                       {lead.date

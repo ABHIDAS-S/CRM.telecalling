@@ -2078,6 +2078,7 @@ export default function StaffHeader({
             to: "/staff/reports/incentiveReport",
             label: "Incentive",
             icon: FiDollarSign,
+            state: { incentiveEntry: "navbar" },
             control: permissions.IncentiveReport ?? false
           }
         ]
@@ -2282,7 +2283,7 @@ export default function StaffHeader({
                 <button
                   key={child.to}
                   type="button"
-                  onClick={() => handleSafeNavigate(child.to)}
+                  onClick={() => handleSafeNavigate(child.to, { state: child.state })}
                   className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] font-medium transition ${
                     isPathActive(child.to)
                       ? "bg-[#243145] text-white"
@@ -2649,7 +2650,7 @@ export default function StaffHeader({
                                         key={child.to}
                                         type="button"
                                         onClick={() =>
-                                          handleSafeNavigate(child.to)
+                                          handleSafeNavigate(child.to, { state: child.state })
                                         }
                                         className={`flex w-full items-center gap-1.5 rounded-xl px-3 py-2 text-left text-[13px] font-medium ${
                                           isPathActive(child.to)

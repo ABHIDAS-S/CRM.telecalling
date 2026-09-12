@@ -1,15 +1,15 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Search, TrendingUp, Users } from "lucide-react";
 import { useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
-import IncentiveLeadsModal from "./IncentiveLeadsModal";
 import { BranchSelect } from "./BranchSelect";
-import UseFetch from "../../hooks/useFetch";
+import { CustomSelect } from "../common/CustomSelect";
+import useCachedFetch from "../../hooks/useCachedFetch";
+import { formatDisplayCurrency } from "../../helper/formatDisplayNumber";
 import PropTypes from "prop-types";
 
-const formatAmount = (value) =>
-  `₹${Number(value || 0).toLocaleString("en-IN")}`;
+const formatAmount = formatDisplayCurrency;
 
 const getUserTotal = (allocations = []) =>
   allocations.reduce(
@@ -25,6 +25,19 @@ const getInitials = (name = "") =>
     .map((part) => part[0])
     .join("")
     .toUpperCase() || "U";
+
+const IncentiveLeadsModal = lazy(() => import("./IncentiveLeadsModal"));
+
+function useDebouncedValue(value, delay = 350) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedValue(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 function IncentiveTableSkeleton() {
   return (
@@ -58,9 +71,15 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
   const [showLeadsModal, setShowLeadsModal] = useState(false);
+  const debouncedSearch = useDebouncedValue(search);
 
   const isScoreBoardReport = location.state?.incentiveScope === "self";
   const isSelfReport = isScoreBoardReport && Boolean(loggeduser?._id);
+  const isNavbarReport = location.state?.incentiveEntry === "navbar";
+  const [navbarYear, setNavbarYear] = useState(
+    String(selectedYear || new Date().getFullYear())
+  );
+  const [navbarPeriod, setNavbarPeriod] = useState("");
 
   useEffect(() => {
     setReportBranch(selectedBranch || "");
@@ -78,16 +97,41 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
     return [...new Map(options.map((branch) => [String(branch.id), branch])).values()];
   }, [loggeduser?.selected, reportBranch]);
 
+  const navbarPeriodsUrl =
+    isNavbarReport && reportBranch && navbarYear
+      ? `/target/gettargetresult?month=1&year=${navbarYear}&periodMode=all&selectedBranch=${reportBranch}`
+      : null;
+  const { data: navbarTargetData } = useCachedFetch(navbarPeriodsUrl);
+  const navbarPeriodOptions = useMemo(
+    () =>
+      [...new Set(navbarTargetData?.periods || [])],
+    [navbarTargetData]
+  );
+
+  useEffect(() => {
+    if (!isNavbarReport || !navbarPeriodOptions.length) return;
+    if (!navbarPeriodOptions.includes(navbarPeriod)) {
+      setNavbarPeriod(
+        navbarTargetData?.selectedPeriodName || navbarPeriodOptions[0]
+      );
+    }
+  }, [isNavbarReport, navbarPeriod, navbarPeriodOptions, navbarTargetData]);
+
+  const reportYear = isNavbarReport ? navbarYear : selectedYear;
+  const reportPeriod = isNavbarReport ? navbarPeriod : selectedPeriod;
+
   const incentiveReportUrl =
-    reportBranch && selectedYear && selectedPeriod
-      ? `/target/getIncentiveReport?year=${selectedYear}&period=${encodeURIComponent(selectedPeriod)}&selectedBranch=${reportBranch}`
+    reportBranch && reportYear && reportPeriod
+      ? `/target/getIncentiveReport?year=${reportYear}&period=${encodeURIComponent(reportPeriod)}&selectedBranch=${reportBranch}`
       : null;
   const {
     data: incentiveData,
     loading,
+    isRefreshing,
     error,
-    refreshHook,
-  } = UseFetch(incentiveReportUrl);
+    isOffline,
+    refresh: refreshReport,
+  } = useCachedFetch(incentiveReportUrl);
   const branches = useMemo(
     () =>
       Array.isArray(incentiveData?.branches) ? incentiveData.branches : [],
@@ -95,7 +139,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
   );
 
   const filteredBranches = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+    const keyword = debouncedSearch.trim().toLowerCase();
 
     return branches
       .map((branch) => ({
@@ -113,9 +157,9 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
         }),
       }))
       .filter((branch) => branch.users.length > 0);
-  }, [branches, isSelfReport, loggeduser?._id, search]);
+  }, [branches, isSelfReport, loggeduser?._id, debouncedSearch]);
 
-  const handleOpenUserLeads = (user) => {
+  const handleOpenUserLeads = useCallback((user) => {
     const total = getUserTotal(user?.allocations);
 
     setSelectedUser(user);
@@ -126,13 +170,13 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
       allocations: user?.allocations || [],
     });
     setShowLeadsModal(true);
-  };
+  }, []);
 
-  const closeLeadsModal = () => {
+  const closeLeadsModal = useCallback(() => {
     setShowLeadsModal(false);
     setSelectedUser(null);
     setSelectedAllocation(null);
-  };
+  }, []);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#ADD8E6] p-2 sm:p-3">
@@ -150,13 +194,55 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
               <p className="text-xs text-gray-500">
                 {isSelfReport ? "Your incentive achievement" : "Branch-wise incentive achievement"}
                 <span className="mx-1.5 text-gray-300">•</span>
-                {selectedPeriod || "Select a period"} {selectedYear || ""}
+                {reportPeriod || "Select a period"} {reportYear || ""}
               </p>
             </div>
           </div>
 
           <div className="flex w-full flex-wrap gap-2 lg:w-auto">
-            {!isSelfReport && (
+            {isNavbarReport && (
+              <>
+                <CustomSelect
+                  label="Period"
+                  labletrue
+                  value={navbarPeriod}
+                  onChange={setNavbarPeriod}
+                  placeholder="Select period"
+                  className="min-w-36 flex-1 sm:w-44 lg:w-48"
+                  options={navbarPeriodOptions.map((period) => ({
+                    value: period,
+                    label: String(period).replace(/\s+\d{4}$/, "")
+                  }))}
+                />
+                <CustomSelect
+                  label="Year"
+                  labletrue
+                  value={navbarYear}
+                  onChange={(year) => {
+                      setNavbarYear(year);
+                      setNavbarPeriod("");
+                  }}
+                  className="min-w-28 flex-1 sm:w-32 lg:w-36"
+                  options={Array.from({ length: 6 }, (_, index) => {
+                      const year = String(new Date().getFullYear() - index);
+                      return { value: year, label: year };
+                    })}
+                />
+                <CustomSelect
+                  label="Branch"
+                  labletrue
+                  value={reportBranch}
+                  onChange={setReportBranch}
+                  placeholder="Select branch"
+                  className="min-w-44 flex-1 sm:w-52 lg:w-56"
+                  options={branchOptions.map((branch) => ({
+                    value: branch.id,
+                    label: branch.label
+                  }))}
+                />
+              </>
+            )}
+            {!isNavbarReport && !isSelfReport && (
               <div className="min-w-48 flex-1 sm:w-56 lg:w-64">
                 <BranchSelect
                   value={reportBranch}
@@ -191,15 +277,32 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
       </section>
 
       <main className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-white p-3 shadow-sm ring-1 ring-black/5 sm:p-4">
-        {loading ? (
+        {(isRefreshing || isOffline) && branches.length > 0 && (
+          <div className="mb-3 flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <span>{isOffline ? "Offline — showing the last loaded report." : "Updating report…"}</span>
+            {isOffline && (
+              <button type="button" onClick={refreshReport} className="font-semibold underline">
+                Retry
+              </button>
+            )}
+          </div>
+        )}
+        {loading && branches.length === 0 ? (
           <IncentiveTableSkeleton />
-        ) : error ? (
+        ) : error && branches.length === 0 ? (
           <div className="grid min-h-56 place-items-center rounded-xl border border-dashed border-red-200 bg-red-50 px-4 text-center">
             <div>
               <p className="text-sm font-semibold text-red-700">
                 Failed to load incentive report
               </p>
               <p className="mt-1 text-xs text-red-500">{error}</p>
+              <button
+                type="button"
+                onClick={refreshReport}
+                className="mt-3 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                Retry
+              </button>
             </div>
           </div>
         ) : filteredBranches.length === 0 ? (
@@ -368,18 +471,20 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
       </main>
 
       {showLeadsModal && selectedUser && selectedAllocation && (
-        <IncentiveLeadsModal
-          key={`${reportBranch}:${selectedYear}:${selectedPeriod}:${selectedUser.userId}`}
-          user={selectedUser}
-          allocation={selectedAllocation}
-          year={Number(selectedYear)}
-          period={selectedPeriod}
-          selectedBranch={reportBranch}
-          canEditAssignments={isAdmin || (loggeduser?.role === "Staff" && loggeduser?.isVerified === true &&
-            loggeduser?.permissions?.some((permission) => permission.LeadReallocation === true)) || false}
-          onClose={closeLeadsModal}
-          onAssignmentUpdated={refreshHook}
-        />
+        <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/20" />}>
+          <IncentiveLeadsModal
+            key={`${reportBranch}:${reportYear}:${reportPeriod}:${selectedUser.userId}`}
+            user={selectedUser}
+            allocation={selectedAllocation}
+            year={Number(reportYear)}
+            period={reportPeriod}
+            selectedBranch={reportBranch}
+            canEditAssignments={isAdmin || (loggeduser?.role === "Staff" && loggeduser?.isVerified === true &&
+              loggeduser?.permissions?.some((permission) => permission.LeadReallocation === true)) || false}
+            onClose={closeLeadsModal}
+            onAssignmentUpdated={refreshReport}
+          />
+        </Suspense>
       )}
     </div>
   );

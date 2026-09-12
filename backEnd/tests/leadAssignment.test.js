@@ -237,3 +237,46 @@ test("incentive details and report move rewards to the corrected owner and prese
   assert.equal(incentiveOwnerModel(lead.activityLog[0]), "Staff");
   assert.equal(String(incentiveOwnerId(lead.activityLog[1])), String(ids.old));
 });
+
+test("the Lead allocation credits leadBy over a legacy first-activity submitter", async () => {
+  await Lead.updateOne(
+    { _id: ids.lead },
+    {
+      $set: {
+        leadBy: ids.old,
+        leadByModel: "Staff",
+        "activityLog.0.submittedUser": ids.replacement,
+        "activityLog.0.submissiondoneByModel": "Staff",
+        allocationType: ids.otherTask,
+        "activityLog.1.taskBy": null,
+      },
+    }
+  );
+  await Product.collection.insertOne({
+    _id: ids.product,
+    selected: [{ category_id: ids.category }],
+  });
+  await TargetConfiguration.collection.insertOne({
+    branch: ids.branch,
+    year: 2026,
+    periodName: "September",
+    categoryId: ids.category,
+    startDate: new Date("2026-09-01"),
+    endDate: new Date("2026-09-30"),
+    allocationValues: [{ allocationId: ids.otherTask, value: 100 }],
+    monthlyTargets: [],
+  });
+
+  const query = `year=2026&period=September&selectedBranch=${ids.branch}`;
+  const report = await request(`/report?${query}`);
+  const user = report.data.branches[0].users.find(
+    (item) => item.userId === String(ids.old)
+  );
+  const details = await request(
+    `/details?${query}&userId=${ids.old}&allocationId=${ids.otherTask}`
+  );
+
+  assert.equal(user.totalAmount, 100);
+  assert.equal(details.data.leads.length, 1);
+  assert.equal(details.data.leads[0].leadId, "LEAD-TEST");
+});

@@ -2476,33 +2476,43 @@ export const gettargetResult = async (req, res) => {
       return null;
     };
 
-    const getLeadCategoryItems = (
-      lead,
-      configCategoryId
-    ) => {
-      const entries = [];
+    const getPrimaryLeadItem = (lead) => {
+      const items = objects(lead.leadFor);
+      const isAdditionalService = (item) =>
+        item.isDefaultService === true || Boolean(item.parentPrimaryProductId);
 
-      for (const item of objects(lead.leadFor)) {
-        const meta = getItemMeta(item);
+      // Additional/default services belong to their parent product. A lead is
+      // therefore measured against the primary product's category only.
+      return (
+        items.find(
+          (item) =>
+            !isAdditionalService(item) &&
+            item.productorServicemodel === "Product"
+        ) ||
+        items.find((item) => !isAdditionalService(item)) ||
+        items[0] ||
+        null
+      );
+    };
 
-        if (!meta?.categoryId) continue;
+    const getLeadCategoryItems = (lead, configCategoryId) => {
+      const primaryItem = getPrimaryLeadItem(lead);
+      const meta = getItemMeta(primaryItem);
 
-        if (
-          String(meta.categoryId) !==
-          String(configCategoryId)
-        ) {
-          continue;
-        }
-
-        entries.push({
-          id: String(item.productorServiceId),
-          model: item.productorServicemodel,
-          name: meta.name,
-          licenseNumber: item.licenseNumber || null,
-        });
+      if (
+        !primaryItem ||
+        !meta?.categoryId ||
+        String(meta.categoryId) !== String(configCategoryId)
+      ) {
+        return [];
       }
 
-      return entries;
+      return [{
+        id: String(primaryItem.productorServiceId),
+        model: primaryItem.productorServicemodel,
+        name: meta.name,
+        licenseNumber: primaryItem.licenseNumber || null,
+      }];
     };
 
     const getVerifiedAmountForCategory = (
@@ -3128,6 +3138,36 @@ const buildIncentiveReportData = async ({
         )
       : [];
   const num = (value) => Number(value) || 0;
+  // The first activity represents lead creation, so the Lead incentive belongs
+  // to leadBy. A submitted user or an assignment correction on that activity
+  // must not move the Lead reward away from the person who generated the lead.
+  // Other allocations retain their explicit correction/submitted-user owner.
+  // taskallocatedTo is deliberately not a fallback: assignment is not proof
+  // of completion.
+  const getIncentiveOwner = (lead, activity, activityIndex) => {
+    if (activityIndex === 0 && lead.leadBy) {
+      return {
+        userId: String(lead.leadBy),
+        userModel: lead.leadByModel || "Staff",
+      };
+    }
+
+    if (activity.incentiveAssignedUser) {
+      return {
+        userId: String(activity.incentiveAssignedUser),
+        userModel: activity.incentiveAssignedUserModel || "Staff",
+      };
+    }
+
+    if (activity.submittedUser) {
+      return {
+        userId: String(activity.submittedUser),
+        userModel: activity.submissiondoneByModel || "Staff",
+      };
+    }
+
+    return null;
+  };
   const branchQuery =
     selectedBranch === "all" ? {} : { branch: selectedBranch };
 
@@ -3178,7 +3218,7 @@ const buildIncentiveReportData = async ({
     .select(
       `leadId leadDate leadBranch customerName paymentVerified netAmount
        balanceAmount totalPaidAmount forcefullyClosedTarget leadFor
-       paymentHistory activityLog`
+       paymentHistory activityLog leadBy leadByModel allocationType`
     )
     .lean();
 
@@ -3219,10 +3259,10 @@ const buildIncentiveReportData = async ({
       .lean(),
     Branch.find({ _id: { $in: branchIds } }).select("branchName").lean(),
     Product.find({ _id: { $in: [...productIds] } })
-      .select("selected.category_id category_id categoryId")
+      .select("productName name selected.category_id category_id categoryId")
       .lean(),
     Service.find({ _id: { $in: [...serviceIds] } })
-      .select("selected.category_id category_id categoryId")
+      .select("serviceName name selected.category_id category_id categoryId")
       .lean(),
     Customer.find({ _id: { $in: [...customerIds] } })
       .select("customerName name")
@@ -3249,6 +3289,26 @@ const buildIncentiveReportData = async ({
   };
   products.forEach(registerCategory);
   services.forEach(registerCategory);
+  const productNameMap = new Map([
+    ...products.map((product) => [
+      String(product._id),
+      product.productName || product.name || "",
+    ]),
+    ...services.map((service) => [
+      String(service._id),
+      service.serviceName || service.name || "",
+    ]),
+  ]);
+  const getLeadProductName = (lead) =>
+    [...new Set(
+      objects(lead.leadFor)
+        .map((item) =>
+          String(item.productorServiceName || "").trim() ||
+          productNameMap.get(String(item.productorServiceId || "")) ||
+          ""
+        )
+        .filter(Boolean)
+    )].join(", ");
 
   const branchAllocationMap = new Map();
   for (const config of targetConfigs) {
@@ -3331,15 +3391,23 @@ const buildIncentiveReportData = async ({
       );
 
       for (const [activityIndex, activity] of objects(lead.activityLog).entries()) {
-        const userId = String(incentiveOwnerId(activity) || "");
-        if (!userId) continue;
+        const owner = getIncentiveOwner(lead, activity, activityIndex);
+        if (!owner) continue;
+        const { userId, userModel } = owner;
         const taskById = String(activity.taskBy || "");
         const taskId = String(activity.taskId || "");
+        // Lead creation is stored in two historical shapes. Newer records use
+        // activity.taskBy; older records keep the configured Lead task on the
+        // parent document as allocationType. Match either representation.
+        const leadAllocationId =
+          activityIndex === 0 ? String(lead.allocationType || "") : "";
         const allocationId = rules.has(taskById)
           ? taskById
           : rules.has(taskId)
             ? taskId
-            : "";
+            : rules.has(leadAllocationId)
+              ? leadAllocationId
+              : "";
         if (!allocationId) continue;
 
         const completed =
@@ -3373,7 +3441,7 @@ const buildIncentiveReportData = async ({
         awarded.add(rewardKey);
         userModels.set(
           userId,
-          incentiveOwnerModel(activity) === "Admin" ? "Admin" : "Staff"
+          userModel === "Admin" ? "Admin" : "Staff"
         );
 
         if (!earnedByBranch.has(branchId)) earnedByBranch.set(branchId, new Map());
@@ -3391,6 +3459,7 @@ const buildIncentiveReportData = async ({
           leadId: lead.leadId || "",
           leadMongoId: String(lead._id),
           partyName: customerMap.get(String(lead.customerName || "")) || "",
+          productName: getLeadProductName(lead),
           date: lead.leadDate,
           allocationId,
           allocationLabel:
@@ -3565,6 +3634,7 @@ export const getIncentiveLeads = async (req, res) => {
           leadId: detail.leadId,
           leadMongoId: detail.leadMongoId,
           partyName: detail.partyName,
+          productName: detail.productName,
           date: detail.date,
           allocationMap: new Map(),
         });
@@ -3599,6 +3669,7 @@ export const getIncentiveLeads = async (req, res) => {
         leadId: lead.leadId,
         leadMongoId: lead.leadMongoId,
         partyName: lead.partyName,
+        productName: lead.productName,
         date: lead.date,
         allocations,
         totalAmount: allocations.reduce(

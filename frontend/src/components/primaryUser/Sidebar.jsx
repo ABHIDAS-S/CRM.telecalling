@@ -15,6 +15,7 @@ import {
   CheckCircle2
 } from "lucide-react"
 import { CustomSelect } from "../common/CustomSelect"
+import { formatDisplayNumber } from "../../helper/formatDisplayNumber"
 
 const MONTH_NAME_TO_NUM = {
   january: 1,
@@ -76,8 +77,6 @@ const CATEGORY_THEMES = [
     pill: "bg-violet-50 text-violet-700"
   }
 ]
-
-const formatAmount = (num = 0) => `${Number(num || 0)}`
 
 const getShortMonth = (monthName = "") => {
   const key = String(monthName).trim().toLowerCase()
@@ -151,7 +150,7 @@ const CategoryCard = ({ item, index, onClick }) => {
             />
           </div>
           <div className="text-[11px] font-bold text-slate-800">
-            {formatAmount(achieved)}
+            {formatDisplayNumber(achieved)}
           </div>
           <ChevronRight size={14} className="text-slate-400" />
         </div>
@@ -206,6 +205,10 @@ const Sidebar = ({
   branchOptions,
   categorylist,
   targetLoading,
+  targetRefreshing,
+  targetError,
+  targetOffline,
+  onRetryTarget,
   BranchSelect,
   SkeletonTable,
   selectedYear,
@@ -392,11 +395,11 @@ console.log(normalizedCategories)
             </div>
 
             <div className="mt-1 flex items-center justify-between">
-              <span className="text-[10px] font-medium leading-4 text-slate-200">
+              <span className="text-[12px] font-medium leading-4 text-slate-200">
                 Achieved Points
               </span>
-              <span className="text-[14px] font-semibold leading-none text-white">
-                {achievedPoints}
+              <span className="text-[18px] font-bold leading-none text-white">
+                {formatDisplayNumber(achievedPoints)}
               </span>
             </div>
           </div>
@@ -436,6 +439,16 @@ console.log(normalizedCategories)
                 <Layers size={15} className="text-white/90" />
                 Categories
               </div>
+
+              {(targetRefreshing || targetError || targetOffline) && (
+                <button
+                  type="button"
+                  onClick={onRetryTarget}
+                  className="text-[9px] font-medium text-white/75 underline hover:text-white"
+                >
+                  {targetOffline ? "Offline" : targetError ? "Retry" : "Updating…"}
+                </button>
+              )}
 
               {/* <button
                 type="button"
