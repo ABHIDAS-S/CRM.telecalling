@@ -6493,7 +6493,7 @@ const getAttendanceCoverageByPunch = ({ punchIn, punchOut, lateLimit, minOutTime
     afternoon: punchOut != null && punchOut >= minOutTime
   };
 };
-const recomputeDayFromCoverage = (day, user, dateKey,arr) => {
+const recomputeDayFromCoverage = (day, user, dateKey, arr) => {
   const workedMorning =
     day.coverage.attendance.morning || day.coverage.onsite.morning;
   const workedAfternoon =
@@ -6524,10 +6524,10 @@ const recomputeDayFromCoverage = (day, user, dateKey,arr) => {
   day.present = present;
   day.notMarked = Math.max(0, 1 - coveredTotal);
   if (user.name === "Abhishek EV") {
-    console.log("arr,date,converted",arr, dateKey,coveredTotal)
-//     console.log("coveredmorning", coveredMorning)
-//  console.log("coveredafter", coveredAfternoon)
-console.log("workedmorining",workedMorning)
+    console.log("arr,date,converted", arr, dateKey, coveredTotal)
+    //     console.log("coveredmorning", coveredMorning)
+    //  console.log("coveredafter", coveredAfternoon)
+    console.log("workedmorining", workedMorning)
   }
   if (coveredMorning && coveredAfternoon) {
     day.notMarked = 0;
@@ -6538,7 +6538,7 @@ console.log("workedmorining",workedMorning)
   }
 }
 
-const applyLeaveToDay = (day, leaveDoc,user,dateKey) => {
+const applyLeaveToDay = (day, leaveDoc, user, dateKey) => {
   if (!day || !leaveDoc || leaveDoc.onsite === true || !APPROVED(leaveDoc)) return;
 
   const bucket = normalizeLeaveCategory(leaveDoc.leaveCategory);
@@ -6577,8 +6577,8 @@ const applyLeaveToDay = (day, leaveDoc,user,dateKey) => {
       day.coverage.onsite.afternoon = false;
     }
   }
-const arr="applyleave"
-  recomputeDayFromCoverage(day,user,dateKey,arr);
+  const arr = "applyleave"
+  recomputeDayFromCoverage(day, user, dateKey, arr);
 };
 
 
@@ -6612,9 +6612,9 @@ const applyOnsiteToDay = (day, onsiteDoc, user, dateKey) => {
     day.coverage.onsite.afternoon = true;
   } else {
     const period = onsiteDoc.halfDayPeriod || "Afternoon";
-if(user.name===""){
-console.log("datekeyyyyyy",dateKey,period)
-}
+    if (user.name === "") {
+      console.log("datekeyyyyyy", dateKey, period)
+    }
     if (period === "Morning") {
       day.coverage.onsite.morning = true;
     }
@@ -6630,8 +6630,8 @@ console.log("datekeyyyyyy",dateKey,period)
       // }
     }
   }
-const arr="applyonsite"
-  recomputeDayFromCoverage(day, user, dateKey,arr);
+  const arr = "applyonsite"
+  recomputeDayFromCoverage(day, user, dateKey, arr);
 }
 
 
@@ -6737,8 +6737,8 @@ const classifyAttendanceDay = ({
 
   day.coverage.attendance.morning = attendanceCoverage.morning;
   day.coverage.attendance.afternoon = attendanceCoverage.afternoon;
-const arr="classifyattendance"
-  recomputeDayFromCoverage(day,user,dateKey,arr);
+  const arr = "classifyattendance"
+  recomputeDayFromCoverage(day, user, dateKey, arr);
 
   if (!attendanceCoverage.morning && !attendanceCoverage.afternoon) {
     day.cantchange = true;
@@ -7036,10 +7036,10 @@ export const GetsomeAll = async (req, res, yearParam = {}, monthParam = {}) => {
 
 
         for (const leave of dayLeaves) {
-          applyLeaveToDay(day, leave,user,dateKey);
+          applyLeaveToDay(day, leave, user, dateKey);
         }
 
-        recomputeDayFromCoverage(day,user,dateKey);
+        recomputeDayFromCoverage(day, user, dateKey);
 
         const leaveTotal = getLeaveTotal(day);
         if (leaveTotal === 0.5) stats.halfDayLeave += 0.5;
@@ -7426,56 +7426,172 @@ export const StaffRegister = async (req, res) => {
 //   }
 // }
 
+// export const UpdateUserandAdmin = async (req, res) => {
+//   const { userId, userData, tabledata, imageData = {} } = req.body   // ✅ default imageData too, avoids a crash if it's ever missing entirely
+//   const { profileUrl, documentUrl } = imageData                       // ✅ no default here — undefined vs "" vs real value are now distinguishable
+//   const { role } = userData
+//   console.log("pffff", profileUrl)
+//   console.log(typeof profileUrl === "string")
+
+//   const { assignedto, profileUrl: _ignoredProfileUrl, documentUrl: _ignoredDocumentUrl, ...filteredUserData } = userData
+
+//   const { password } = filteredUserData
+//   const assignedtoId = assignedto
+
+//   let assignedtoModel
+//   const isStaff = await Staff.exists({ _id: assignedtoId })
+//   const isAdmin = await Admin.exists({ _id: assignedtoId })
+//   if (isStaff) {
+//     assignedtoModel = "Staff"
+//   } else if (isAdmin) {
+//     assignedtoModel = "Admin"
+//   }
+
+//   try {
+//     const updateQuery = {
+//       $set: {
+//         assignedtoModel,
+//         assignedto,
+//         ...filteredUserData
+//       }
+//     }
+
+//     if (tabledata.length === 0) {
+//       updateQuery.$set.selected = []
+//     } else {
+//       updateQuery.$set.selected = tabledata
+//     }
+
+//     if (updateQuery.$set.password) {
+//       const salt = await bcrypt.genSalt(10)
+//       const hashedPassword = await bcrypt.hash(password, salt)
+//       updateQuery.$set.password = hashedPassword
+//     } else {
+//       delete updateQuery.$set.password
+//     }
+
+//     // Only write these fields when a real, non-empty new value came through.
+//     // typeof check + truthy check together handle: key missing entirely,
+//     // key present but "", and key present with a real URL — all correctly.
+//     if (typeof profileUrl === "string") {
+//       updateQuery.$set.profileUrl = profileUrl
+//     }
+//     if (typeof documentUrl === "string" && documentUrl.length > 0) {
+//       updateQuery.$set.documentUrl = documentUrl
+//     }
+
+//     const updateStaff = await Staff.findByIdAndUpdate(
+//       userId,
+//       updateQuery,
+//       { new: true }
+//     )
+
+//     if (!updateStaff) {
+//       return res.status(404).json({ message: "Not found" })
+//     }
+
+//     return res.status(200).json({ message: "updated succesfully" })
+//   } catch (error) {
+//     console.log("error:", error.message)
+//     res.status(500).json({ message: "Internal servor error" })
+//   }
+// }
 export const UpdateUserandAdmin = async (req, res) => {
-  const { userId, userData, tabledata, imageData = {} } = req.body   // ✅ default imageData too, avoids a crash if it's ever missing entirely
-  const { profileUrl, documentUrl } = imageData                       // ✅ no default here — undefined vs "" vs real value are now distinguishable
+  const { userId, userData, tabledata = [], imageData = {} } = req.body
+
+  const { profileUrl, documentUrl } = imageData
   const { role } = userData
+
   console.log("pffff", profileUrl)
   console.log(typeof profileUrl === "string")
 
-  const { assignedto, profileUrl: _ignoredProfileUrl, documentUrl: _ignoredDocumentUrl, ...filteredUserData } = userData
+  const {
+    assignedto,
+    profileUrl: _ignoredProfileUrl,
+    documentUrl: _ignoredDocumentUrl,
+    ...filteredUserData
+  } = userData
 
   const { password } = filteredUserData
   const assignedtoId = assignedto
 
-  let assignedtoModel
-  const isStaff = await Staff.exists({ _id: assignedtoId })
-  const isAdmin = await Admin.exists({ _id: assignedtoId })
-  if (isStaff) {
-    assignedtoModel = "Staff"
-  } else if (isAdmin) {
-    assignedtoModel = "Admin"
-  }
-
   try {
+    let assignedtoModel
+
+    /*
+      Avoid querying with undefined/null assignedto.
+      This prevents unnecessary or invalid `exists()` calls.
+    */
+    if (assignedtoId) {
+      const isStaff = await Staff.exists({ _id: assignedtoId })
+      const isAdmin = await Admin.exists({ _id: assignedtoId })
+
+      if (isStaff) {
+        assignedtoModel = "Staff"
+      } else if (isAdmin) {
+        assignedtoModel = "Admin"
+      }
+    }
+
     const updateQuery = {
       $set: {
-        assignedtoModel,
-        assignedto,
         ...filteredUserData
       }
     }
 
-    if (tabledata.length === 0) {
-      updateQuery.$set.selected = []
-    } else {
-      updateQuery.$set.selected = tabledata
+    /*
+      Only update assignedto fields if the frontend included assignedto.
+      If it is absent, the existing assigned-to user/model remains unchanged.
+    */
+    if (assignedto !== undefined) {
+      updateQuery.$set.assignedto = assignedto
+      updateQuery.$set.assignedtoModel = assignedtoModel
     }
 
-    if (updateQuery.$set.password) {
-      const salt = await bcrypt.genSalt(10)
-      const hashedPassword = await bcrypt.hash(password, salt)
-      updateQuery.$set.password = hashedPassword
+    /*
+      Explicitly set the selected companies/branches.
+      [] clears all selections.
+    */
+    updateQuery.$set.selected = tabledata
+
+    /*
+      Update password + password expiry only when a usable new password exists.
+      Do not update passwordExpiryAt when editing unrelated user fields.
+    */
+    if (typeof password === "string" && password.trim().length > 0) {
+    
+
+      const expiryDate = new Date()
+      expiryDate.setMonth(expiryDate.getMonth() + 2)
+
+      updateQuery.$set.password = password
+      updateQuery.$set.passwordExpiryAt = expiryDate
     } else {
+      /*
+        Important: Prevent password: "" / undefined from overwriting
+        the existing stored password.
+      */
       delete updateQuery.$set.password
     }
 
-    // Only write these fields when a real, non-empty new value came through.
-    // typeof check + truthy check together handle: key missing entirely,
-    // key present but "", and key present with a real URL — all correctly.
+    /*
+      profileUrl:
+      - undefined => do not modify stored profile image.
+      - ""        => clear stored profile image.
+      - URL       => replace stored profile image.
+    */
     if (typeof profileUrl === "string") {
       updateQuery.$set.profileUrl = profileUrl
     }
+
+    /*
+      documentUrl:
+      - undefined => leave unchanged.
+      - ""        => leave unchanged with your current requirement.
+      - URL       => update.
+      
+      If you also want "" to clear the document, remove `&& documentUrl.length > 0`.
+    */
     if (typeof documentUrl === "string" && documentUrl.length > 0) {
       updateQuery.$set.documentUrl = documentUrl
     }
@@ -7483,17 +7599,26 @@ export const UpdateUserandAdmin = async (req, res) => {
     const updateStaff = await Staff.findByIdAndUpdate(
       userId,
       updateQuery,
-      { new: true }
+      {
+        new: true,
+        runValidators: true
+      }
     )
 
     if (!updateStaff) {
       return res.status(404).json({ message: "Not found" })
     }
 
-    return res.status(200).json({ message: "updated succesfully" })
+    return res.status(200).json({
+      message: "Updated successfully",
+      passwordExpiryAt: updateStaff.passwordExpiryAt
+    })
   } catch (error) {
-    console.log("error:", error.message)
-    res.status(500).json({ message: "Internal servor error" })
+    console.error("UpdateUserandAdmin error:", error)
+
+    return res.status(500).json({
+      message: "Internal server error"
+    })
   }
 }
 export const Login = async (req, res) => {
@@ -7561,6 +7686,8 @@ export const Login = async (req, res) => {
         message: "Your password has expired. Please change your password.",
         passwordExpired: true,
         userId: user._id,
+        department: user?.department,
+        role: user?.role,
         passwordExpiryAt
       })
     }
@@ -7570,7 +7697,7 @@ export const Login = async (req, res) => {
     if (token) {
       const { password, ...userwithoutpassword } = user
 
-      
+
       return res.status(200).json({
         message: "Login successful",
         token,
@@ -7592,11 +7719,13 @@ export const Login = async (req, res) => {
     })
   }
 }
-
 export const changePassword = async (req, res) => {
   try {
     const { userId, currentPassword, newPassword, confirmPassword } = req.body
-
+console.log("userid",userId)
+console.log("currentpassword",currentPassword)
+console.log("newpassword",newPassword)
+console.log("confirmPassword",confirmPassword)
     if (!currentPassword || !newPassword || !confirmPassword) {
       return res.status(400).json({ message: "All password fields are required" })
     }
@@ -7604,47 +7733,111 @@ export const changePassword = async (req, res) => {
     if (newPassword !== confirmPassword) {
       return res.status(400).json({ message: "Confirm password does not match" })
     }
+
     let user = null
 
+    // Remove .lean() - you need the full Mongoose document to call .save()
     user = await Staff.findById(userId)
     if (user) {
+
       true
     } else {
       user = await Admin.findById(userId)
-
     }
+
     if (!user) {
       return res.status(404).json({ message: "User not found" })
     }
-
+console.log("userrrrr",user?.password)
     const isMatch = await bcrypt.compare(currentPassword, user.password)
     if (!isMatch) {
       return res.status(400).json({ message: "Current password is incorrect" })
     }
 
-    // const hashedPassword = await bcrypt.hash(newPassword, 10)
-    console.log("newpaswword", newPassword)
-    console.log("currrentpasss", currentPassword)
-    // console.log("hashedpasss",hashedPassword)
-    console.log("user", user)
     const expiryDate = new Date()
     expiryDate.setMonth(expiryDate.getMonth() + 2)
 
+    // Hash the new password before saving
+    // const hashedPassword = await bcrypt.hash(newPassword, 10)
     user.password = newPassword
     user.passwordExpiryAt = expiryDate
     await user.save()
 
+    const token = generateToken(res, user)
+    const leavemasterdata = await Leavemaster.find({})
+    const { password, ...userwithoutpassword } = user.toObject()
+
     return res.status(200).json({
       message: "Password updated successfully",
+      token,
+      user: userwithoutpassword,
+      leavemasterdata,
       passwordExpiryAt: expiryDate
     })
   } catch (error) {
+    console.log("error", error?.message)
+    console.log("errorrrrrrrrrrrr", error)
     return res.status(500).json({
       message: "Failed to update password",
       error: error.message
     })
   }
 }
+
+// export const changePassword = async (req, res) => {
+//   try {
+//     const { userId, currentPassword, newPassword, confirmPassword } = req.body
+
+//     if (!currentPassword || !newPassword || !confirmPassword) {
+//       return res.status(400).json({ message: "All password fields are required" })
+//     }
+
+//     if (newPassword !== confirmPassword) {
+//       return res.status(400).json({ message: "Confirm password does not match" })
+//     }
+//     let user = null
+
+//     user = await Staff.findById(userId).lean()
+//     if (user) {
+//       true
+//     } else {
+//       user = await Admin.findById(userId).lean()
+
+//     }
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" })
+//     }
+
+//     const isMatch = await bcrypt.compare(currentPassword, user.password)
+//     if (!isMatch) {
+//       return res.status(400).json({ message: "Current password is incorrect" })
+//     }
+
+//     const expiryDate = new Date()
+//     expiryDate.setMonth(expiryDate.getMonth() + 2)
+
+//     user.password = newPassword
+//     user.passwordExpiryAt = expiryDate
+//     await user.save()
+//     const token = generateToken(res, user)
+//     const leavemasterdata = await Leavemaster.find({})
+//     const { password, ...userwithoutpassword } = user
+//     return res.status(200).json({
+//       message: "Password updated successfully",
+//       token,
+//       user: userwithoutpassword,
+//       leavemasterdata,
+//       passwordExpiryAt: expiryDate
+//     })
+//   } catch (error) {
+// console.log("error",error?.message)
+// console.log("errorrrrrrrrrrrr",error)
+//     return res.status(500).json({
+//       message: "Failed to update password",
+//       error: error.message
+//     })
+//   }
+// }
 
 export const Logout = (req, res) => {
   try {
@@ -13223,7 +13416,7 @@ export const GetsomeAllsummary = async (
           applyLeaveToDay(day, leave);
         }
 
-        recomputeDayFromCoverage(day,user,dateKey);
+        recomputeDayFromCoverage(day, user, dateKey);
 
         const leaveTotal = getLeaveTotal(day);
         if (leaveTotal === 0.5) stats.halfDayLeave += 0.5;

@@ -17,7 +17,7 @@ import {
   selectedCompany as setSelectedCompany
 } from "../../../../slices/companyBranchSlice.js"
 const Login = () => {
-console.log("hhhh")
+  console.log("hhhh")
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [loading, setLoading] = useState(false)
   const dispatch = useDispatch()
@@ -58,15 +58,7 @@ console.log("hhhh")
           setLocalStorageItem("companybranches", allcompanybranches)
           setLocalStorageItem("loggeduserBranchOptions", uniqueBranches)
           setLocalStorageItem("checkinTime", leavemasterdata[0]?.checkIn)
-          // localStorage.setItem("activeCompany", JSON.stringify(selectedCompany))
-          // setLocalStorageItem("loggeduserBranchOptions", uniqueBranches)
-          // setLocalStorageItem("selectedBranch", selectedCompany.branch_id)
-          // setLocalStorageItem("loggeduserbranches", loggeduserbranches)
-          // setLocalStorageItem("companybranches", allcompanybranches)
-          // setLocalStorageItem("checkinTime", leavemasterdata[0]?.checkIn)
 
-          //
-          // Update Redux
           dispatch(setSelectedCompany(selectedCompany))
           dispatch(setsliceselectedBranch(selectedCompany.branch_id))
           dispatch(loggeduserBranches(loggeduserbranches))
@@ -129,15 +121,27 @@ console.log("hhhh")
     } catch (error) {
       console.log(error)
       const expired = error?.response?.data?.passwordExpired
+      console.log(expired)
       const message = error?.response?.data?.message || "Something went wrong"
-
+      console.log(error?.response?.data)
       if (expired) {
         toast.error(message)
-
+        // Store minimal required data for password change flow
+        localStorage.setItem(
+          "pendingPasswordReset",
+          JSON.stringify({
+            userId: error?.response?.data?.userId,
+            role: error?.response?.data?.role,
+            department: error?.response?.data?.department,
+            expired: true
+          })
+        )
         // Option 1: redirect to a dedicated reset/change password page
         navigate("/change-password", {
           state: {
             userId: error?.response?.data?.userId,
+            role: error?.response?.data?.role,
+            department: error?.response?.data?.department,
             expired: true
           }
         })

@@ -142,11 +142,7 @@ export default function ClosedLeads() {
     UseFetch(closedLeadsUrl)
   const pageLoading = loading || closedLeadsLoading
   console.log(closedleads)
-  console.log(selectedreduxbranch)
-  console.log(verifiedLead)
-  console.log(isdepartmentisAccountant)
-  console.log(selectedreduxbranch)
-  console.log(collectionlead)
+
   const a = collectionlead?.filter((item) => item.null)
   console.log(a)
   const { data: branchProduct } = UseFetch(
@@ -278,6 +274,7 @@ export default function ClosedLeads() {
   }, [loggedUserBranches])
   console.log("Hh")
   useEffect(() => {
+    console.log(closedleads)
     if (closedleads?.closedLeads && closedleads?.closedLeads?.length > 0) {
       setTableData(normalizeTableData(closedleads?.closedLeads))
 
@@ -912,8 +909,10 @@ export default function ClosedLeads() {
                 }
                 className="min-w-0 bg-transparent text-[11px] text-slate-700 outline-none"
               />
-            
+             
             </div>
+
+            
           </div>
         </section>
         <section className="flex min-h-0 flex-1 flex-col p-2 md:p-3">

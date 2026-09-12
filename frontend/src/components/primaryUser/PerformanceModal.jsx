@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
+import PropTypes from "prop-types"
+import { BellRing, Eye } from "lucide-react"
+import api from "../../api/api"
+import { LeadhistoryModal } from "./LeadhistoryModal"
 
 import { FancySelect } from "../common/FancySelect"
 export function PerformanceModal({
@@ -38,7 +43,6 @@ console.log(products)
   console.log(targetData)
   console.log(open)
   console.log(modalOpen)
-  if (!open) return null
   console.log(loggedUser)
   console.log(selectedUser)
   console.log(selectedUser)
@@ -48,6 +52,8 @@ console.log(products)
   console.log(selectedperiod)
   console.log(allperiods)
   const [selectedDatapopup, setselectedDataPopup] = useState({})
+  const [achievedLeadDrilldown, setAchievedLeadDrilldown] = useState(null)
+  const [historyDialog, setHistoryDialog] = useState(null)
   const [activeMetric, setActiveMetric] = useState("achieved")
   const [allusersData, setallusersData] = useState([])
   const [userwisetargetData, setuserwisetargetdata] = useState({})
@@ -119,6 +125,9 @@ console.log(products)
   }, [targetData?.selectedPeriodName, periodmode, yearSelected])
   console.log(categoryId)
   console.log(targetData)
+  const userWiseResults = Array.isArray(targetData?.userWiseResults)
+    ? targetData.userWiseResults
+    : []
   useEffect(() => {
     if (
       categoryId &&
@@ -126,7 +135,7 @@ console.log(products)
       typeof targetData === "object" &&
       !Array.isArray(targetData)
     ) {
-      const filteredselectedCategory = targetData?.userWiseResults
+      const filteredselectedCategory = userWiseResults
         .flatMap((user) => user.categories || [])
         .filter((item) => item.categoryId === categoryId)
       console.log("Hh")
@@ -143,19 +152,18 @@ console.log(products)
       setselectedDataPopup(summary)
      
     }
-  }, [targetData])
+  }, [targetData, categoryId, userWiseResults])
 
   const periodOptions = useMemo(() => {
-    return (targetData.periods || []).map((period) => {
+    return (targetData?.periods || []).map((period) => {
       const parsed = getPeriodRange(period)
       return {
         value: period,
         label: parsed?.displayLabel || String(period).replace(/\s+\d{4}$/, "")
       }
     })
-  }, [targetData.periods])
+  }, [targetData?.periods])
   console.log(periodOptions)
-  console.log(targetData.periods)
   const monthOptions = useMemo(() => {
     const parsed = getPeriodRange(localSelectedPeriod)
 
@@ -182,16 +190,6 @@ console.log(products)
     })
   }, [])
   console.log(targetData)
-console.log(targetData?.userWiseResults)
-const u=targetData?.userWiseResults?.filter((it)=>it.userName==="M P Rajasree")
-console.log(u)
-const t=targetData?.userWiseResults.filter((user)=>  user.categories?.some(
-            (cat) => String(cat.categoryId) === String(categoryId)
-          ))
-console.log(t)
-console.log(t?.length)
-const ee=t.map((it)=>it.userName)
-console.log(ee)
   // const handleMetricTab = (tab) => {
   //   setActiveMetric(tab)
   //   console.log(tab)
@@ -291,6 +289,9 @@ const handleMetricTab = (tab) => {
         userId: user.userId,
         userName: user.userName,
         designation: user.designation || "",
+        achievedLeads: matchedCategories.flatMap((cat) =>
+          Array.isArray(cat.achievedLeads) ? cat.achievedLeads : []
+        ),
 
         amount: Number(amount || 0),
 
@@ -357,6 +358,41 @@ const handleMetricTab = (tab) => {
 
     return `Q: ${num.toLocaleString("en-IN")}`
   }
+
+  const openAchievedLeadHistory = async (lead) => {
+    if (!lead?.leadMongoId) return
+    const drilldown = achievedLeadDrilldown
+    setAchievedLeadDrilldown(null)
+    setHistoryDialog({ leadId: lead.leadId, history: [], loading: true, drilldown })
+    try {
+      const response = await api.get(`/lead/getSelectedLead?leadId=${lead.leadMongoId}`)
+      setHistoryDialog((current) => current && ({
+        ...current,
+        history: response.data?.data?.[0]?.activityLog || [],
+        loading: false,
+      }))
+    } catch {
+      setHistoryDialog((current) => current && ({ ...current, loading: false, error: "Unable to load event log." }))
+    }
+  }
+
+  const closeAchievedLeadHistory = () => {
+    const drilldown = historyDialog?.drilldown || null
+    setHistoryDialog(null)
+    setAchievedLeadDrilldown(drilldown)
+  }
+
+  // Keep all hooks above this guard. This component is mounted by Layout on
+  // every route, so rendering its overlay while closed hides the destination
+  // page (including LeadMaster after a View navigation).
+  if (!open && !modalOpen) return null
+
+  const handleAchievedLeadView = () => {
+    setHistoryDialog(null)
+    setAchievedLeadDrilldown(null)
+    onClose?.()
+  }
+
   console.log("hhh")
   return (
     // <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-3 backdrop-blur-sm">
@@ -591,6 +627,7 @@ const handleMetricTab = (tab) => {
     //     )}
     //   </div>
     // </div>
+<>
 <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 p-3 backdrop-blur-sm sm:p-5">
   <div className="flex min-h-full items-center justify-center">
     <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/10 sm:max-h-[calc(100dvh-2.5rem)]">
@@ -749,7 +786,19 @@ const handleMetricTab = (tab) => {
                           </td>
 
                           <td className="px-3 py-2 text-right text-[12px] font-semibold text-slate-900">
-                            {formatValue(item?.amount)}
+                            {activeMetric === "achieved" && Number(item?.amount) > 0 ? (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  setAchievedLeadDrilldown({ userName: item.userName, leads: item.achievedLeads })
+                                }}
+                                className="rounded px-1 text-emerald-700 underline decoration-emerald-300 underline-offset-2 transition hover:bg-emerald-50 hover:text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                                aria-label={`View achieved leads for ${item.userName}`}
+                              >
+                                {formatValue(item?.amount)}
+                              </button>
+                            ) : formatValue(item?.amount)}
                           </td>
                         </tr>
                       );
@@ -864,7 +913,188 @@ const handleMetricTab = (tab) => {
     </div>
   </div>
 </div>
+{achievedLeadDrilldown && (
+  <AchievedLeadsModal
+    userName={achievedLeadDrilldown.userName}
+    leads={achievedLeadDrilldown.leads}
+    loggedUser={loggedUser}
+    onClose={() => setAchievedLeadDrilldown(null)}
+    onEventLog={openAchievedLeadHistory}
+    onViewLead={handleAchievedLeadView}
+  />
+)}
+{historyDialog?.loading && (
+  <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-900/50 p-4">
+    <p className="rounded-xl bg-white px-5 py-4 text-sm font-medium text-slate-700 shadow-xl">Loading event log…</p>
+  </div>
+)}
+{historyDialog && !historyDialog.loading && (
+  historyDialog.error ? (
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-900/50 p-4">
+      <div className="rounded-xl bg-white p-5 text-center shadow-xl"><p className="text-sm text-red-600">{historyDialog.error}</p><button type="button" onClick={closeAchievedLeadHistory} className="mt-3 rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white">Back</button></div>
+    </div>
+  ) : <LeadhistoryModal selectedLeadId={historyDialog.leadId} historyList={historyDialog.history} handlecloseModal={closeAchievedLeadHistory} />
+)}
+</>
   )
+}
+
+function AchievedLeadsModal({ userName, leads, loggedUser, onClose, onEventLog, onViewLead }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const uniqueLeads = [...new Map((leads || []).filter((lead) => lead?.leadMongoId)
+    .map((lead) => [lead.leadMongoId, lead])).values()]
+
+  const viewLeadMaster = (lead) => {
+    const leadMongoId = lead?.leadMongoId || lead?._id
+    if (!leadMongoId) return
+    const isAdmin = loggedUser?.role === "Admin" || location.pathname.startsWith("/admin")
+    const breadcrumb = [
+      { label: "Lead", path: "", state: "" },
+      { label: "Achieved Records", path: location.pathname, state: location.state || {} },
+      { label: "New Lead", path: "" },
+    ]
+    navigate(
+      isAdmin ? "/admin/transaction/lead/leadEdit" : "/staff/transaction/lead/leadEdit",
+      { state: { leadId: leadMongoId, breadcrumb, isReadOnly: true, from: "Ownleadlist" } }
+    )
+    onViewLead()
+  }
+
+  return (
+
+<div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Achieved leads">
+  <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+    <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-4 py-3">
+      <div>
+        <p className="text-sm font-semibold text-slate-800">
+          <span className="mr-2 text-blue-500">●</span>Achieved Records
+        </p>
+        <p className="mt-0.5 text-xs text-slate-500">{userName || "Selected user"}</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500">
+          {uniqueLeads.length} total
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+
+    <div className="overflow-auto p-4">
+      {uniqueLeads.length ? (
+        <div className="overflow-hidden border border-slate-300">
+          <table className="min-w-[1000px] w-full table-fixed border-collapse text-xs">
+            <thead className="bg-blue-600 text-[11px] uppercase tracking-wide text-white">
+              <tr>
+                <th className="w-56 border-r border-blue-400 px-3 py-2 text-left">Name</th>
+                <th className="border-r border-blue-400 px-3 py-2 text-left">Lead ID</th>
+                <th className="border-r border-blue-400 px-3 py-2 text-left">Mobile</th>
+                <th className="border-r border-blue-400 px-3 py-2 text-center">License No.</th>
+                <th className="border-r border-blue-400 px-3 py-2 text-center">Product Name</th>
+                <th className="border-r border-blue-400 px-3 py-2 text-center">Event Log</th>
+                <th className="border-r border-blue-400 px-3 py-2 text-center">View</th>
+                <th className="px-3 py-2 text-right">₹ Net Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {uniqueLeads.map((lead) => {
+console.log(lead)
+                const displayName = lead.customerName || lead.leadId || "—";
+                const showTooltip = displayName !== "—" && displayName.length > 20; // adjust threshold as needed
+
+                return (
+                  <tr key={lead.leadMongoId} className="hover:bg-slate-50">
+                    {/* Name with custom tooltip (positioned above) */}
+                    <td className="border-r border-slate-200 px-3 py-2">
+                      <div className="group relative block max-w-full">
+                        {/* Visible truncated name */}
+                        <div className="truncate font-semibold text-slate-800">
+                          {displayName}
+                        </div>
+
+                        {/* Tooltip */}
+                        {showTooltip && (
+                          <div
+                            className="pointer-events-none absolute bottom-full left-0 z-50 mb-1 hidden w-max max-w-[min(24rem,calc(100vw-3rem))] whitespace-normal break-words rounded-md bg-slate-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block"
+                            role="tooltip"
+                          >
+                            {displayName}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+
+                    <td className="border-r border-slate-200 px-3 py-2 font-semibold text-slate-700">
+                      {lead.leadId || "—"}
+                    </td>
+                    <td className="border-r border-slate-200 px-3 py-2 text-slate-700">
+                      {lead.mobile || "—"}
+                    </td>
+                    <td className="border-r border-slate-200 px-3 py-2 text-center font-medium text-red-500">
+                      {(lead.categoryItems || [])
+                        .map((item) => item.licenseNumber)
+                        .filter(Boolean)
+                        .join(", ") || "—"}
+                    </td>
+                    <td className="border-r border-slate-200 px-3 py-2 text-center font-medium text-blue-700">
+                      {(lead.categoryItems || [])
+                        .map((item) => item.name)
+                        .filter(Boolean)
+                        .join(", ") || "—"}
+                    </td>
+                    <td className="border-r border-slate-200 px-3 py-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => onEventLog(lead)}
+                        className="inline-flex rounded bg-indigo-600 px-3 py-1 text-white transition hover:bg-indigo-700"
+                        aria-label={`View event log for ${lead.leadId || "lead"}`}
+                      >
+                        <BellRing className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                    <td className="border-r border-slate-200 px-3 py-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => viewLeadMaster(lead)}
+                        className="inline-flex items-center gap-1 rounded bg-blue-600 px-4 py-1 text-xs font-semibold text-white transition hover:bg-blue-700"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        View
+                      </button>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-green-700">
+                      ₹ {Number(lead.netAmount || 0).toLocaleString("en-IN")}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="py-8 text-center text-sm text-slate-500">
+          No achieved leads found for this user.
+        </p>
+      )}
+    </div>
+  </div>
+</div>
+  )
+}
+
+AchievedLeadsModal.propTypes = {
+  userName: PropTypes.string,
+  leads: PropTypes.array,
+  loggedUser: PropTypes.shape({ role: PropTypes.string }),
+  onClose: PropTypes.func.isRequired,
+  onEventLog: PropTypes.func.isRequired,
+  onViewLead: PropTypes.func.isRequired,
 }
 
 function SummaryPill({ label, value, tone, active, onClick, isAmountMode }) {

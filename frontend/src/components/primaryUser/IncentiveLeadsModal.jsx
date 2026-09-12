@@ -294,81 +294,85 @@
 //     </div>
 //   )
 // }
-import { useEffect, useState } from "react"
+import { useMemo, useState } from "react"
 import { X, Search, FileSpreadsheet } from "lucide-react"
-
-// Static mock — replace with your real API call later.
-// Signature matches what the component expects:
-// async ({ userId, allocationKey, month, year }) => [{ leadId, partyName, date, amount }]
-const fetchIncentiveLeads = async ({ userId, allocationKey, month, year }) => {
-  console.log("fetchIncentiveLeads called with", { userId, allocationKey, month, year })
-
-  // simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 500))
-
-  return [
-    { leadId: "00013", partyName: "capson marketing", date: "2026-08-02", amount: 1500 },
-    { leadId: "00021", partyName: "vijaya park", date: "2026-08-04", amount: 2200 },
-    { leadId: "00034", partyName: "roy international", date: "2026-08-06", amount: 800 },
-    { leadId: "00041", partyName: "mercedez", date: "2026-08-09", amount: 3000 },
-
-  ]
-}
+import UseFetch from "../../hooks/useFetch"
+import PropTypes from "prop-types"
+import LeadAssignmentEditor from "./LeadAssignmentEditor"
 
 export default function IncentiveLeadsModal({
-  user = { userId: "u1", name: "Preetha K.P" },
-  allocation = { key: "coding", label: "Coding" },
-  month = 8,
-  year = 2026,
-  monthLabel = "August",
+  user,
+  allocation,
+  year,
+  period,
+  selectedBranch,
+  canEditAssignments = false,
+  onAssignmentUpdated = () => {},
   onClose = () => {}
 }) {
-  const [loading, setLoading] = useState(true)
-  const [leads, setLeads] = useState([])
   const [search, setSearch] = useState("")
+  const [editingLead, setEditingLead] = useState(null)
+  const [success, setSuccess] = useState("")
+  const detailsUrl =
+    user?.userId && selectedBranch && period && year && allocation?.key
+      ? `/target/getIncentiveLeads?userId=${user.userId}&year=${year}&period=${encodeURIComponent(period)}&selectedBranch=${selectedBranch}&allocationId=${allocation.key}`
+      : null
+  const { data, loading, error, refreshHook } = UseFetch(detailsUrl)
+  // Older detail responses omit the capability flag. Use the logged-in user's
+  // permission in that case; an explicit server denial always takes precedence.
+  const editingAllowed = data?.canEditAssignments ?? canEditAssignments
+  const editButton = (lead) => (
+    <button type="button" onClick={() => { setSuccess(""); setEditingLead(lead) }}
+      disabled={!editingAllowed || !lead.leadMongoId}
+      title={!editingAllowed ? "Requires Admin or LeadReallocation permission" : !lead.leadMongoId ? "This lead has no assignment record ID" : "Change the assigned person"}
+      aria-label={`Edit assigned person for lead ${lead.leadId}`}
+      className="rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">Edit</button>
+  )
+  const leads = useMemo(
+    () => (Array.isArray(data?.leads) ? data.leads : []),
+    [data]
+  )
 
-  useEffect(() => {
-    let active = true
-    const load = async () => {
-      setLoading(true)
-      try {
-        const res = await fetchIncentiveLeads({
-          userId: user.userId,
-          allocationKey: allocation.key,
-          month,
-          year
-        })
-        if (active) setLeads(res || [])
-      } catch (e) {
-        console.log(e)
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
-    load()
-    return () => {
-      active = false
-    }
-  }, [user, allocation, month, year])
+  const allocationColumns = useMemo(() => {
+    const columns = new Map()
+    leads.forEach((lead) => {
+      const allocations = lead?.allocations || []
+      allocations.forEach((item) => {
+        if (item?.allocationId && !columns.has(item.allocationId)) {
+          columns.set(item.allocationId, {
+            key: item.allocationId,
+            label: item.label || "Allocation"
+          })
+        }
+      })
+    })
+    return [...columns.values()]
+  }, [leads])
 
   const filtered = leads.filter(
     (l) =>
-      l.leadId?.toLowerCase().includes(search.toLowerCase()) ||
-      l.partyName?.toLowerCase().includes(search.toLowerCase())
+      String(l.leadId || "").toLowerCase().includes(search.toLowerCase()) ||
+      String(l.partyName || "").toLowerCase().includes(search.toLowerCase()) ||
+      String(l.productName || "").toLowerCase().includes(search.toLowerCase())
   )
 
-  const total = filtered.reduce((sum, l) => sum + (l.amount || 0), 0)
+  const total = filtered.reduce(
+    (sum, lead) => sum + Number(lead.totalAmount || 0),
+    0
+  )
+  const formatAmount = (value) =>
+    `₹${Number(value || 0).toLocaleString("en-IN")}`
 
   return (
     <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-sm flex items-center justify-center z-[60] p-3 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[88vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex-shrink-0 px-6 py-4 border-b border-gray-100">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-base font-bold text-gray-900">{allocation.label}</h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                {user.name} · {monthLabel} {year}
+                {user.name} · {period} {year}
               </p>
             </div>
             <button
@@ -390,9 +394,11 @@ export default function IncentiveLeadsModal({
               />
             </div>
             <div className="text-xs font-semibold text-gray-500 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full whitespace-nowrap">
-              ₹{total.toLocaleString()} total
+              {formatAmount(total)} total
             </div>
           </div>
+          {success && <p role="status" className="mt-2 text-sm text-green-700">{success}</p>}
+          {!loading && !error && !editingAllowed && <p className="mt-2 text-xs text-gray-500">Editing assignments requires Admin or LeadReallocation permission.</p>}
         </div>
 
         {/* Table */}
@@ -403,13 +409,70 @@ export default function IncentiveLeadsModal({
                 <div key={i} className="h-10 rounded-lg bg-gray-100 animate-pulse" />
               ))}
             </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-16 text-red-500">
+              <p className="text-sm font-medium">Unable to load incentive leads</p>
+              <p className="mt-1 text-xs">{error}</p>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
               <FileSpreadsheet className="w-8 h-8 mb-2" />
               <p className="text-sm font-medium">No leads found</p>
             </div>
           ) : (
-            <table className="min-w-full">
+            <>
+              <div className="space-y-3 p-3 md:hidden">
+                {filtered.map((lead) => (
+                  <article
+                    key={lead.leadMongoId || lead.leadId}
+                    className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-blue-700">
+                          {lead.leadId || "—"}
+                        </p>
+                        <p className="truncate text-xs text-gray-700">
+                          {lead.partyName || "—"}
+                        </p>
+                        <p className="truncate text-[11px] text-gray-500">
+                          {lead.productName || "—"}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-gray-400">
+                          {lead.date
+                            ? new Date(lead.date).toLocaleDateString("en-GB")
+                            : "—"}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-sm font-bold text-gray-900">
+                        {formatAmount(lead.totalAmount)}
+                      </p>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-3">
+                      {allocationColumns.map((column) => {
+                        const item = (lead.allocations || []).find(
+                          (entry) => entry.allocationId === column.key
+                        )
+                        return (
+                          <div key={column.key} className="rounded-lg bg-gray-50 p-2">
+                            <p className="truncate text-[10px] font-semibold uppercase text-gray-400">
+                              {column.label}
+                            </p>
+                            <p className="mt-0.5 text-xs font-semibold text-gray-800">
+                              {formatAmount(item?.amount)}
+                            </p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="mt-3 flex justify-end">{editButton(lead)}</div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <table className="min-w-full whitespace-nowrap">
               <thead className="sticky top-0 bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="px-6 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
@@ -419,24 +482,39 @@ export default function IncentiveLeadsModal({
                     Party Name
                   </th>
                   <th className="px-6 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                    Product Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
                     Date
                   </th>
-                  {/* <th className="px-6 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
-                    Amount
-                  </th> */}
+                  {allocationColumns.map((column) => (
+                    <th
+                      key={column.key}
+                      className="px-4 py-3 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-500"
+                    >
+                      {column.label}
+                    </th>
+                  ))}
+                  <th className="px-6 py-3 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                    Total
+                  </th>
+                  <th className="sticky right-0 bg-gray-50 px-4 py-3 text-right text-xs text-gray-500">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtered.map((lead, i) => (
+                {filtered.map((lead) => (
                   <tr
-                    key={`${lead.leadId}-${i}`}
+                    key={lead.leadMongoId || lead.leadId}
                     className="hover:bg-blue-50/40 transition-colors"
                   >
                     <td className="px-6 py-3.5 text-sm font-semibold text-blue-700">
                       {lead.leadId}
                     </td>
                     <td className="px-6 py-3.5 text-sm text-gray-800">
-                      {lead.partyName}
+                      {lead.partyName || "—"}
+                    </td>
+                    <td className="px-6 py-3.5 text-sm text-gray-700">
+                      {lead.productName || "—"}
                     </td>
                     <td className="px-6 py-3.5 text-sm text-gray-500">
                       {lead.date
@@ -447,16 +525,57 @@ export default function IncentiveLeadsModal({
                           })
                         : "—"}
                     </td>
-                    {/* <td className="px-6 py-3.5 text-sm font-semibold text-gray-900 text-right">
-                      ₹{Number(lead.amount || 0).toLocaleString()}
-                    </td> */}
+                    {allocationColumns.map((column) => {
+                      const item = (lead.allocations || []).find(
+                        (entry) => entry.allocationId === column.key
+                      )
+                      return (
+                        <td
+                          key={column.key}
+                          className="px-4 py-3.5 text-center text-sm font-semibold text-gray-700"
+                        >
+                          {formatAmount(item?.amount)}
+                        </td>
+                      )
+                    })}
+                    <td className="px-6 py-3.5 text-sm font-semibold text-gray-900 text-right">
+                      {formatAmount(lead.totalAmount)}
+                    </td>
+                    <td className="sticky right-0 bg-white px-4 py-3 text-right">{editButton(lead)}</td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>
+      {editingLead && <LeadAssignmentEditor key={editingLead.leadMongoId}
+        lead={editingLead} onClose={() => setEditingLead(null)}
+        onSaved={() => {
+          setEditingLead(null)
+          setSuccess("Assigned person updated. Incentive reports are refreshing.")
+          refreshHook()
+          onAssignmentUpdated()
+        }} />}
     </div>
   )
+}
+
+IncentiveLeadsModal.propTypes = {
+  user: PropTypes.shape({
+    userId: PropTypes.string.isRequired,
+    name: PropTypes.string
+  }).isRequired,
+  allocation: PropTypes.shape({
+    key: PropTypes.string.isRequired,
+    label: PropTypes.string
+  }).isRequired,
+  year: PropTypes.number.isRequired,
+  period: PropTypes.string.isRequired,
+  selectedBranch: PropTypes.string.isRequired,
+  canEditAssignments: PropTypes.bool,
+  onAssignmentUpdated: PropTypes.func,
+  onClose: PropTypes.func
 }

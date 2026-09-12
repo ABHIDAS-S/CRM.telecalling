@@ -12,6 +12,7 @@ import TaskAnalysis from "../../../pages/primaryUser/List/TaskAnalysis"
 import TaskAnalysisTable from "../../../pages/primaryUser/List/TaskAnalysisTable"
 import ReallocationTable from "../../../pages/primaryUser/List/ReallocationTable"
 import LostLeads from "../../../pages/common/LostLeads"
+
 import CollectionUpdate from "../../../pages/primaryUser/List/CollectionUpdate"
 import LeadClosed from "../../../pages/primaryUser/edit/LeadClosed"
 const transactionsRoutes = [

@@ -1,90 +1,15 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Search, TrendingUp, Users } from "lucide-react";
 import { useSelector } from "react-redux";
-import IncentiveLeadsModal from "./IncentiveLeadsModal";
+import { useLocation } from "react-router-dom";
+import { BranchSelect } from "./BranchSelect";
+import { CustomSelect } from "../common/CustomSelect";
+import useCachedFetch from "../../hooks/useCachedFetch";
+import { formatDisplayCurrency } from "../../helper/formatDisplayNumber";
+import PropTypes from "prop-types";
 
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-/* Change to false when the real incentive-summary API is ready. */
-const USE_DEMO_DATA = true;
-
-const DEMO_BRANCHES = [
-  {
-    branchId: "demo-branch-1",
-    branchName: "CAMET",
-    users: [
-      {
-        userId: "demo-user-1",
-        name: "Preetha K.P",
-        designation: "General Manager",
-        allocations: [
-          { key: "coding", label: "Coding", achieved: 4500 },
-          { key: "implementation", label: "Implementation", achieved: 3200 },
-          { key: "testing", label: "Testing", achieved: 0 },
-          { key: "qc", label: "QC", achieved: 1800 },
-          { key: "lead", label: "Lead", achieved: 6000 },
-          { key: "closing", label: "Closing", achieved: 2000 },
-        ],
-      },
-      {
-        userId: "demo-user-2",
-        name: "Sreeraj Vijay",
-        designation: "Programmer",
-        allocations: [
-          { key: "coding", label: "Coding", achieved: 9000 },
-          { key: "implementation", label: "Implementation", achieved: 0 },
-          { key: "testing", label: "Testing", achieved: 1500 },
-          { key: "qc", label: "QC", achieved: 0 },
-          { key: "lead", label: "Lead", achieved: 0 },
-          { key: "closing", label: "Closing", achieved: 0 },
-        ],
-      },
-      {
-        userId: "demo-user-3",
-        name: "Ruksana Kasim",
-        designation: "Programmer",
-        allocations: [
-          { key: "coding", label: "Coding", achieved: 5200 },
-          { key: "implementation", label: "Implementation", achieved: 2800 },
-          { key: "testing", label: "Testing", achieved: 0 },
-          { key: "qc", label: "QC", achieved: 1200 },
-          { key: "lead", label: "Lead", achieved: 0 },
-          { key: "closing", label: "Closing", achieved: 3500 },
-        ],
-      },
-      {
-        userId: "demo-user-4",
-        name: "Abhidas S",
-        designation: "Marketing Executive",
-        allocations: [
-          { key: "coding", label: "Coding", achieved: 0 },
-          { key: "implementation", label: "Implementation", achieved: 2500 },
-          { key: "testing", label: "Testing", achieved: 0 },
-          { key: "qc", label: "QC", achieved: 0 },
-          { key: "lead", label: "Lead", achieved: 7400 },
-          { key: "closing", label: "Closing", achieved: 9800 },
-        ],
-      },
-    ],
-  },
-];
-
-const formatAmount = (value) =>
-  `₹${Number(value || 0).toLocaleString("en-IN")}`;
+const formatAmount = formatDisplayCurrency;
 
 const getUserTotal = (allocations = []) =>
   allocations.reduce(
@@ -100,6 +25,19 @@ const getInitials = (name = "") =>
     .map((part) => part[0])
     .join("")
     .toUpperCase() || "U";
+
+const IncentiveLeadsModal = lazy(() => import("./IncentiveLeadsModal"));
+
+function useDebouncedValue(value, delay = 350) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedValue(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 function IncentiveTableSkeleton() {
   return (
@@ -120,114 +58,108 @@ function IncentiveTableSkeleton() {
   );
 }
 
-export default function IncentiveReport({
-  loggedUser,
-  fetchIncentiveSummary,
-  fetchUserAllocationBreakdown,
-  fetchIncentiveLeads,
-}) {
+export default function IncentiveReport({ selectedYear, selectedPeriod }) {
   const loggeduser = useSelector((state) => state.auth.user);
+  const location = useLocation();
+  const selectedBranch = useSelector(
+    (state) => state.companyBranch.selectedBranch
+  );
   const isAdmin = loggeduser?.role === "Admin";
 
-  const now = new Date();
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
-  const [branchId, setBranchId] = useState("all");
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [branches, setBranches] = useState([]);
+  const [reportBranch, setReportBranch] = useState(selectedBranch || "");
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
   const [showLeadsModal, setShowLeadsModal] = useState(false);
+  const debouncedSearch = useDebouncedValue(search);
 
-  const branchForRequest = isAdmin
-    ? branchId
-    : loggedUser?.branch?._id || loggeduser?.branch?._id || "all";
+  const isScoreBoardReport = location.state?.incentiveScope === "self";
+  const isSelfReport = isScoreBoardReport && Boolean(loggeduser?._id);
+  const isNavbarReport = location.state?.incentiveEntry === "navbar";
+  const [navbarYear, setNavbarYear] = useState(
+    String(selectedYear || new Date().getFullYear())
+  );
+  const [navbarPeriod, setNavbarPeriod] = useState("");
 
   useEffect(() => {
-    let active = true;
-    let demoTimer = null;
+    setReportBranch(selectedBranch || "");
+  }, [selectedBranch]);
 
-    const load = async () => {
-      setLoading(true);
-      setError("");
+  const branchOptions = useMemo(() => {
+    const options = (loggeduser?.selected || [])
+      .filter((branch) => branch?.branch_id)
+      .map((branch) => ({ id: branch.branch_id, label: branch.branchName }));
 
-      if (USE_DEMO_DATA) {
-        demoTimer = setTimeout(() => {
-          if (!active) return;
-          setBranches(DEMO_BRANCHES);
-          setLoading(false);
-        }, 450);
+    if (reportBranch && !options.some((branch) => String(branch.id) === String(reportBranch))) {
+      options.push({ id: reportBranch, label: "Selected branch" });
+    }
 
-        return;
-      }
+    return [...new Map(options.map((branch) => [String(branch.id), branch])).values()];
+  }, [loggeduser?.selected, reportBranch]);
 
-      if (typeof fetchIncentiveSummary !== "function") {
-        if (active) {
-          setBranches([]);
-          setLoading(false);
-        }
-        return;
-      }
+  const navbarPeriodsUrl =
+    isNavbarReport && reportBranch && navbarYear
+      ? `/target/gettargetresult?month=1&year=${navbarYear}&periodMode=all&selectedBranch=${reportBranch}`
+      : null;
+  const { data: navbarTargetData } = useCachedFetch(navbarPeriodsUrl);
+  const navbarPeriodOptions = useMemo(
+    () =>
+      [...new Set(navbarTargetData?.periods || [])],
+    [navbarTargetData]
+  );
 
-      try {
-        const response = await fetchIncentiveSummary({
-          branchId: branchForRequest,
-          month,
-          year,
-          search: search.trim(),
-        });
+  useEffect(() => {
+    if (!isNavbarReport || !navbarPeriodOptions.length) return;
+    if (!navbarPeriodOptions.includes(navbarPeriod)) {
+      setNavbarPeriod(
+        navbarTargetData?.selectedPeriodName || navbarPeriodOptions[0]
+      );
+    }
+  }, [isNavbarReport, navbarPeriod, navbarPeriodOptions, navbarTargetData]);
 
-        const fetchedBranches = Array.isArray(response?.branches)
-          ? response.branches
-          : Array.isArray(response?.data?.branches)
-            ? response.data.branches
-            : [];
+  const reportYear = isNavbarReport ? navbarYear : selectedYear;
+  const reportPeriod = isNavbarReport ? navbarPeriod : selectedPeriod;
 
-        if (active) setBranches(fetchedBranches);
-      } catch (requestError) {
-        console.error("Failed to load incentive report:", requestError);
-
-        if (active) {
-          setBranches([]);
-          setError(
-            requestError?.response?.data?.message ||
-              requestError?.message ||
-              "Unable to load incentive report"
-          );
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    load();
-
-    return () => {
-      active = false;
-      if (demoTimer) clearTimeout(demoTimer);
-    };
-  }, [branchForRequest, fetchIncentiveSummary, month, search, year]);
+  const incentiveReportUrl =
+    reportBranch && reportYear && reportPeriod
+      ? `/target/getIncentiveReport?year=${reportYear}&period=${encodeURIComponent(reportPeriod)}&selectedBranch=${reportBranch}`
+      : null;
+  const {
+    data: incentiveData,
+    loading,
+    isRefreshing,
+    error,
+    isOffline,
+    refresh: refreshReport,
+  } = useCachedFetch(incentiveReportUrl);
+  const branches = useMemo(
+    () =>
+      Array.isArray(incentiveData?.branches) ? incentiveData.branches : [],
+    [incentiveData]
+  );
 
   const filteredBranches = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-
-    if (!keyword) return branches;
+    const keyword = debouncedSearch.trim().toLowerCase();
 
     return branches
       .map((branch) => ({
         ...branch,
-        users: (branch?.users || []).filter((user) =>
-          `${user?.name || ""} ${user?.designation || ""}`
-            .toLowerCase()
-            .includes(keyword)
-        ),
+        users: (branch?.users || []).filter((user) => {
+          const matchesLoggedUser =
+            !isSelfReport || String(user?.userId) === String(loggeduser?._id);
+          const matchesSearch =
+            !keyword ||
+            `${user?.name || ""} ${user?.designation || ""}`
+              .toLowerCase()
+              .includes(keyword);
+
+          return matchesLoggedUser && matchesSearch;
+        }),
       }))
       .filter((branch) => branch.users.length > 0);
-  }, [branches, search]);
+  }, [branches, isSelfReport, loggeduser?._id, debouncedSearch]);
 
-  const handleOpenUserLeads = (user) => {
+  const handleOpenUserLeads = useCallback((user) => {
     const total = getUserTotal(user?.allocations);
 
     setSelectedUser(user);
@@ -238,13 +170,13 @@ export default function IncentiveReport({
       allocations: user?.allocations || [],
     });
     setShowLeadsModal(true);
-  };
+  }, []);
 
-  const closeLeadsModal = () => {
+  const closeLeadsModal = useCallback(() => {
     setShowLeadsModal(false);
     setSelectedUser(null);
     setSelectedAllocation(null);
-  };
+  }, []);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#ADD8E6] p-2 sm:p-3">
@@ -260,35 +192,117 @@ export default function IncentiveReport({
                 Incentive Report
               </h1>
               <p className="text-xs text-gray-500">
-                {isAdmin ? "Staff-wise achievement" : "Your branch achievement"}
+                {isSelfReport ? "Your incentive achievement" : "Branch-wise incentive achievement"}
                 <span className="mx-1.5 text-gray-300">•</span>
-                {MONTHS[month - 1]} {year}
+                {reportPeriod || "Select a period"} {reportYear || ""}
               </p>
             </div>
           </div>
 
-          <div className="relative w-full sm:w-56 lg:w-64">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search staff..."
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
-            />
+          <div className="flex w-full flex-wrap gap-2 lg:w-auto">
+            {isNavbarReport && (
+              <>
+                <CustomSelect
+                  label="Period"
+                  labletrue
+                  value={navbarPeriod}
+                  onChange={setNavbarPeriod}
+                  placeholder="Select period"
+                  className="min-w-36 flex-1 sm:w-44 lg:w-48"
+                  options={navbarPeriodOptions.map((period) => ({
+                    value: period,
+                    label: String(period).replace(/\s+\d{4}$/, "")
+                  }))}
+                />
+                <CustomSelect
+                  label="Year"
+                  labletrue
+                  value={navbarYear}
+                  onChange={(year) => {
+                      setNavbarYear(year);
+                      setNavbarPeriod("");
+                  }}
+                  className="min-w-28 flex-1 sm:w-32 lg:w-36"
+                  options={Array.from({ length: 6 }, (_, index) => {
+                      const year = String(new Date().getFullYear() - index);
+                      return { value: year, label: year };
+                    })}
+                />
+                <CustomSelect
+                  label="Branch"
+                  labletrue
+                  value={reportBranch}
+                  onChange={setReportBranch}
+                  placeholder="Select branch"
+                  className="min-w-44 flex-1 sm:w-52 lg:w-56"
+                  options={branchOptions.map((branch) => ({
+                    value: branch.id,
+                    label: branch.label
+                  }))}
+                />
+              </>
+            )}
+            {!isNavbarReport && !isSelfReport && (
+              <div className="min-w-48 flex-1 sm:w-56 lg:w-64">
+                <BranchSelect
+                  value={reportBranch}
+                  onChange={setReportBranch}
+                  options={branchOptions}
+                  label="Branch"
+                  labletrue
+                  className="w-full"
+                />
+              </div>
+            )}
+            <div className="relative min-w-48 flex-1 sm:w-56 lg:w-64">
+              <label
+                htmlFor="incentive-staff-search"
+                className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-transparent select-none"
+              >
+                Search
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  id="incentive-staff-search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search staff..."
+                  className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-800 outline-none transition placeholder:text-gray-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       <main className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-white p-3 shadow-sm ring-1 ring-black/5 sm:p-4">
-        {loading ? (
+        {(isRefreshing || isOffline) && branches.length > 0 && (
+          <div className="mb-3 flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <span>{isOffline ? "Offline — showing the last loaded report." : "Updating report…"}</span>
+            {isOffline && (
+              <button type="button" onClick={refreshReport} className="font-semibold underline">
+                Retry
+              </button>
+            )}
+          </div>
+        )}
+        {loading && branches.length === 0 ? (
           <IncentiveTableSkeleton />
-        ) : error ? (
+        ) : error && branches.length === 0 ? (
           <div className="grid min-h-56 place-items-center rounded-xl border border-dashed border-red-200 bg-red-50 px-4 text-center">
             <div>
               <p className="text-sm font-semibold text-red-700">
                 Failed to load incentive report
               </p>
               <p className="mt-1 text-xs text-red-500">{error}</p>
+              <button
+                type="button"
+                onClick={refreshReport}
+                className="mt-3 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                Retry
+              </button>
             </div>
           </div>
         ) : filteredBranches.length === 0 ? (
@@ -299,7 +313,7 @@ export default function IncentiveReport({
                 No incentive data found
               </p>
               <p className="mt-1 text-xs text-gray-400">
-                Try changing the selected month, branch, or staff search.
+                Try changing the selected period, branch, or staff search.
               </p>
             </div>
           </div>
@@ -310,7 +324,7 @@ export default function IncentiveReport({
 
             return (
               <section key={branch.branchId} className="mb-5 last:mb-0">
-                {isAdmin && (
+                {!isSelfReport && (
                   <div className="mb-2 flex items-center justify-between px-1">
                     <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-700">
                       {branch.branchName || "Unnamed branch"}
@@ -457,18 +471,26 @@ export default function IncentiveReport({
       </main>
 
       {showLeadsModal && selectedUser && selectedAllocation && (
-        <IncentiveLeadsModal
-          user={selectedUser}
-          allocation={selectedAllocation}
-          month={month}
-          year={year}
-          monthLabel={MONTHS[month - 1]}
-          fetchIncentiveSummary={fetchIncentiveSummary}
-          fetchUserAllocationBreakdown={fetchUserAllocationBreakdown}
-          fetchIncentiveLeads={fetchIncentiveLeads}
-          onClose={closeLeadsModal}
-        />
+        <Suspense fallback={<div className="fixed inset-0 z-50 bg-black/20" />}>
+          <IncentiveLeadsModal
+            key={`${reportBranch}:${reportYear}:${reportPeriod}:${selectedUser.userId}`}
+            user={selectedUser}
+            allocation={selectedAllocation}
+            year={Number(reportYear)}
+            period={reportPeriod}
+            selectedBranch={reportBranch}
+            canEditAssignments={isAdmin || (loggeduser?.role === "Staff" && loggeduser?.isVerified === true &&
+              loggeduser?.permissions?.some((permission) => permission.LeadReallocation === true)) || false}
+            onClose={closeLeadsModal}
+            onAssignmentUpdated={refreshReport}
+          />
+        </Suspense>
       )}
     </div>
   );
 }
+
+IncentiveReport.propTypes = {
+  selectedYear: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  selectedPeriod: PropTypes.string
+};

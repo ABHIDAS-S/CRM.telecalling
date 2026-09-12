@@ -38,8 +38,8 @@ function LeadEdit() {
 
   const location = useLocation()
   const { leadId, isReadOnly, refreshKey, from } = location.state || {}
-console.log(from)
-console.log(location?.state)
+  console.log(from)
+  console.log(location?.state)
   console.log(isReadOnly)
   console.log(location?.state)
   const nav = [
@@ -134,7 +134,7 @@ console.log(location?.state)
       }
     }
   }, [targetData])
-console.log(leadId)
+  console.log(leadId)
   useEffect(() => {
     console.log("hhhh")
     if (leadId) {
@@ -245,18 +245,25 @@ console.log(leadId)
   }
   console.log(leadId)
 
-  const handleSubmit = async (data, leadData, objectId,from=null,previousLeadCustomer,isCustomerChanged) => {
+  const handleSubmit = async (
+    data,
+    leadData,
+    objectId,
+    from = null,
+    previousLeadCustomer,
+    isCustomerChanged
+  ) => {
     console.log(data)
     console.log(leadData)
-console.log(from)
-console.log(isCustomerChanged)
-console.log(previousLeadCustomer)
+    console.log(from)
+    console.log(isCustomerChanged)
+    console.log(previousLeadCustomer)
 
-const newnetamount = leadData.reduce(
-  (sum, item) => sum + Number(item.netAmount || 0),
-  0
-);
-console.log(newnetamount)
+    const newnetamount = leadData.reduce(
+      (sum, item) => sum + Number(item.netAmount || 0),
+      0
+    )
+    console.log(newnetamount)
 
     console.log(objectId)
 
@@ -267,17 +274,17 @@ console.log(newnetamount)
         {
           data,
           leadData,
-from,
-previousleadCustomer:previousLeadCustomer,
-isCustomerChanged
+          from,
+          previousleadCustomer: previousLeadCustomer,
+          isCustomerChanged
         }
       )
       if (response.status === 200) {
         toast.success(response.data.message)
         setLoader(false)
       }
-console.log(response)
-console.log(response?.data)
+      console.log(response)
+      console.log(response?.data)
       navigate(-1)
     } catch (error) {
       setLoader(false)
@@ -286,15 +293,12 @@ console.log(response?.data)
     }
   }
   console.log("hhhh")
+  console.log(fetcheddata)
   return (
     <div className="h-full bg-[#ADD8E6 overflow-hidden">
       <div className="flex h-full flex-row overflow-hidden">
-       
         <div className="flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden justify-center">
-         
-
           <div className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden  w-full justify-center  bg-[#ADD8E6]">
-        
             <LeadMaster
               process="edit"
               handleEditData={handleSubmit}
@@ -308,7 +312,6 @@ console.log(response?.data)
             />
           </div>
         </div>
-      
       </div>
     </div>
   )

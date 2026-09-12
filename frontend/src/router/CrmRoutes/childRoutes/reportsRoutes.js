@@ -32,7 +32,7 @@ const reportsRoutes = [
   },
   { path: "/admin/reports/sales-funel", component: SalesFunnel },
   { path: "/admin/reports/dailystaffactivity", component: DailyStaffActivity },
-  { path: "/admin//reports/incentiveReport", component: IncentiveReport }
+  { path: "/admin/reports/incentiveReport", component: IncentiveReport }
 
 ];
 

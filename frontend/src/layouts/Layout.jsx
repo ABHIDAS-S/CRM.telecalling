@@ -1,4 +1,3 @@
-
 import React from "react"
 import { useEffect, useRef, useState } from "react"
 import { useSelector, useDispatch } from "react-redux"
@@ -31,7 +30,7 @@ const Layout = () => {
   const [selectedMonth, setSelectedMonth] = useState(
     String(now.getMonth() + 1).padStart(2, "0")
   )
-console.log(selectedMonth)
+  console.log(selectedMonth)
   const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()))
   console.log(selectedMonth)
   const [categorylist, setcategorylist] = useState([])
@@ -96,8 +95,7 @@ console.log(selectedMonth)
     "/admin/transaction/lead/collectionUpdate",
     "/staff/transaction/lead/lostLeads",
     "/admin/transaction/lead/lostLeads",
-"/admin/reports/closed-leads",
-"/staff/transaction/lead/closed-leads",
+    "/admin/reports/closed-leads",
     "/staff/reports/summary",
     "/admin/reports/summary",
     "/staff/reports/expiry-register",
@@ -117,6 +115,7 @@ console.log(selectedMonth)
     "/staff/transaction/leave-application",
     "/admin/transaction/leave-application",
     "/staff/reports/account-search",
+    "/staff/transaction/lead/closed-leads",
     "/admin/reports/account-search",
     "/staff/transaction/lead",
     "/admin/transaction/lead",
@@ -129,9 +128,17 @@ console.log(selectedMonth)
     "staff/transaction/lead/verifiedCollections"
   ]
 
-  const shouldshowSidebar = hideHeaderRoutes.some((route) =>
-    matchPath({ path: route, end: true }, location.pathname)
-  )
+  const isScoreBoardIncentiveReport =
+    location.state?.incentiveScope === "self" &&
+    [
+      "/admin/reports/incentiveReport",
+      "/staff/reports/incentiveReport"
+    ].includes(location.pathname)
+  const shouldshowSidebar =
+    isScoreBoardIncentiveReport ||
+    hideHeaderRoutes.some((route) =>
+      matchPath({ path: route, end: true }, location.pathname)
+    )
   console.log(shouldshowSidebar)
   //   useEffect(() => {
   // const a=localStorage.getItem("user")
@@ -194,6 +201,7 @@ console.log(selectedMonth)
             targetData={targetData}
             selectedMonths={selectedMonth}
             yearSelected={selectedYear}
+            onYearChange={setSelectedYear}
             setselectedCategory={setselectedCategory}
             selectedCategory={selectedCategory}
             setproductList={setproductList}
@@ -231,7 +239,10 @@ console.log(selectedMonth)
           {/* <Header /> */}
 
           <main className="flex-1 overflow-auto">
-            <Mainrouter />
+            <Mainrouter
+              selectedYear={selectedYear}
+              selectedPeriod={selectedPeriod}
+            />
           </main>
         </div>
       </div>

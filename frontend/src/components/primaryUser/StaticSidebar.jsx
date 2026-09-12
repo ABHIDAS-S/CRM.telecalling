@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import UseFetch from "../../hooks/useFetch"
+import useCachedFetch from "../../hooks/useCachedFetch"
 import useMediaQuery from "@mui/material/useMediaQuery"
 import { BranchSelect } from "./BranchSelect"
 import {
@@ -21,6 +21,7 @@ export const StaticSidebar = ({
   selectedCompanyBranch,
   selectedMonths,
   yearSelected,
+  onYearChange,
   setcategoryId,
   onselectedPeriodChange,
   setselectedCategory,
@@ -75,15 +76,24 @@ export const StaticSidebar = ({
   const selectedBranch = useSelector((b) => b.companyBranch.selectedBranch)
   console.log(selectedBranch)
   console.log(brand)
-  const { data, loading: targetLoading } = UseFetch(
+  const {
+    data,
+    loading: targetLoading,
+    isRefreshing: targetRefreshing,
+    error: targetError,
+    isOffline: targetOffline,
+    refresh: refreshTarget
+  } = useCachedFetch(
     selectedBranch &&
       selectedMonth &&
       selectedYear &&
       periodMode &&
       `/target/gettargetresult?month=${selectedMonth}&year=${selectedYear}&periodMode=${periodMode}&selectedBranch=${selectedBranch}`
   )
-  const { data: branchProduct } = UseFetch(
-    `/product/getallbranchProduct?branch=${selectedBranch}`
+  const { data: branchProduct = [] } = useCachedFetch(
+    selectedBranch
+      ? `/product/getallbranchProduct?branch=${selectedBranch}`
+      : null
   )
   console.log(selectedMonth)
   console.log(data)
@@ -91,7 +101,7 @@ export const StaticSidebar = ({
   console.log(selectedYear)
   console.log(periodMode)
   console.log(data)
-  const { data: branchlist } = UseFetch("/branch/getBranch")
+  const { data: branchlist } = useCachedFetch("/branch/getBranch")
   useEffect(() => {
     console.log("hhhhhdddd")
     console.log(selectedCategory)
@@ -211,6 +221,19 @@ export const StaticSidebar = ({
   }, [yearSelected])
 
   useEffect(() => {
+    const defaultPeriod = data?.selectedPeriodName
+    if (defaultPeriod && defaultPeriod !== selectedPeriod) {
+      setselectedPeriod(defaultPeriod)
+      onselectedPeriodChange?.(defaultPeriod, selectedMonth)
+    }
+  }, [
+    data?.selectedPeriodName,
+    onselectedPeriodChange,
+    selectedMonth,
+    selectedPeriod
+  ])
+
+  useEffect(() => {
     setSelectedMonth(selectedMonths)
   }, [selectedMonths])
 
@@ -228,6 +251,9 @@ export const StaticSidebar = ({
   }, [branchlist, user])
   console.log(branchOptions)
   useEffect(() => {
+    // A filter change briefly has no result; retain the previous sidebar
+    // values until the replacement request finishes.
+    if (!data) return
     if (data?.userWiseResults && data?.userWiseResults.length && user?._id) {
       console.log(data)
 
@@ -420,7 +446,10 @@ console.log(names)
                 onperformanceModalClick={onperformanceModalClick}
                 onLogoutClick={logout}
                 selectedYear={selectedYear}
-                setSelectedYear={setSelectedYear}
+                setSelectedYear={(value) => {
+                  setSelectedYear(value)
+                  onYearChange?.(value)
+                }}
                 targetData={targetData}
                 onselectedPeriodChange={onselectedPeriodChange}
                 onavataropenClick={onavataropenClick}
@@ -433,6 +462,10 @@ console.log(names)
                 branchOptions={branchOptions}
                 categorylist={categorylist}
                 targetLoading={targetLoading}
+                targetRefreshing={targetRefreshing}
+                targetError={targetError}
+                targetOffline={targetOffline}
+                onRetryTarget={refreshTarget}
                 BranchSelect={BranchSelect}
                 SkeletonTable={SkeletonTable}
                 setAvatarOpen={setAvatarOpen}
