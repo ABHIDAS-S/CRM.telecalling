@@ -66,7 +66,9 @@ const CustomerAdd = ({
       email: "",
       mobile: "",
       landline: "",
+      isPartner: false,
       partner: "",
+      partnerSelection: "",
       industry: "",
       registrationType: "",
       gstNo: "",
@@ -116,12 +118,14 @@ console.log(licenseAvailable)
   const watchedLicense = watch("licensenumber")
   const watchedTaggedLicenses = watch("taggedLicenses") || []
   const selectedCountry = watch("country")
+  const isPartnerCustomer = watch("isPartner")
   const watchedTaggedLicenseDueDates = watch("taggedLicenseDueDates") || {}
   const hasTaggedLicenses =
     popupType === "Additionalservice" && watchedTaggedLicenses.length > 0
 
   const { data: licensenumber } = UseFetch("customer/getLicensenumber")
   const { data: partners } = UseFetch("customer/getallpartners")
+  const { data: partnerCustomers } = UseFetch("customer/getPartnerCustomers")
   const { data: productData, error: productError } = UseFetch(
     loggeduserBranch &&
       `/product/getallProducts?branchselected=${encodeURIComponent(
@@ -329,10 +333,21 @@ console.log(licenseAvailable)
     return `${day}-${month}-${year}`
   }
 
+  // Customer APIs can return `partner` as either an ObjectId string or a
+  // populated Partner document. The select control always needs the ID.
+  const getPartnerId = (partnerValue) => {
+    if (!partnerValue) return ""
+    if (typeof partnerValue === "object") {
+      return String(partnerValue?._id || partnerValue?.id || "")
+    }
+    return String(partnerValue)
+  }
+
   useEffect(() => {
     if (customer && process === "edit" && !isSaved) {
       console.log("hhhh")
       console.log(customer.country)
+      const partnerId = getPartnerId(customer?.partner)
       reset({
         customerName: customer?.customerName || "",
         address1: customer?.address1 || "",
@@ -345,7 +360,11 @@ console.log(licenseAvailable)
         email: customer?.email || "",
         mobile: customer?.mobile || "",
         landline: customer?.landline || "",
-        partner: customer?.partner || "",
+        // Older customers may not have this flag. A linked partner means that
+        // they should continue to appear as a partner customer when edited.
+        isPartner: customer?.isPartner ?? Boolean(partnerId),
+        partner: partnerId,
+        partnerSelection: getPartnerId(customer?.partnerSelection),
         industry: customer?.industry || "",
         registrationType: customer?.registrationType || "",
         gstNo: customer?.gstNo || "",
@@ -1413,7 +1432,10 @@ setTableData((prev) => {
       const { customerIsActive, ...customerFormData } = data
       const customerPayload = {
         ...customerFormData,
-        isActive: customerIsActive || "Running"
+        isActive: customerIsActive || "Running",
+        isPartner: Boolean(data.isPartner),
+        partner: data.isPartner ? data.partner : "",
+        partnerSelection: data.partnerSelection || ""
       }
 
       if (process === "Registration") {
@@ -1441,7 +1463,9 @@ setTableData((prev) => {
           email: "",
           mobile: "",
           landline: "",
+          isPartner: false,
           partner: "",
+          partnerSelection: "",
           industry: "",
           registrationType: "",
           gstNo: "",
@@ -1675,22 +1699,6 @@ setTableData((prev) => {
                   className={tileInputClass}
                   placeholder="Mobile number"
                 />
-              </InfoInputCard>
-
-              <InfoInputCard
-                icon={<FaLandmark size={12} />}
-                iconBg="bg-[#fff8df]"
-                iconColor="text-[#d1a91b]"
-                label="Partnership"
-              >
-                <select {...register("partner")} className={tileInputClass}>
-                  <option value="">Select Partner</option>
-                  {partner?.map((partnr, index) => (
-                    <option key={index} value={partnr._id}>
-                      {partnr.partner}
-                    </option>
-                  ))}
-                </select>
               </InfoInputCard>
 
               <InfoInputCard
@@ -2028,6 +2036,36 @@ setTableData((prev) => {
               </InfoInputCard>
 
               <InfoInputCard
+                  icon={<FaLandmark size={12} />}
+                  iconBg="bg-[#fff8df]"
+                  iconColor="text-[#d1a91b]"
+                  label="Partner Selection"
+                >
+                  <Controller
+                    name="partnerSelection"
+                    control={control}
+                    render={({ field }) => (
+                      <select
+                        value={getPartnerId(field.value)}
+                        onChange={(event) => field.onChange(event.target.value)}
+                        className={tileInputClass}
+                      >
+                        <option value="">Select partner customer</option>
+                        {partnerCustomers?.map((customer) => {
+                          const customerId = getPartnerId(customer)
+                          return (
+                            <option key={customerId} value={customerId}>
+                              {customer.customerName}
+                              {customer.mobile ? ` - ${customer.mobile}` : ""}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    )}
+                  />
+                </InfoInputCard>
+
+              <InfoInputCard
                 icon={<FaHashtag size={12} />}
                 iconBg="bg-[#eefbf2]"
                 iconColor="text-[#4cbf73]"
@@ -2059,6 +2097,86 @@ setTableData((prev) => {
                   />
                 </InfoInputCard>
               )}
+            </div>
+
+            <div className="mt-4 border-t border-[#edf1f7] pt-4">
+              <div className="grid max-w-md grid-cols-1 gap-3">
+                <InfoInputCard
+                  icon={<FaLandmark size={12} />}
+                  iconBg="bg-[#fff8df]"
+                  iconColor="text-[#d1a91b]"
+                  label="Is this customer also a partner?"
+                >
+                  <Controller
+                    name="isPartner"
+                    control={control}
+                    render={({ field }) => (
+                      <div className="inline-flex w-full rounded-lg border border-[#dce3ee] bg-[#f7f9fc] p-1">
+                        <button
+                          type="button"
+                          aria-pressed={!field.value}
+                          onClick={() => {
+                            field.onChange(false)
+                            setValue("partner", "", { shouldDirty: true })
+                          }}
+                          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                            !field.value
+                              ? "bg-white text-[#1b2a4a] shadow-sm"
+                              : "text-[#8390a6] hover:text-[#526079]"
+                          }`}
+                        >
+                          No
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={Boolean(field.value)}
+                          onClick={() => field.onChange(true)}
+                          className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                            field.value
+                              ? "bg-[#1b2a4a] text-white shadow-sm"
+                              : "text-[#8390a6] hover:text-[#526079]"
+                          }`}
+                        >
+                          Yes
+                        </button>
+                      </div>
+                    )}
+                  />
+                </InfoInputCard>
+
+                {isPartnerCustomer && (
+                  <InfoInputCard
+                    icon={<FaLandmark size={12} />}
+                    iconBg="bg-[#fff8df]"
+                    iconColor="text-[#d1a91b]"
+                    label="Partner Type"
+                    error={errors.partner?.message}
+                  >
+                    <Controller
+                      name="partner"
+                      control={control}
+                      rules={{ required: "Select a partner type" }}
+                      render={({ field }) => (
+                        <select
+                          value={getPartnerId(field.value)}
+                          onChange={(event) => field.onChange(event.target.value)}
+                          className={tileInputClass}
+                        >
+                          <option value="">Select Partner</option>
+                          {partner?.map((partnr) => {
+                            const partnerId = getPartnerId(partnr)
+                            return (
+                              <option key={partnerId} value={partnerId}>
+                                {partnr.partner}
+                              </option>
+                            )
+                          })}
+                        </select>
+                      )}
+                    />
+                  </InfoInputCard>
+                )}
+              </div>
             </div>
           </div>
 

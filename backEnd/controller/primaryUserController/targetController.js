@@ -3638,6 +3638,10 @@ const buildIncentiveReportData = async ({
     [...configuredStaffIds].map((id) => [id, "Staff"])
   );
   const earnedByBranch = new Map();
+  // Keep the supporting values for the report grid in addition to the
+  // incentive total. `leadIds` gives the real lead count even if an amount
+  // incentive is paid over more than one verified payment.
+  const allocationMetricsByBranch = new Map();
   const details = [];
   const awarded = new Set();
 
@@ -3808,6 +3812,25 @@ const buildIncentiveReportData = async ({
         if (!branchUsers.has(userId)) branchUsers.set(userId, new Map());
         const allocationTotals = branchUsers.get(userId);
         allocationTotals.set(allocationId, num(allocationTotals.get(allocationId)) + incentiveAmount);
+
+        if (!allocationMetricsByBranch.has(branchId)) {
+          allocationMetricsByBranch.set(branchId, new Map());
+        }
+        const branchMetrics = allocationMetricsByBranch.get(branchId);
+        if (!branchMetrics.has(userId)) branchMetrics.set(userId, new Map());
+        const userMetrics = branchMetrics.get(userId);
+        if (!userMetrics.has(allocationId)) {
+          userMetrics.set(allocationId, {
+            leadIds: new Set(),
+            amount: 0,
+            incentive: 0,
+          });
+        }
+        const metric = userMetrics.get(allocationId);
+        metric.leadIds.add(String(lead._id));
+        metric.amount += num(percentageBaseAmount);
+        metric.incentive += incentiveAmount;
+
         details.push({
           userId,
           branchId,
@@ -3901,9 +3924,15 @@ const buildIncentiveReportData = async ({
     const users = [...ids]
       .map((userId) => {
         const user = userMap.get(userId);
+        const userMetrics = allocationMetricsByBranch
+          .get(branchId)
+          ?.get(userId);
         const allocations = allocationColumns.map((column) => ({
           ...column,
           achieved: num(branchUsers.get(userId)?.get(column.key)),
+          count: userMetrics?.get(column.key)?.leadIds.size || 0,
+          amount: num(userMetrics?.get(column.key)?.amount),
+          incentive: num(userMetrics?.get(column.key)?.incentive),
         }));
         return {
           userId,

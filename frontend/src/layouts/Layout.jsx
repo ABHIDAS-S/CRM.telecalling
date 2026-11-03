@@ -126,8 +126,8 @@ const Layout = () => {
     "/admin/transaction/lead/leadClosed",
     "/staff/transaction/lead/leadClosed",
     "staff/transaction/lead/verifiedCollections",
-"/admin/reports/researchandDevelopment",
-"/staff/reports/researchandDevelopment"
+    "/admin/reports/researchandDevelopment",
+    "/staff/reports/researchandDevelopment"
   ]
 
   const isScoreBoardIncentiveReport =

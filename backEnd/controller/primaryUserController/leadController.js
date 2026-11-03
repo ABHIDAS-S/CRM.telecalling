@@ -1751,11 +1751,19 @@ export const LeadRegister = async (req, res) => {
       taxableAmount,
       netAmount,
       partner,
+      partnerSelection,
       allocationType = null,
       selfAllocation,
       leadBy,
       leadBranch,
     } = leadData
+    // Both partner references are optional. The UI sends an empty string when
+    // the selected customer has no partner selection, which cannot be cast to
+    // a MongoDB ObjectId.
+    const optionalObjectId = (value) =>
+      value && mongoose.Types.ObjectId.isValid(value) ? value : null
+    const normalizedPartner = optionalObjectId(partner)
+    const normalizedPartnerSelection = optionalObjectId(partnerSelection)
     const leadDate = new Date()
     const lastLead = await LeadId.findOne().sort({ leadId: -1 }).session(session)
 
@@ -1838,7 +1846,8 @@ export const LeadRegister = async (req, res) => {
       pincode,
       dueDate,
       source,
-      partner,
+      partner: normalizedPartner,
+      partnerSelection: normalizedPartnerSelection,
       leadBranch,
       remark,
       leadBy,
@@ -1898,7 +1907,9 @@ export const LeadRegister = async (req, res) => {
           mobile: mobile,
           landline: phone,
           email: email,
-          partner: partner
+          // The lead's Partner dropdown stores a customer partner selection;
+          // do not replace the Customer's Partner-master reference.
+          partnerSelection: normalizedPartnerSelection
         },
       },
       { session, new: true }
@@ -4479,7 +4490,7 @@ export const UpdateCollection = async (req, res) => {
             email: formData.email,
             mobile: formData?.mobile,
             registrationType: formData?.registrationType,
-            partner: formData?.partner,
+            partnerSelection: formData?.partnerSelection || null,
             country: formData?.country,
             state: formData?.state,
             city: formData?.city,
@@ -4580,7 +4591,7 @@ export const UpdateCollection = async (req, res) => {
       }
 
       lead.totalPaidAmount = newTotalPaid
-      lead.partner = formData.partner
+      lead.partnerSelection = formData?.partnerSelection || null
       lead.balanceAmount = newBalance
 
       if (isFrom === "reallocation") {
@@ -4600,7 +4611,7 @@ export const UpdateCollection = async (req, res) => {
             email: formData?.email,
             mobile: formData?.mobile,
             pincode: formData?.pincode,
-            partner: formData?.partner
+            partnerSelection: formData?.partnerSelection || null
           }
         },
         { session }
@@ -6130,7 +6141,10 @@ export const Leadclosing = async (req, res) => {
         customerDoc.mobile = data.mobile;
         customerDoc.email = data.email;
         customerDoc.landline = data.phone;
-        customerDoc.partner = data.partner;
+        // `partner` is the customer's Partner-master relationship. A lead's
+        // Partner dropdown represents the customer-to-customer selection, so
+        // never overwrite the legacy Partner-master field while closing a lead.
+        customerDoc.partnerSelection = data.partnerSelection || null;
         // customerDoc.createdFrom = "Lead";
         customerDoc.selected = selected;
 
@@ -7204,7 +7218,9 @@ export const UpdateLeadRegister = async (req, res) => {
               mobile: data.mobile,
               email: data.email,
               landline: data.phone,
-              partner: data.partner,
+              // Keep the Customer's Partner-master reference unchanged. The
+              // lead edit form changes only the customer partner selection.
+              partnerSelection: data.partnerSelection || null,
             },
           },
           { new: true, runValidators: true, session }
