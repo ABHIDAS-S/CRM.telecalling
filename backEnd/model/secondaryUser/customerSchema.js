@@ -466,6 +466,18 @@ const CustomerSchema = new mongoose.Schema(
       set: (v) => (v === "" ? null : v),
     },
 
+    isPartner: {
+      type: Boolean,
+      default: false,
+    },
+
+    partnerSelection: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      default: null,
+      set: (v) => (v === "" ? null : v),
+    },
+
     contactPerson: {
       type: String,
       trim: true,
