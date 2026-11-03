@@ -144,6 +144,15 @@ const getCompletedAt = (item) => item.taskCompletedAt || [...(item.taskTimeline 
   .reverse()
   .find((event) => event.event === "Development Completed")?.at
 
+const isCompletedInSelectedPeriod = (item, month, year) => {
+  const completedAt = getCompletedAt(item)
+  if (!completedAt) return false
+
+  const completedDate = new Date(completedAt)
+  return completedDate.getFullYear() === Number(year)
+    && months[completedDate.getMonth()] === month
+}
+
 const codingAndQcTaskId = "689c23493e94902039b97743"
 
 const getIdValue = (value) => String(value?._id || value || "")
@@ -335,12 +344,20 @@ export default function ResearchandDevelopement() {
     }
   }, [])
 
-  const statusCounts = workStatuses.map((status) => ({
-    ...status,
-    count: status.label === "All"
+  const statusCounts = workStatuses.map((status) => {
+    const count = status.label === "All"
       ? workItems.length
-      : workItems.filter((item) => status.label === "Overdue" ? isOverdue(item) : item.status === status.label).length
-  }))
+      : status.label === "Completed"
+        ? workItems.filter((item) =>
+          item.status === "Completed"
+          && isCompletedInSelectedPeriod(item, month, year)
+        ).length
+        : workItems.filter((item) =>
+          status.label === "Overdue" ? isOverdue(item) : item.status === status.label
+        ).length
+
+    return { ...status, count }
+  })
   const filteredWorkItems = workItems.filter((item) => {
     const matchesStatus = activeStatusFilter === "All"
       || (activeStatusFilter === "Overdue" ? isOverdue(item) : item.status === activeStatusFilter)
@@ -348,10 +365,7 @@ export default function ResearchandDevelopement() {
     if (leadScope === "Owned" && String(item.assignedDeveloperId) !== String(loggedUser?._id)) return false
     if (activeStatusFilter !== "Completed") return true
 
-    const completedAt = getCompletedAt(item)
-    if (!completedAt) return false
-    const completedDate = new Date(completedAt)
-    return completedDate.getFullYear() === Number(year) && months[completedDate.getMonth()] === month
+    return isCompletedInSelectedPeriod(item, month, year)
   }).sort((left, right) => {
     if (!["In Progress", "Pending", "Overdue"].includes(activeStatusFilter)) return 0
     const leftTime = new Date(left.expectedCompletionDate).getTime()

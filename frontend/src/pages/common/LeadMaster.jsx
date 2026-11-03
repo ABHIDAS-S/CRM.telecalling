@@ -1801,6 +1801,7 @@ console.log(originalCustomerTableData)
   )
 
   const { data: alluser, loading: usersLoading } = UseFetch("/auth/getallUsers")
+  const { data: partnerCustomers } = UseFetch("/customer/getPartnerCustomers")
   const {
     data: customerData,
     loading: customerLoading,
@@ -1810,6 +1811,20 @@ console.log(originalCustomerTableData)
       selectedBranch &&
       `/customer/getallCustomer?branchSelected=${selectedBranch}`,
     { cacheTime: 5 * 60 * 1000 }
+  )
+  // Partner Selection uses customer records that are explicitly marked as
+  // partners. The selected customer ID is stored separately on the lead.
+  const partnerCustomerOptions = useMemo(
+    () =>
+      (Array.isArray(partnerCustomers) ? partnerCustomers : [])
+        .filter((customer) => customer?.isPartner === true)
+        .map((customer) => ({
+          customerId: String(customer._id),
+          value: String(customer._id),
+          label: customer.customerName || "Unnamed partner",
+          mobile: customer.mobile || ""
+        })),
+    [partnerCustomers]
   )
   // Track timers for each row index
   const debounceTimersRef = useRef({})
@@ -2075,6 +2090,7 @@ console.log(originalCustomerTableData)
       setpreviousLeadCustomer(Data[0]?.customerName?._id)
       setValueMain("leadId", Data[0]?.leadId)
       setValueMain("partner", Data[0]?.partner)
+      setValueMain("partnerSelection", Data[0]?.partnerSelection || "")
       setValueMain("remark", Data[0].remark)
       setValueMain("discamnt", Data[0]?.discountAmount || 0)
       existingLeadTotalsRef.current = {
@@ -2589,6 +2605,7 @@ console.log(licenses)
           email: item?.email,
           phone: item?.landline,
           partner: item?.partner,
+          partnerSelection: item?.partnerSelection,
           country: item?.country,
           state: item?.state,
           registrationType: item?.registrationType,
@@ -2688,10 +2705,10 @@ console.log(licenses)
       )
       setValueMain("email", selectedCustomer.email)
       setValueMain(
-        "partner",
-        selectedCustomer?.partner?._id
-          ? selectedCustomer?.partner?._id
-          : selectedCustomer?.partner
+        "partnerSelection",
+        selectedCustomer?.partnerSelection?._id
+          ? selectedCustomer?.partnerSelection?._id
+          : selectedCustomer?.partnerSelection || ""
       )
     }
   }, [selectedCustomer])
@@ -3751,6 +3768,7 @@ console.log(licenses)
       mobile: "",
       source: "",
       partner: "",
+      partnerSelection: "",
       allocationType: null,
       dueDate: "",
       remark: "",
@@ -5416,6 +5434,7 @@ convertexcel
                           mobile: "",
                           source: "",
                           partner: "",
+                          partnerSelection: "",
                           allocationType: null,
                           dueDate: "",
                           remark: "",
@@ -5517,12 +5536,12 @@ convertexcel
                       </p>
                     )}
                   </div>
-                  <div className="hidden">
+                  <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1">
-                      Associate with
+                      Partner
                     </label>
                     <select
-                      {...registerMain("partner")}
+                      {...registerMain("partnerSelection")}
                       disabled={isReadOnly}
                       className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
                         isReadOnly
@@ -5531,15 +5550,21 @@ convertexcel
                       }`}
                     >
                       <option value="">Select Partner</option>
-                      {partner?.map((p, i) => (
-                        <option key={i} value={p._id}>
-                          {p.partner}
+                      {partnerCustomerOptions.map((partnerCustomer) => (
+                        <option
+                          key={partnerCustomer.customerId}
+                          value={partnerCustomer.value}
+                        >
+                          {partnerCustomer.label}
+                          {partnerCustomer.mobile
+                            ? ` - ${partnerCustomer.mobile}`
+                            : ""}
                         </option>
                       ))}
                     </select>
-                    {errorsMain.partner && (
+                    {errorsMain.partnerSelection && (
                       <p className="text-red-500 text-xs mt-1">
-                        {errorsMain.partner.message}
+                        {errorsMain.partnerSelection.message}
                       </p>
                     )}
                   </div>

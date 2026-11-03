@@ -17,6 +17,7 @@ import {
   DeleteCallnotes,
   GetselectedDateCalls,
   GetallPartners,
+  GetPartnerCustomers,
   UpdatePartners,
   DeletePartner,
   LeavemasterRegister,
@@ -77,6 +78,7 @@ router.delete("/deleteCustomer", authMiddleware, DeleteCustomer)
 router.post("/partnerRegistration", authMiddleware, PartnerRegistration)
 router.post("/servicesRegistration", authMiddleware, ServicesRegistration)
 router.get("/getallpartners", authMiddleware, GetallPartners)
+router.get("/getPartnerCustomers", authMiddleware, GetPartnerCustomers)
 router.get("/getallServices", authMiddleware, GetallServices)
 router.put("/partnerEdit", authMiddleware, UpdatePartners)
 router.put("/serviceEdit", authMiddleware, UpdateServices)

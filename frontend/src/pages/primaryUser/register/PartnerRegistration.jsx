@@ -5,6 +5,41 @@ import Edit from "../../../components/common/Edit"
 import api from "../../../api/api"
 import UseFetch from "../../../hooks/useFetch"
 import { toast } from "react-toastify"
+
+const partnerStyles = `
+  .pr-root, .pr-root * { box-sizing: border-box; }
+  .pr-root { height: calc(100dvh - 74px); min-height: 0; max-height: calc(100dvh - 74px); overflow: hidden; background: #ADD8E6; padding: 10px; font-family: 'DM Sans', sans-serif; }
+  .pr-shell { height: 100%; min-height: 0; overflow: hidden; border-radius: 18px; background: #fff; box-shadow: 0 8px 24px rgba(15, 23, 42, .08); display: flex; flex-direction: column; }
+  .pr-header { height: 50px; flex-shrink: 0; display: flex; align-items: center; gap: 14px; padding: 0 18px; background: #1a1d2e; }
+  .pr-title { color: #fff; font-size: 15px; font-weight: 600; letter-spacing: .5px; }
+  .pr-badge { margin-left: auto; border-radius: 999px; padding: 4px 10px; background: rgba(99,102,241,.25); color: #c7d2fe; font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+  .pr-body { flex: 1; min-height: 0; overflow: hidden; padding: 10px; background: #f4f7fb; }
+  .pr-card { height: 100%; min-height: 0; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #e6ebf3; border-radius: 14px; background: #fff; }
+  .pr-form { flex-shrink: 0; padding: 12px 14px; border-bottom: 1px solid #edf1f7; }
+  .pr-label { margin-bottom: 8px; color: #7c8db0; font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
+  .pr-form-grid { display: grid; grid-template-columns: minmax(180px, 1.1fr) minmax(180px, 1fr) minmax(210px, 1.2fr) auto; gap: 10px; align-items: start; }
+  .pr-input, .pr-select, .pr-branch-trigger { width: 100%; height: 38px; border: 1.5px solid #dfe5ef; border-radius: 8px; padding: 0 11px; background: #f8f9fc; color: #1e293b; font-size: 13px; outline: none; transition: .2s; }
+  .pr-input:focus, .pr-select:focus, .pr-branch-trigger:focus { border-color: #6366f1; background: #fff; box-shadow: 0 0 0 4px rgba(99,102,241,.12); }
+  .pr-branch-trigger { display: flex; align-items: center; justify-content: space-between; text-align: left; cursor: pointer; }
+  .pr-branch-menu { position: absolute; z-index: 50; top: calc(100% + 6px); left: 0; right: 0; max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; padding: 6px; box-shadow: 0 12px 24px rgba(15,23,42,.12); }
+  .pr-branch-option { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 7px; color: #475569; font-size: 13px; cursor: pointer; }
+  .pr-branch-option:hover { background: #f8fafc; }
+  .pr-submit, .pr-cancel { height: 38px; border: 0; border-radius: 8px; padding: 0 14px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: .2s; }
+  .pr-submit { background: #6366f1; color: #fff; }.pr-submit:hover { background: #4f46e5; }
+  .pr-cancel { background: #eef1f6; color: #4b5563; }.pr-cancel:hover { background: #e2e8f0; }
+  .pr-error { margin-top: 5px; color: #ef4444; font-size: 11px; }
+  .pr-table-section { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .pr-table-header { display: flex; align-items: center; padding: 10px 14px; border-bottom: 1px solid #edf1f7; background: #f8f9fc; }
+  .pr-table-title { color: #374151; font-size: 13px; font-weight: 600; }.pr-count { margin-left: 8px; border-radius: 999px; padding: 2px 9px; background: #e5e7eb; color: #4b5563; font-size: 11px; }
+  .pr-table-wrap { flex: 1; min-height: 0; overflow: auto; }.pr-table { width: 100%; min-width: 720px; border-collapse: collapse; table-layout: fixed; }
+  .pr-table th { position: sticky; top: 0; z-index: 2; padding: 10px 14px; border-bottom: 1px solid #e5e7eb; background: #f8f9fc; color: #94a3b8; font-size: 10px; font-weight: 700; letter-spacing: .6px; text-align: left; text-transform: uppercase; }
+  .pr-table th:nth-last-child(-n+2), .pr-table td:nth-last-child(-n+2) { width: 76px; text-align: center; }
+  .pr-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: .15s; }.pr-table tbody tr:hover { background: #fafbff; }
+  .pr-table td { padding: 9px 14px; color: #1e293b; font-size: 12px; vertical-align: middle; }.pr-partner { display: flex; align-items: center; gap: 8px; font-weight: 600; }.pr-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: #6366f1; }
+  .pr-empty { padding: 40px 20px; text-align: center; color: #64748b; font-size: 13px; font-weight: 600; }
+  @media (max-width: 900px) { .pr-root { height: calc(100dvh - 64px); max-height: calc(100dvh - 64px); padding: 10px; }.pr-shell { border-radius: 18px; }.pr-body { padding: 10px; }.pr-form-grid { grid-template-columns: 1fr 1fr; }.pr-submit, .pr-cancel { width: 100%; } }
+  @media (max-width: 560px) { .pr-header { padding: 0 16px; }.pr-form { padding: 16px; }.pr-form-grid { grid-template-columns: 1fr; }.pr-table-header { padding: 14px 16px; } }
+`
 export const PartnerRegistration = () => {
   // const [value, setValue] = useState("")
   const [items, setItems] = useState([])
@@ -12,7 +47,6 @@ export const PartnerRegistration = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [submitError, setSubmiterror] = useState("")
   const [selectedCompany, setSelectedCompany] = useState("")
-  const [selectedBranch, setSelectedBranch] = useState(null)
   const [editState, seteditState] = useState(true)
   const [editId, setEditId] = useState("")
   const [formData, setFormData] = useState({
@@ -23,10 +57,10 @@ export const PartnerRegistration = () => {
 
   const dropdownbranchRef = useRef(null)
 
-  const { data: companyData, error: companyError } = UseFetch(
+  const { data: companyData } = UseFetch(
     "/company/getCompany"
   )
-  const { data, loading, error, refreshHook } = UseFetch(
+  const { data, refreshHook } = UseFetch(
     "/customer/getallpartners"
   )
   useEffect(() => {
@@ -66,6 +100,18 @@ export const PartnerRegistration = () => {
       companyData?.find((company) => company._id === selectedCompany)
         ?.branches || [],
     [companyData, selectedCompany]
+  )
+  const partnerRows = useMemo(
+    () =>
+      items.flatMap((partnerItem) =>
+        (partnerItem?.relationBranches || []).map((relation) => ({
+          partnerId: partnerItem._id,
+          partnerName: partnerItem.partner,
+          relation,
+          relationCount: partnerItem.relationBranches?.length || 0
+        }))
+      ),
+    [items]
   )
 
   const handleEdit = (id) => {
@@ -167,7 +213,11 @@ const branches=itemToEdit.relationBranches.map((item)=>item.branchName?._id)
       }
 
       refreshHook()
-      setFormData({ partnerName: "", branchName: "" })
+      setFormData({
+        partnerName: "",
+        companyName: selectedCompany,
+        branchName: []
+      })
       setEditId(null)
       setLoader(false)
     } catch (error) {
@@ -177,20 +227,26 @@ const branches=itemToEdit.relationBranches.map((item)=>item.branchName?._id)
     }
   }
   return (
-    <div>
+    <>
+      <style>{partnerStyles}</style>
+      <div className="pr-root">
+        <div className="pr-shell">
+          <header className="pr-header">
+            <span className="pr-title">Manage Partners</span>
+            <span className="pr-badge">Customer</span>
+          </header>
+          <div className="pr-body">
+            <div className="pr-card">
       {loader && (
         <BarLoader
-          cssOverride={{ width: "100%", height: "6px" }} // Tailwind's `h-4` corresponds to `16px`
-          color="#4A90E2" // Change color as needed
-          // loader={true}
+          cssOverride={{ width: "100%", height: "4px" }}
+          color="#6366f1"
         />
       )}
-      <h1 className="text-sm font-bold mb-6  text-gray-800 px-6 pt-6  uppercase">
-        ADD PARTNERS
-      </h1>
-
-      <div className="md:flex md:items-start ">
-        <div className="grid grid-cols-1 md:grid-cols-4 w-full px-3 md:px-8 gap-6 mb-2">
+      <div className="pr-form">
+        <p className="pr-label">{editId ? "Edit Partner" : "Add New Partner"}</p>
+      <div className="md:flex md:items-start">
+        <div className="grid grid-cols-1 md:grid-cols-4 w-full gap-3 mb-2">
           {/* Partner Name Input */}
           <div className="flex flex-col w-full">
             <input
@@ -207,7 +263,7 @@ const branches=itemToEdit.relationBranches.map((item)=>item.branchName?._id)
                 }))
               }}
               placeholder="Enter your brand name"
-              className="p-1 border border-gray-300 rounded focus:border-gray-500 outline-none"
+              className="pr-input"
               value={formData.partnerName || ""}
             />
             {submitError.partnerError && (
@@ -218,9 +274,18 @@ const branches=itemToEdit.relationBranches.map((item)=>item.branchName?._id)
           {/* Company Select */}
           <div className="flex flex-col w-full ">
             <select
-              className="p-1 border border-gray-300 rounded focus:border-gray-500 outline-none"
+              className="pr-select"
               value={selectedCompany || ""}
-              onChange={(e) => setSelectedCompany(e.target.value)}
+              onChange={(e) => {
+                const companyName = e.target.value
+                setSelectedCompany(companyName)
+                setFormData((prev) => ({
+                  ...prev,
+                  companyName,
+                  branchName: []
+                }))
+                setSubmiterror({})
+              }}
             >
               <option value="">Select Company</option>
               {companyData?.map((company) => (
@@ -237,9 +302,15 @@ const branches=itemToEdit.relationBranches.map((item)=>item.branchName?._id)
           <div className=" w-full relative" ref={dropdownbranchRef}>
             <div
               onClick={() => setIsDropdownOpen((prev) => !prev)}
-              className="py-1 px-2 border border-gray-300 rounded-md flex items-center justify-between w-full cursor-pointer"
+              className="pr-branch-trigger"
             >
-              <span>Select Branch</span>
+              <span>
+                {Array.isArray(formData.branchName) && formData.branchName.length
+                  ? `${formData.branchName.length} branch${
+                      formData.branchName.length > 1 ? "es" : ""
+                    } selected`
+                  : "Select Branch"}
+              </span>
               <svg
                 className={`w-4 h-4 text-gray-500 transform transition-transform duration-200 ${
                   isDropdownOpen ? "rotate-180" : "rotate-0"
@@ -261,11 +332,11 @@ const branches=itemToEdit.relationBranches.map((item)=>item.branchName?._id)
               <p className="text-red-500 text-sm">{submitError.branchError}</p>
             )}
             {isDropdownOpen && (
-              <div className="absolute left-0 mt-2 bg-gray-50 z-30 px-2 rounded-md w-full">
+              <div className="pr-branch-menu">
                 {filteredBranches?.map((branch) => (
                   <label
                     key={branch._id}
-                    className="flex items-center gap-2 mb-1"
+                    className="pr-branch-option"
                   >
                     <input
                       type="checkbox"
@@ -302,10 +373,10 @@ const branches=itemToEdit.relationBranches.map((item)=>item.branchName?._id)
             )} */}
           </div>
         </div>
-        <div className="px-3 md:px-8 flex md:justify-end">
+        <div className="flex md:justify-end">
           <button
             onClick={handleSubmit}
-            className="bg-blue-500 hover:bg-blue-700 text-white px-4 py-1 rounded"
+            className="pr-submit"
           >
             {editState ? "ADD" : "UPDATE"}
           </button>
@@ -317,62 +388,67 @@ const branches=itemToEdit.relationBranches.map((item)=>item.branchName?._id)
         )}
       </div>
 
-      {/* ✅ Separate Button Row (Independent Layout) */}
+      </div>
 
-      {items && items.length > 0 && (
-        <section className="m-3 md:m-8">
-          <div className="w-full xl:mb-0">
-            <div className="relative flex flex-col min-w-0 break-words bg-red-50 w-full mb-6 p-6 shadow-xl rounded">
-              <div className="block w-full overflow-x-auto overflow-y-auto h-[calc(80vh-200px)] rounded-md ">
-                <table className="items-center w-full border-collapse border border-gray-300">
+      <section className="pr-table-section">
+          <div className="pr-table-header">
+            <span className="pr-table-title">All Partners <span className="pr-count">{partnerRows.length}</span></span>
+          </div>
+              <div className="pr-table-wrap">
+                <table className="pr-table">
                   <thead>
-                    <tr className="bg-gray-300 sticky top-0 z-10 text-center">
-                      <th className=" text-black  py-3 text-sm uppercase whitespace-nowrap font-semibold max-w-[50px]">
+                    <tr>
+                      <th>
                         SNO.
                       </th>
-                      <th className=" px-6 text-black  py-3 text-sm uppercase whitespace-nowrap font-semibold">
+                      <th>
                         Partner
                       </th>
-                      <th className=" px-6  text-black  py-3 text-sm uppercase whitespace-nowrap font-semibold">
+                      <th>
                         Company Name
                       </th>
-                      <th className="px-6  text-black  py-3 text-sm uppercase whitespace-nowrap font-semibold">
+                      <th>
                         Branch Name
                       </th>
-                      <th className="px-6   text-blue-500 align-middle  py-3 text-sm uppercase  whitespace-nowrap font-semibold">
+                      <th>
                         Edit
                       </th>
-                      <th className="px-6  text-red-500 align-middle  py-3 text-sm uppercase whitespace-nowrap font-semibold">
+                      <th>
                         Delete
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="text-center">
-                    {items?.map((el, Index) =>
+                  <tbody>
+                    {partnerRows.length === 0 ? (
+                      <tr>
+                        <td colSpan="6">
+                          <div className="pr-empty">No partners found</div>
+                        </td>
+                      </tr>
+                    ) : items?.map((el, Index) =>
                       el.relationBranches.map((item, index) => (
-                        <tr
-                          key={`${el._id}-${index}`}
-                          className="border-b border-gray-300"
-                        >
-                          <td className="px-6  text-wrap border-t-0 align-middle border-l-0 border-r-0 whitespace-nowrap text-black p-2 max-w-[50px]">
+                        <tr key={`${el._id}-${index}`}>
+                          <td>
                             {index === 0 ? Index + 1 : ""}
                           </td>
-                          <td className="px-6  text-wrap border-t-0 align-middle border-l-0 border-r-0 whitespace-nowrap text-black p-2">
-                            {el.partner}
+                          <td>
+                            <div className="pr-partner">
+                              <span className="pr-dot" />
+                              <span>{el.partner}</span>
+                            </div>
                           </td>
-                          <td className="px-6   text-wrap border-t-0 align-middle border-l-0 border-r-0 whitespace-nowrap text-black p-2">
+                          <td>
                             {item?.companyName?.companyName}
                           </td>
-                          <td className="px-6   text-wrap border-t-0 align-middle border-l-0 border-r-0 whitespace-nowrap text-black p-2">
+                          <td>
                             {item?.branchName?.branchName}
                           </td>
-                          <td className="cursor-pointer  px-6 border-t-0 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-2">
-                            <div className=" flex justify-center">
-                              {" "}
+                          <td>
+                            <div className="flex justify-center">
                               <Edit onEdit={handleEdit} Id={el._id} />
                             </div>
                           </td>
-                          <td className="cursor-pointer flex justify-center px-6 border-t-0 align-middle border-l-0 border-r-0 whitespace-nowrap p-2">
+                          <td>
                             <div className="flex justify-center">
                               {el.relationBranches.length === 1 ? (
                                 // Only one branch, delete whole partner
@@ -396,10 +472,12 @@ const branches=itemToEdit.relationBranches.map((item)=>item.branchName?._id)
                   </tbody>
                 </table>
               </div>
+        </section>
+
             </div>
           </div>
-        </section>
-      )}
-    </div>
+        </div>
+      </div>
+    </>
   )
 }

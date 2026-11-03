@@ -1,3 +1,4 @@
+import React from "react"
 import {
   Mail,
   MessageSquareText,
@@ -92,26 +93,27 @@ const SalesFunnel = ({ stages, onStageClick }) => {
         <p className="mt-0.5 text-xs text-slate-500">Current month lead progression from initial contact to conversion</p>
       </div>
 
-      <div className="grid gap-2.5 md:grid-cols-[minmax(140px,0.72fr)_minmax(220px,1.28fr)] md:items-center">
-        <div className="flex min-h-[160px] flex-col items-center justify-center gap-1">
+      <div className="grid gap-2 md:grid-cols-[minmax(210px,1.25fr)_minmax(155px,0.75fr)] md:items-center">
+        <div className="flex min-h-[220px] flex-col items-center justify-center gap-1.5">
           {stages.map((stage) => {
             const isClickable = stage.value > 0
             return (
             <div
-              key={stage.label}
-              role={isClickable ? "button" : undefined}
-              tabIndex={isClickable ? 0 : undefined}
               onClick={() => isClickable && onStageClick?.(stage)}
               onKeyDown={(event) => {
                 if (isClickable && (event.key === "Enter" || event.key === " ")) onStageClick?.(stage)
               }}
-              className={`flex h-7.5 items-center justify-center rounded-md text-sm font-bold text-white shadow-sm ${
+              key={stage.label}
+              role={isClickable ? "button" : undefined}
+              tabIndex={isClickable ? 0 : undefined}
+              className={`flex h-9 items-center justify-center rounded-[4px] border border-white/15 text-sm font-bold text-white ${
                 isClickable ? "cursor-pointer transition-transform hover:-translate-y-0.5 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2" : "cursor-default"
               }`}
               style={{
                 width: `${stage.width}%`,
                 background: stage.color,
-                clipPath: "polygon(0 0, 100% 0, calc(100% - 10px) 100%, 10px 100%)"
+                clipPath: "polygon(0 0, 100% 0, calc(100% - 12px) 100%, 12px 100%)",
+                boxShadow: "0 3px 0 rgba(15,23,42,0.16), 0 7px 12px rgba(15,23,42,0.10)"
               }}
             >
               {stage.value}
@@ -134,21 +136,21 @@ const SalesFunnel = ({ stages, onStageClick }) => {
                 onKeyDown={(event) => {
                   if (isClickable && (event.key === "Enter" || event.key === " ")) onStageClick?.(stage)
                 }}
-                className={`flex items-center gap-2 py-1.5 first:pt-0 last:pb-0 ${
+                className={`flex items-center gap-1.5 py-1.5 first:pt-0 last:pb-0 ${
                   isClickable ? "cursor-pointer rounded-md transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400" : ""
                 }`}
               >
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: stage.dotColor }} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-semibold text-slate-700">{stage.label}</p>
-                  <p className="mt-px flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                  <p className="mt-px flex items-center gap-0.5 text-[11px] font-medium text-slate-500">
                     <span>{stage.value}</span>
                     <span>|</span>
                     <IndianRupee className="h-2.5 w-2.5" />
                     <span>{formatINR(stage.amount)}</span>
                   </p>
                 </div>
-                <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700">
+                <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
                   {percentage}
                 </span>
               </div>
@@ -780,11 +782,11 @@ const MarketingDashboard = () => {
     return stages
   }, {})
   const funnelStages = [
-    ["New Leads", 100, "linear-gradient(135deg, #164cb8, #2563d9)", "#2563d9"],
-    ["Contacted", 84, "linear-gradient(135deg, #2877ea, #428ded)", "#3b82f6"],
-    ["System Study", 68, "linear-gradient(135deg, #5da7f7, #78b9f7)", "#60a5fa"],
-    ["Lost", 52, "linear-gradient(135deg, #87c7fa, #a8d7fb)", "#93c5fd"],
-    ["Converted", 42, "linear-gradient(135deg, #25ba72, #45ce88)", "#34c77d"]
+    ["New Leads", 100, "linear-gradient(180deg, #326fe4 0%, #2459bd 100%)", "#2563d9"],
+    ["Contacted", 84, "linear-gradient(180deg, #4b91ec 0%, #2e72d0 100%)", "#3b82f6"],
+    ["System Study", 68, "linear-gradient(180deg, #84bdf1 0%, #5e97ce 100%)", "#60a5fa"],
+    ["Lost", 52, "linear-gradient(180deg, #a9ccec 0%, #7fa8cf 100%)", "#93c5fd"],
+    ["Converted", 42, "linear-gradient(180deg, #3dcc87 0%, #249f65 100%)", "#34c77d"]
   ].map(([label, width, color, dotColor]) => ({
     label,
     value: funnelNumber(salesFunnelStageMap[label]?.count),
@@ -1129,7 +1131,7 @@ const MarketingDashboard = () => {
                 className="
     mt-3 grid min-w-0 gap-3 sm:mt-4 sm:gap-4
     grid-cols-1          /* mobile: stacked (one below the other) */
-    lg:grid-cols-2       /* desktop/tablet+: two diagrams side by side */
+    lg:grid-cols-2       /* dashboard panels sit side by side on wide screens */
   "
               >
                 {/* Sales Funnel */}

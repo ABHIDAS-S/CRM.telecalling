@@ -21,6 +21,7 @@ export const StaticSidebar = ({
   selectedCompanyBranch,
   selectedMonths,
   yearSelected,
+  activePeriod,
   onYearChange,
   setcategoryId,
   onselectedPeriodChange,
@@ -89,6 +90,14 @@ export const StaticSidebar = ({
       selectedYear &&
       periodMode &&
       `/target/gettargetresult?month=${selectedMonth}&year=${selectedYear}&periodMode=${periodMode}&selectedBranch=${selectedBranch}`
+  )
+  // The target-result endpoint remains the source for target/category cards.
+  // Achieved Points must use the same calculation as Incentive Report.
+  const reportPeriod = activePeriod || selectedPeriod
+  const { data: incentiveReport } = useCachedFetch(
+    selectedBranch && selectedYear && reportPeriod
+      ? `/target/getIncentiveReport?year=${selectedYear}&period=${encodeURIComponent(reportPeriod)}&selectedBranch=${selectedBranch}`
+      : null
   )
   console.log(periodMode)
   console.log(selectedMonth)
@@ -293,8 +302,6 @@ export const StaticSidebar = ({
       console.log(aa)
       setloggeduserTarget(selectedUser || null)
       console.log(selectedUser)
-      setachievedPoints(selectedUser?.incentive || 0)
-
       const updatedCategories = uniqueCategories
         .map((cat) => {
           const matchedCategories =
@@ -334,6 +341,19 @@ export const StaticSidebar = ({
       setcategorylist([])
     }
   }, [data, user, parenttargetData, setselectedPeriod])
+
+  useEffect(() => {
+    if (!incentiveReport || !user?._id) return
+
+    const branch = incentiveReport.branches?.find(
+      (item) => String(item.branchId) === String(selectedBranch)
+    )
+    const reportUser = branch?.users?.find(
+      (item) => String(item.userId) === String(user._id)
+    )
+
+    setachievedPoints(Number(reportUser?.totalAmount) || 0)
+  }, [incentiveReport, selectedBranch, user?._id])
 
   const handlepasswordChange = async (payload) => {
     try {
