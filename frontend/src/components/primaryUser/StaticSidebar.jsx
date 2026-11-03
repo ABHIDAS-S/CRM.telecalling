@@ -21,6 +21,7 @@ export const StaticSidebar = ({
   selectedCompanyBranch,
   selectedMonths,
   yearSelected,
+  activePeriod,
   onYearChange,
   setcategoryId,
   onselectedPeriodChange,
@@ -92,9 +93,10 @@ export const StaticSidebar = ({
   )
   // The target-result endpoint remains the source for target/category cards.
   // Achieved Points must use the same calculation as Incentive Report.
+  const reportPeriod = activePeriod || selectedPeriod
   const { data: incentiveReport } = useCachedFetch(
-    selectedBranch && selectedYear && selectedPeriod
-      ? `/target/getIncentiveReport?year=${selectedYear}&period=${encodeURIComponent(selectedPeriod)}&selectedBranch=${selectedBranch}`
+    selectedBranch && selectedYear && reportPeriod
+      ? `/target/getIncentiveReport?year=${selectedYear}&period=${encodeURIComponent(reportPeriod)}&selectedBranch=${selectedBranch}`
       : null
   )
   console.log(periodMode)

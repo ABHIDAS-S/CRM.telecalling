@@ -203,6 +203,7 @@ const Layout = () => {
             targetData={targetData}
             selectedMonths={selectedMonth}
             yearSelected={selectedYear}
+            activePeriod={selectedPeriod}
             onYearChange={setSelectedYear}
             setselectedCategory={setselectedCategory}
             selectedCategory={selectedCategory}
