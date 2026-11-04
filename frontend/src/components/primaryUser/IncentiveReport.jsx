@@ -11,6 +11,30 @@ import PropTypes from "prop-types";
 
 const formatAmount = formatDisplayCurrency;
 
+const TruncatedTooltip = ({ value, className = "" }) => {
+  const text = String(value || "—");
+
+  return (
+    <div className="relative min-w-0">
+      <span tabIndex={0} className={`peer block truncate outline-none ${className}`}>
+        {text}
+      </span>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-0 top-full z-[70] mt-1 w-max max-w-[22rem] -translate-y-1 whitespace-normal rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium normal-case tracking-normal text-white opacity-0 shadow-lg ring-1 ring-slate-700 transition-all duration-150 peer-hover:translate-y-0 peer-hover:opacity-100 peer-focus:translate-y-0 peer-focus:opacity-100"
+      >
+        {text}
+        <span className="absolute -top-1 left-3 h-2 w-2 rotate-45 bg-slate-900" />
+      </span>
+    </div>
+  );
+};
+
+TruncatedTooltip.propTypes = {
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  className: PropTypes.string,
+};
+
 const getUserTotal = (allocations = []) =>
   allocations.reduce(
     (sum, allocation) => sum + Number(allocation?.achieved || 0),
@@ -412,7 +436,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                     </p>
                     <p className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
                       <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" />
-                      Scroll inside the table to view every category
+                      Scroll inside the table to view every Tasks
                     </p>
                   </div>
 
@@ -433,14 +457,14 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                     </colgroup>
                     <thead className="border-b-2 border-slate-300 text-[9px] font-semibold uppercase tracking-wide text-slate-600">
                       <tr>
-                        <th rowSpan="2" className="sticky left-0 top-0 z-30 h-16 break-words border-r border-slate-300 bg-amber-300 px-3 py-2 text-left leading-tight text-slate-900 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)]">
+                        <th rowSpan="2" className="sticky left-0 top-0 z-30 h-12 whitespace-nowrap border-r border-slate-300 bg-amber-300 px-2 py-0.5 text-left text-[8px] leading-none text-slate-900 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)]">
                           Employee Name
                         </th>
                         {incentiveGroups.map((group, index) => (
                           <th
                             key={group.key}
                             colSpan="3"
-                            className={`sticky top-0 z-20 h-8 break-words border-r border-slate-300 px-1.5 py-1 text-center leading-tight text-slate-900 ${
+                            className={`sticky top-0 z-20 h-6 whitespace-nowrap border-r border-slate-300 px-1 py-0 text-center text-[8px] leading-none text-slate-900 ${
                               index === 0
                                 ? "bg-orange-200"
                                 : index === 1
@@ -455,7 +479,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                             {group.label}
                           </th>
                         ))}
-                        <th rowSpan="2" className="sticky right-0 top-0 z-30 h-16 break-words bg-indigo-100 px-3 py-2 text-right leading-tight text-slate-900 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)]">
+                        <th rowSpan="2" className="sticky right-0 top-0 z-30 h-12 whitespace-nowrap bg-indigo-100 px-2 py-0.5 text-right text-[8px] leading-none text-slate-900 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)]">
                           Total Incentive Amt
                         </th>
                       </tr>
@@ -464,7 +488,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                           group.fields.map((field, fieldIndex) => (
                             <th
                               key={`${group.key}-${field}`}
-                              className={`sticky top-8 z-20 h-8 break-words border-r border-slate-300 px-1.5 py-1 text-center leading-tight ${
+                               className={`sticky top-6 z-20 h-6 whitespace-nowrap border-r border-slate-300 px-1 py-0 text-center text-[8px] leading-none ${
                                 groupIndex === 0
                                   ? "bg-orange-100"
                                   : groupIndex === 1
@@ -501,8 +525,8 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                             }}
                             className="group cursor-pointer border-t border-slate-200 bg-white transition-colors hover:bg-blue-50/70 focus:bg-blue-50/70 focus:outline-none"
                           >
-                            <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors group-hover:bg-blue-50/70 group-focus:bg-blue-50/70">
-                              {user?.name || "—"}
+                            <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors hover:z-50 focus-within:z-50 group-hover:bg-blue-50/70 group-focus:bg-blue-50/70">
+                              <TruncatedTooltip value={user?.name} />
                             </td>
 
                             {incentiveGroups.flatMap((group) => {

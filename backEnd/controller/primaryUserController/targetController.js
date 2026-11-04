@@ -3509,12 +3509,20 @@ const buildIncentiveReportData = async ({
     };
   }
 
+  const periodStart = new Date(
+    Math.min(...targetConfigs.map((config) => new Date(config.startDate).getTime()))
+  );
+  const periodEnd = new Date(
+    Math.max(...targetConfigs.map((config) => new Date(config.endDate).getTime()))
+  );
+
   const leads = await LeadMaster.find({
     leadBranch: { $in: branchIds },
+    "paymentHistory.paymentDate": { $gte: periodStart, $lte: periodEnd },
   })
     .select(
       `leadId leadDate leadBranch customerName paymentVerified netAmount
-       taxAmount balanceAmount totalPaidAmount forcefullyClosedTarget leadFor
+       taxAmount discountAmount balanceAmount totalPaidAmount forcefullyClosedTarget leadFor
        paymentHistory activityLog leadBy leadByModel allocationType`
     )
     .lean();
@@ -3596,9 +3604,22 @@ const buildIncentiveReportData = async ({
       service.serviceName || service.name || "",
     ]),
   ]);
+  const getDisplayLeadProducts = (lead) => {
+    const items = objects(lead.leadFor);
+    const primaryProducts = items.filter(
+      (item) =>
+        String(item?.productorservicetype || "").toLowerCase() ===
+        "primaryproduct"
+    );
+
+    // A primary product is the lead's display product. Additional and enhanced
+    // services remain part of the lead's financial/incentive data, but must
+    // not create a separate Product List row or clutter the Lead List label.
+    return primaryProducts.length ? primaryProducts : items;
+  };
   const getLeadProductName = (lead) =>
     [...new Set(
-      objects(lead.leadFor)
+      getDisplayLeadProducts(lead)
         .map((item) =>
           String(item.productorServiceName || "").trim() ||
           productNameMap.get(String(item.productorServiceId || "")) ||
@@ -3631,8 +3652,8 @@ const buildIncentiveReportData = async ({
   );
   const earnedByBranch = new Map();
   // Keep the supporting values for the report grid in addition to the
-  // incentive total. Amount targets use each lead's tax-exclusive amount;
-  // payment collection records do not determine their report value.
+  // incentive total. The displayed lead amount is tax-exclusive and is only
+  // recorded once per lead/allocation; incentive calculations remain separate.
   const allocationMetricsByBranch = new Map();
   const details = [];
   const awarded = new Set();
@@ -3759,6 +3780,10 @@ const buildIncentiveReportData = async ({
       );
 
       const activities = objects(lead.activityLog);
+      const taxExclusiveLeadAmount = Math.max(
+        num(lead.netAmount) - num(lead.taxAmount),
+        0
+      );
       const awardActivity = ({ activity, activityIndex, percentageBaseAmount, eventDate, paymentKey = "quantity" }) => {
         if (activityIndex !== 0 && !isTaskCompletionEvent(activity)) return;
 
@@ -3819,8 +3844,11 @@ const buildIncentiveReportData = async ({
           });
         }
         const metric = userMetrics.get(allocationId);
+        const isFirstLeadForAllocation = !metric.leadIds.has(String(lead._id));
         metric.leadIds.add(String(lead._id));
-        metric.amount += num(percentageBaseAmount);
+        if (isFirstLeadForAllocation) {
+          metric.amount += taxExclusiveLeadAmount;
+        }
         metric.incentive += incentiveAmount;
 
         details.push({
@@ -3836,28 +3864,34 @@ const buildIncentiveReportData = async ({
           incentiveMode,
           configuredValue,
           percentageBaseAmount,
+          netAmount: num(lead.netAmount),
+          taxAmount: num(lead.taxAmount),
+          leadAmount: taxExclusiveLeadAmount,
+          discountAmount: num(lead.discountAmount),
           incentiveAmount,
           amount: incentiveAmount,
         });
       };
 
       if (config.measurementType === "amount") {
-        const taxExclusiveLeadAmount = Math.max(
-          num(lead.netAmount) - num(lead.taxAmount),
-          0
+        const cappedPaymentAmounts = getCappedVerifiedCategoryAmountsByPayment(
+          lead,
+          categoryId
         );
-        if (taxExclusiveLeadAmount <= 0) continue;
-
-        for (const [activityIndex, activity] of activities.entries()) {
-          const completedAt = activityCompletedAt(lead, activity, activityIndex);
-          if (!isWithinPeriod(completedAt, config)) continue;
-          awardActivity({
-            activity,
-            activityIndex,
-            percentageBaseAmount: taxExclusiveLeadAmount,
-            eventDate: completedAt,
-            paymentKey: `lead-${lead._id}`,
-          });
+        for (const [paymentIndex, payment] of payments.entries()) {
+          if (payment.paymentVerified !== true || !isWithinPeriod(payment.paymentDate, config)) continue;
+          const paymentAmount = cappedPaymentAmounts.get(paymentIndex) || 0;
+          if (paymentAmount <= 0) continue;
+          for (const [activityIndex, activity] of activities.entries()) {
+            if (!isWithinPeriod(activityCompletedAt(lead, activity, activityIndex), config)) continue;
+            awardActivity({
+              activity,
+              activityIndex,
+              percentageBaseAmount: paymentAmount,
+              eventDate: payment.paymentDate,
+              paymentKey: String(payment._id || paymentIndex),
+            });
+          }
         }
       } else {
         if (!fullyPaidEligible) continue;
@@ -4047,6 +4081,10 @@ export const getIncentiveLeads = async (req, res) => {
           partyName: detail.partyName,
           productName: detail.productName,
           date: detail.date,
+          netAmount: Number(detail.netAmount || 0),
+          taxAmount: Number(detail.taxAmount || 0),
+          leadAmount: Number(detail.leadAmount || 0),
+          discountAmount: Number(detail.discountAmount || 0),
           allocationMap: new Map(),
         });
       }
@@ -4082,6 +4120,10 @@ export const getIncentiveLeads = async (req, res) => {
         partyName: lead.partyName,
         productName: lead.productName,
         date: lead.date,
+        netAmount: lead.netAmount,
+        taxAmount: lead.taxAmount,
+        leadAmount: lead.leadAmount,
+        discountAmount: lead.discountAmount,
         allocations,
         totalAmount: allocations.reduce(
           (total, allocation) => total + Number(allocation.amount || 0),
