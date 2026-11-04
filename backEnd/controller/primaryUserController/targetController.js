@@ -3522,7 +3522,7 @@ const buildIncentiveReportData = async ({
   })
     .select(
       `leadId leadDate leadBranch customerName paymentVerified netAmount
-       taxAmount balanceAmount totalPaidAmount forcefullyClosedTarget leadFor
+       taxAmount discountAmount balanceAmount totalPaidAmount forcefullyClosedTarget leadFor
        paymentHistory activityLog leadBy leadByModel allocationType`
     )
     .lean();
@@ -3604,9 +3604,22 @@ const buildIncentiveReportData = async ({
       service.serviceName || service.name || "",
     ]),
   ]);
+  const getDisplayLeadProducts = (lead) => {
+    const items = objects(lead.leadFor);
+    const primaryProducts = items.filter(
+      (item) =>
+        String(item?.productorservicetype || "").toLowerCase() ===
+        "primaryproduct"
+    );
+
+    // A primary product is the lead's display product. Additional and enhanced
+    // services remain part of the lead's financial/incentive data, but must
+    // not create a separate Product List row or clutter the Lead List label.
+    return primaryProducts.length ? primaryProducts : items;
+  };
   const getLeadProductName = (lead) =>
     [...new Set(
-      objects(lead.leadFor)
+      getDisplayLeadProducts(lead)
         .map((item) =>
           String(item.productorServiceName || "").trim() ||
           productNameMap.get(String(item.productorServiceId || "")) ||
@@ -3851,6 +3864,10 @@ const buildIncentiveReportData = async ({
           incentiveMode,
           configuredValue,
           percentageBaseAmount,
+          netAmount: num(lead.netAmount),
+          taxAmount: num(lead.taxAmount),
+          leadAmount: taxExclusiveLeadAmount,
+          discountAmount: num(lead.discountAmount),
           incentiveAmount,
           amount: incentiveAmount,
         });
@@ -4064,6 +4081,10 @@ export const getIncentiveLeads = async (req, res) => {
           partyName: detail.partyName,
           productName: detail.productName,
           date: detail.date,
+          netAmount: Number(detail.netAmount || 0),
+          taxAmount: Number(detail.taxAmount || 0),
+          leadAmount: Number(detail.leadAmount || 0),
+          discountAmount: Number(detail.discountAmount || 0),
           allocationMap: new Map(),
         });
       }
@@ -4099,6 +4120,10 @@ export const getIncentiveLeads = async (req, res) => {
         partyName: lead.partyName,
         productName: lead.productName,
         date: lead.date,
+        netAmount: lead.netAmount,
+        taxAmount: lead.taxAmount,
+        leadAmount: lead.leadAmount,
+        discountAmount: lead.discountAmount,
         allocations,
         totalAmount: allocations.reduce(
           (total, allocation) => total + Number(allocation.amount || 0),

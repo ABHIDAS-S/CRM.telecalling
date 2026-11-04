@@ -88,7 +88,7 @@ beforeEach(async () => {
   await Task.collection.insertMany([{ _id: ids.task, taskName: "Demo" }, { _id: ids.otherTask, taskName: "Follow up" }]);
   await Lead.collection.insertOne({
     _id: ids.lead, leadId: "LEAD-TEST", leadBranch: ids.branch, leadDate: new Date("2026-09-08"),
-    paymentVerified: true, netAmount: 100, totalPaidAmount: 100, balanceAmount: 0,
+    paymentVerified: true, netAmount: 100, taxAmount: 18, discountAmount: 7, totalPaidAmount: 100, balanceAmount: 0,
     leadFor: [{ productorServiceId: ids.product, productorServicemodel: "Product" }],
     paymentHistory: [{ paymentVerified: true, paymentDate: new Date("2026-09-08"), paymentEntries: [{ productorServiceId: ids.product, productorServicemodel: "Product", receivedAmount: 100 }] }],
     activityLog: [ids.first, ids.second].map((_id) => ({
@@ -232,6 +232,8 @@ test("incentive details and report move rewards to the corrected owner and prese
   const newDetails = await request(`/details?${query}&userId=${ids.replacement}&allocationId=all`);
   assert.deepEqual(oldDetails.data.leads, []);
   assert.equal(newDetails.data.leads[0].totalAmount, 25);
+  assert.equal(newDetails.data.leads[0].leadAmount, 82);
+  assert.equal(newDetails.data.leads[0].discountAmount, 7);
   const lead = await Lead.findById(ids.lead).lean();
   assert.equal(String(incentiveOwnerId(lead.activityLog[0])), String(ids.replacement));
   assert.equal(incentiveOwnerModel(lead.activityLog[0]), "Staff");

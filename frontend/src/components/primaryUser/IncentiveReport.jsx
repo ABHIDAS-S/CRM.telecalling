@@ -11,6 +11,30 @@ import PropTypes from "prop-types";
 
 const formatAmount = formatDisplayCurrency;
 
+const TruncatedTooltip = ({ value, className = "" }) => {
+  const text = String(value || "—");
+
+  return (
+    <div className="relative min-w-0">
+      <span tabIndex={0} className={`peer block truncate outline-none ${className}`}>
+        {text}
+      </span>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-0 top-full z-[70] mt-1 w-max max-w-[22rem] -translate-y-1 whitespace-normal rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium normal-case tracking-normal text-white opacity-0 shadow-lg ring-1 ring-slate-700 transition-all duration-150 peer-hover:translate-y-0 peer-hover:opacity-100 peer-focus:translate-y-0 peer-focus:opacity-100"
+      >
+        {text}
+        <span className="absolute -top-1 left-3 h-2 w-2 rotate-45 bg-slate-900" />
+      </span>
+    </div>
+  );
+};
+
+TruncatedTooltip.propTypes = {
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  className: PropTypes.string,
+};
+
 const getUserTotal = (allocations = []) =>
   allocations.reduce(
     (sum, allocation) => sum + Number(allocation?.achieved || 0),
@@ -501,8 +525,8 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                             }}
                             className="group cursor-pointer border-t border-slate-200 bg-white transition-colors hover:bg-blue-50/70 focus:bg-blue-50/70 focus:outline-none"
                           >
-                            <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors group-hover:bg-blue-50/70 group-focus:bg-blue-50/70">
-                              {user?.name || "—"}
+                            <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors hover:z-50 focus-within:z-50 group-hover:bg-blue-50/70 group-focus:bg-blue-50/70">
+                              <TruncatedTooltip value={user?.name} />
                             </td>
 
                             {incentiveGroups.flatMap((group) => {
