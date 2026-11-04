@@ -412,7 +412,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                     </p>
                     <p className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
                       <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" />
-                      Scroll inside the table to view every category
+                      Scroll inside the table to view every Tasks
                     </p>
                   </div>
 
@@ -433,14 +433,14 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                     </colgroup>
                     <thead className="border-b-2 border-slate-300 text-[9px] font-semibold uppercase tracking-wide text-slate-600">
                       <tr>
-                        <th rowSpan="2" className="sticky left-0 top-0 z-30 h-16 break-words border-r border-slate-300 bg-amber-300 px-3 py-2 text-left leading-tight text-slate-900 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)]">
+                        <th rowSpan="2" className="sticky left-0 top-0 z-30 h-12 whitespace-nowrap border-r border-slate-300 bg-amber-300 px-2 py-0.5 text-left text-[8px] leading-none text-slate-900 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)]">
                           Employee Name
                         </th>
                         {incentiveGroups.map((group, index) => (
                           <th
                             key={group.key}
                             colSpan="3"
-                            className={`sticky top-0 z-20 h-8 break-words border-r border-slate-300 px-1.5 py-1 text-center leading-tight text-slate-900 ${
+                            className={`sticky top-0 z-20 h-6 whitespace-nowrap border-r border-slate-300 px-1 py-0 text-center text-[8px] leading-none text-slate-900 ${
                               index === 0
                                 ? "bg-orange-200"
                                 : index === 1
@@ -455,7 +455,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                             {group.label}
                           </th>
                         ))}
-                        <th rowSpan="2" className="sticky right-0 top-0 z-30 h-16 break-words bg-indigo-100 px-3 py-2 text-right leading-tight text-slate-900 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)]">
+                        <th rowSpan="2" className="sticky right-0 top-0 z-30 h-12 whitespace-nowrap bg-indigo-100 px-2 py-0.5 text-right text-[8px] leading-none text-slate-900 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)]">
                           Total Incentive Amt
                         </th>
                       </tr>
@@ -464,7 +464,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                           group.fields.map((field, fieldIndex) => (
                             <th
                               key={`${group.key}-${field}`}
-                              className={`sticky top-8 z-20 h-8 break-words border-r border-slate-300 px-1.5 py-1 text-center leading-tight ${
+                               className={`sticky top-6 z-20 h-6 whitespace-nowrap border-r border-slate-300 px-1 py-0 text-center text-[8px] leading-none ${
                                 groupIndex === 0
                                   ? "bg-orange-100"
                                   : groupIndex === 1
