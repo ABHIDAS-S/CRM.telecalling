@@ -3509,20 +3509,12 @@ const buildIncentiveReportData = async ({
     };
   }
 
-  const periodStart = new Date(
-    Math.min(...targetConfigs.map((config) => new Date(config.startDate).getTime()))
-  );
-  const periodEnd = new Date(
-    Math.max(...targetConfigs.map((config) => new Date(config.endDate).getTime()))
-  );
-
   const leads = await LeadMaster.find({
     leadBranch: { $in: branchIds },
-    "paymentHistory.paymentDate": { $gte: periodStart, $lte: periodEnd },
   })
     .select(
       `leadId leadDate leadBranch customerName paymentVerified netAmount
-       balanceAmount totalPaidAmount forcefullyClosedTarget leadFor
+       taxAmount balanceAmount totalPaidAmount forcefullyClosedTarget leadFor
        paymentHistory activityLog leadBy leadByModel allocationType`
     )
     .lean();
@@ -3639,8 +3631,8 @@ const buildIncentiveReportData = async ({
   );
   const earnedByBranch = new Map();
   // Keep the supporting values for the report grid in addition to the
-  // incentive total. `leadIds` gives the real lead count even if an amount
-  // incentive is paid over more than one verified payment.
+  // incentive total. Amount targets use each lead's tax-exclusive amount;
+  // payment collection records do not determine their report value.
   const allocationMetricsByBranch = new Map();
   const details = [];
   const awarded = new Set();
@@ -3850,24 +3842,22 @@ const buildIncentiveReportData = async ({
       };
 
       if (config.measurementType === "amount") {
-        const cappedPaymentAmounts = getCappedVerifiedCategoryAmountsByPayment(
-          lead,
-          categoryId
+        const taxExclusiveLeadAmount = Math.max(
+          num(lead.netAmount) - num(lead.taxAmount),
+          0
         );
-        for (const [paymentIndex, payment] of payments.entries()) {
-          if (payment.paymentVerified !== true || !isWithinPeriod(payment.paymentDate, config)) continue;
-          const paymentAmount = cappedPaymentAmounts.get(paymentIndex) || 0;
-          if (paymentAmount <= 0) continue;
-          for (const [activityIndex, activity] of activities.entries()) {
-            if (!isWithinPeriod(activityCompletedAt(lead, activity, activityIndex), config)) continue;
-            awardActivity({
-              activity,
-              activityIndex,
-              percentageBaseAmount: paymentAmount,
-              eventDate: payment.paymentDate,
-              paymentKey: String(payment._id || paymentIndex),
-            });
-          }
+        if (taxExclusiveLeadAmount <= 0) continue;
+
+        for (const [activityIndex, activity] of activities.entries()) {
+          const completedAt = activityCompletedAt(lead, activity, activityIndex);
+          if (!isWithinPeriod(completedAt, config)) continue;
+          awardActivity({
+            activity,
+            activityIndex,
+            percentageBaseAmount: taxExclusiveLeadAmount,
+            eventDate: completedAt,
+            paymentKey: `lead-${lead._id}`,
+          });
         }
       } else {
         if (!fullyPaidEligible) continue;

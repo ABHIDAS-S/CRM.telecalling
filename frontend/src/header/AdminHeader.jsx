@@ -1618,12 +1618,12 @@ onpasswordClick,
     () => [
       { to: "/admin/masters/company", label: "Company" },
       { to: "/admin/masters/branch", label: "Branch" },
-      { to: "/admin/masters/department", label: "Department" },
       { label: "Product & Service", hasChildren: true },
+      { to: "/admin/masters/partners", label: "Partner Type" },
+      { to: "/admin/masters/department", label: "Department" },
       { to: "/admin/masters/customer", label: "Customer" },
       { label: "Employee", hasChildren: true },
       { to: "/admin/masters/leavemaster", label: "Leave Master" },
-      { to: "/admin/masters/partners", label: "Partners" },
     ],
     []
   )
@@ -1902,7 +1902,15 @@ onpasswordClick,
                   : isGroupActive(group.items)
 
                 return (
-                  <div key={group.label} className="group/menu relative">
+                  <div
+                    key={group.label}
+                    className="group/menu relative"
+                    onMouseLeave={(event) => {
+                      if (event.currentTarget.contains(document.activeElement)) {
+                        document.activeElement?.blur()
+                      }
+                    }}
+                  >
                     <button
                       type="button"
                       className={`flex items-center gap-1.5 rounded-full px-4 py-1 text-[14px] font-semibold transition ${

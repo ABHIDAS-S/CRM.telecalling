@@ -3890,7 +3890,7 @@ export const getNotificationData = async (req, res) => {
 
 export const getBranchwiseMarketingPendingTasks = async (req, res) => {
   try {
-    const { branchId } = req.query;
+    const { branchId, ownLead, staffId } = req.query;
 
     if (!branchId) {
       return res.status(400).json({
@@ -3898,6 +3898,18 @@ export const getBranchwiseMarketingPendingTasks = async (req, res) => {
         data: []
       });
     }
+
+    if (ownLead === "true" && !isValidObjectId(staffId)) {
+      return res.status(400).json({
+        message: "A valid staff ID is required for own pending tasks",
+        data: []
+      });
+    }
+
+    const ownLeadOnly = ownLead === "true";
+    const staffObjectId = ownLeadOnly
+      ? new mongoose.Types.ObjectId(staffId)
+      : null;
 
     // Only populate the static ref here — taskId works fine as-is
     const leads = await LeadMaster.find({ leadBranch: branchId })
@@ -3984,7 +3996,8 @@ export const getBranchwiseMarketingPendingTasks = async (req, res) => {
           activity.allocationChanged === false &&
           activity.taskClosed === false &&
           activity.taskTo !== "followup" &&
-          activity.allocationDate
+          activity.allocationDate &&
+          (!ownLeadOnly || String(activity.taskallocatedTo || "") === String(staffObjectId))
         ) {
           const allocatedUser = activity.taskallocatedTo
             ? userMap.get(activity.taskallocatedTo.toString())
@@ -4165,12 +4178,20 @@ export const getTodayVerifiedCollectionDetails = async (req, res) => {
 
 export const Getallsalesfunnels = async (req, res) => {
   try {
-    const { startDate, endDate, selectedBranch } = req.query;
+    const { startDate, endDate, selectedBranch, ownLead, staffId } = req.query;
+
+    if (ownLead === "true" && !isValidObjectId(staffId)) {
+      return res.status(400).json({ message: "A valid staff ID is required for own leads" });
+    }
 
     const start = new Date(startDate);
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
     const branchObjectId = new mongoose.Types.ObjectId(selectedBranch)
+    const ownLeadOnly = ownLead === "true";
+    const staffObjectId = ownLeadOnly
+      ? new mongoose.Types.ObjectId(staffId)
+      : null;
     const systemStudyTaskId = new mongoose.Types.ObjectId(
       "689c23613e94902039b9774b"
     )
@@ -4184,6 +4205,7 @@ export const Getallsalesfunnels = async (req, res) => {
       {
         $match: {
           leadBranch: branchObjectId,
+          ...(ownLeadOnly ? { "activityLog.taskallocatedTo": staffObjectId } : {}),
           $or: [
             {
               "activityLog.submissionDate": { $gte: start, $lte: end }
@@ -4263,6 +4285,7 @@ export const Getallsalesfunnels = async (req, res) => {
             {
               $match: {
                 leadBranch: branchObjectId,
+                ...(ownLeadOnly ? { leadBy: staffObjectId } : {}),
                 leadDate: { $gte: start, $lte: end }
               }
             },
@@ -4296,6 +4319,7 @@ export const Getallsalesfunnels = async (req, res) => {
                 activityLog: {
                   $elemMatch: {
                     taskTo: "followup",
+                    ...(ownLeadOnly ? { taskallocatedTo: staffObjectId } : {}),
                     submissionDate: { $gte: start, $lte: end }
                   }
                 }
@@ -4328,7 +4352,16 @@ export const Getallsalesfunnels = async (req, res) => {
               $match: {
                 leadBranch: branchObjectId,
                 leadLost: true,
-                leadLostDate: { $gte: start, $lte: end }
+                leadLostDate: { $gte: start, $lte: end },
+                ...(ownLeadOnly ? {
+                  activityLog: {
+                    $elemMatch: {
+                      taskTo: "followup",
+                      taskallocatedTo: staffObjectId,
+                      followupClosed: true
+                    }
+                  }
+                } : {})
               }
             },
             {
@@ -4361,6 +4394,7 @@ export const Getallsalesfunnels = async (req, res) => {
                 activityLog: {
                   $elemMatch: {
                     taskId: systemStudyTaskId,
+                    ...(ownLeadOnly ? { taskallocatedTo: staffObjectId } : {}),
                     submissionDate: { $gte: start, $lte: end }
                   }
                 }
