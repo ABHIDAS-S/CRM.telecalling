@@ -281,7 +281,7 @@ test("the Lead allocation credits leadBy over a legacy first-activity submitter"
   assert.equal(details.data.leads[0].leadId, "LEAD-TEST");
 });
 
-test("amount incentives use each verified payment's period and that period's slab", async () => {
+test("amount incentives use the tax-exclusive lead amount and ignore payment dates", async () => {
   await Product.collection.insertOne({
     _id: ids.product,
     selected: [{ category_id: ids.category }],
@@ -295,6 +295,7 @@ test("amount incentives use each verified payment's period and that period's sla
         allocationType: ids.task,
         leadDate: new Date("2026-09-05"),
         netAmount: 30000,
+        taxAmount: 3000,
         totalPaidAmount: 30000,
         balanceAmount: 0,
         paymentVerified: true,
@@ -354,8 +355,8 @@ test("amount incentives use each verified payment's period and that period's sla
 
   const september = await request(`/report?year=2026&period=July-September&selectedBranch=${ids.branch}`);
   const october = await request(`/report?year=2026&period=October-December&selectedBranch=${ids.branch}`);
-  assert.equal(september.data.summary.totalAmount, 200);
-  assert.equal(october.data.summary.totalAmount, 300);
+  assert.equal(september.data.summary.totalAmount, 270);
+  assert.equal(october.data.summary.totalAmount, 810);
   assert.equal(september.data.branches[0].users[0].userId, String(ids.old));
   assert.equal(october.data.branches[0].users[0].userId, String(ids.replacement));
 });

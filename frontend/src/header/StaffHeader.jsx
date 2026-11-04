@@ -106,14 +106,19 @@ export default function StaffHeader({
         control: permissions.Branch ?? false
       },
       {
-        to: "/staff/masters/department",
-        label: "Department",
-        control: permissions.Department ?? false
-      },
-      {
         label: "Product & Service",
         hasChildren: true,
         control: permissions.ProductandServices ?? false
+      },
+      {
+        to: "/staff/masters/partners",
+        label: "Partner Type",
+        control: permissions.Partners ?? false
+      },
+      {
+        to: "/staff/masters/department",
+        label: "Department",
+        control: permissions.Department ?? false
       },
       {
         to: "/staff/masters/customer",
@@ -130,11 +135,6 @@ export default function StaffHeader({
         label: "Leave Master",
         control: permissions.Leavemaster ?? false
       },
-      {
-        to: "/staff/masters/partners",
-        label: "Partners",
-        control: permissions.Partners ?? false
-      }
     ],
     [permissions]
   )
@@ -663,7 +663,15 @@ console.log(user?.department?.code)
                   : isGroupActive(group.items)
 
                 return (
-                  <div key={group.label} className="group/menu relative">
+                  <div
+                    key={group.label}
+                    className="group/menu relative"
+                    onMouseLeave={(event) => {
+                      if (event.currentTarget.contains(document.activeElement)) {
+                        document.activeElement?.blur()
+                      }
+                    }}
+                  >
                     <button
                       type="button"
                       className={`flex items-center gap-1.5 rounded-full px-4 py-1 text-[14px] font-semibold transition ${
