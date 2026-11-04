@@ -3509,8 +3509,16 @@ const buildIncentiveReportData = async ({
     };
   }
 
+  const periodStart = new Date(
+    Math.min(...targetConfigs.map((config) => new Date(config.startDate).getTime()))
+  );
+  const periodEnd = new Date(
+    Math.max(...targetConfigs.map((config) => new Date(config.endDate).getTime()))
+  );
+
   const leads = await LeadMaster.find({
     leadBranch: { $in: branchIds },
+    "paymentHistory.paymentDate": { $gte: periodStart, $lte: periodEnd },
   })
     .select(
       `leadId leadDate leadBranch customerName paymentVerified netAmount
@@ -3631,8 +3639,8 @@ const buildIncentiveReportData = async ({
   );
   const earnedByBranch = new Map();
   // Keep the supporting values for the report grid in addition to the
-  // incentive total. Amount targets use each lead's tax-exclusive amount;
-  // payment collection records do not determine their report value.
+  // incentive total. The displayed lead amount is tax-exclusive and is only
+  // recorded once per lead/allocation; incentive calculations remain separate.
   const allocationMetricsByBranch = new Map();
   const details = [];
   const awarded = new Set();
@@ -3759,6 +3767,10 @@ const buildIncentiveReportData = async ({
       );
 
       const activities = objects(lead.activityLog);
+      const taxExclusiveLeadAmount = Math.max(
+        num(lead.netAmount) - num(lead.taxAmount),
+        0
+      );
       const awardActivity = ({ activity, activityIndex, percentageBaseAmount, eventDate, paymentKey = "quantity" }) => {
         if (activityIndex !== 0 && !isTaskCompletionEvent(activity)) return;
 
@@ -3819,8 +3831,11 @@ const buildIncentiveReportData = async ({
           });
         }
         const metric = userMetrics.get(allocationId);
+        const isFirstLeadForAllocation = !metric.leadIds.has(String(lead._id));
         metric.leadIds.add(String(lead._id));
-        metric.amount += num(percentageBaseAmount);
+        if (isFirstLeadForAllocation) {
+          metric.amount += taxExclusiveLeadAmount;
+        }
         metric.incentive += incentiveAmount;
 
         details.push({
@@ -3842,22 +3857,24 @@ const buildIncentiveReportData = async ({
       };
 
       if (config.measurementType === "amount") {
-        const taxExclusiveLeadAmount = Math.max(
-          num(lead.netAmount) - num(lead.taxAmount),
-          0
+        const cappedPaymentAmounts = getCappedVerifiedCategoryAmountsByPayment(
+          lead,
+          categoryId
         );
-        if (taxExclusiveLeadAmount <= 0) continue;
-
-        for (const [activityIndex, activity] of activities.entries()) {
-          const completedAt = activityCompletedAt(lead, activity, activityIndex);
-          if (!isWithinPeriod(completedAt, config)) continue;
-          awardActivity({
-            activity,
-            activityIndex,
-            percentageBaseAmount: taxExclusiveLeadAmount,
-            eventDate: completedAt,
-            paymentKey: `lead-${lead._id}`,
-          });
+        for (const [paymentIndex, payment] of payments.entries()) {
+          if (payment.paymentVerified !== true || !isWithinPeriod(payment.paymentDate, config)) continue;
+          const paymentAmount = cappedPaymentAmounts.get(paymentIndex) || 0;
+          if (paymentAmount <= 0) continue;
+          for (const [activityIndex, activity] of activities.entries()) {
+            if (!isWithinPeriod(activityCompletedAt(lead, activity, activityIndex), config)) continue;
+            awardActivity({
+              activity,
+              activityIndex,
+              percentageBaseAmount: paymentAmount,
+              eventDate: payment.paymentDate,
+              paymentKey: String(payment._id || paymentIndex),
+            });
+          }
         }
       } else {
         if (!fullyPaidEligible) continue;

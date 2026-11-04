@@ -281,7 +281,7 @@ test("the Lead allocation credits leadBy over a legacy first-activity submitter"
   assert.equal(details.data.leads[0].leadId, "LEAD-TEST");
 });
 
-test("amount incentives use the tax-exclusive lead amount and ignore payment dates", async () => {
+test("amount incentives keep payment-based rewards while displaying tax-exclusive lead amounts", async () => {
   await Product.collection.insertOne({
     _id: ids.product,
     selected: [{ category_id: ids.category }],
@@ -355,8 +355,10 @@ test("amount incentives use the tax-exclusive lead amount and ignore payment dat
 
   const september = await request(`/report?year=2026&period=July-September&selectedBranch=${ids.branch}`);
   const october = await request(`/report?year=2026&period=October-December&selectedBranch=${ids.branch}`);
-  assert.equal(september.data.summary.totalAmount, 270);
-  assert.equal(october.data.summary.totalAmount, 810);
+  assert.equal(september.data.summary.totalAmount, 200);
+  assert.equal(october.data.summary.totalAmount, 300);
+  assert.equal(september.data.branches[0].users[0].allocations[0].amount, 27000);
+  assert.equal(october.data.branches[0].users[0].allocations[1].amount, 27000);
   assert.equal(september.data.branches[0].users[0].userId, String(ids.old));
   assert.equal(october.data.branches[0].users[0].userId, String(ids.replacement));
 });
