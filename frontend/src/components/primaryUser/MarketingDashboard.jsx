@@ -201,7 +201,7 @@ const SalesFunnel = ({ stages, onStageClick, isLoading }) => {
       </div>
 
       {isLoading ? (
-        <div className="grid min-h-[220px] animate-pulse gap-5 md:grid-cols-[minmax(210px,1.25fr)_minmax(155px,0.75fr)] md:items-center">
+        <div className="grid min-h-[220px] animate-pulse gap-5 md:grid-cols-[minmax(175px,0.85fr)_minmax(190px,1.15fr)] md:items-center">
           <div className="flex flex-col items-center justify-center gap-2.5">
             {[100, 84, 68, 52, 42].map((width) => <span key={width} className="h-9 rounded-[4px] bg-slate-100" style={{ width: `${width}%` }} />)}
           </div>
@@ -209,7 +209,7 @@ const SalesFunnel = ({ stages, onStageClick, isLoading }) => {
             {Array.from({ length: 5 }, (_, index) => <div key={index} className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-slate-100" /><span className="h-3 flex-1 rounded bg-slate-100" /><span className="h-5 w-9 rounded-full bg-slate-100" /></div>)}
           </div>
         </div>
-      ) : <div className="grid gap-2 md:grid-cols-[minmax(210px,1.25fr)_minmax(155px,0.75fr)] md:items-center">
+      ) : <div className="grid gap-2 md:grid-cols-[minmax(175px,0.85fr)_minmax(190px,1.15fr)] md:items-center">
         <div className="flex min-h-[220px] flex-col items-center justify-center gap-1.5">
           {stages.map((stage) => {
             const isClickable = stage.value > 0
@@ -2167,7 +2167,6 @@ function CollectionDetails({
 
   function handleNavigate(item) {
     console.log(item)
-    if (item.amount <= 0) return
     navigate(basePath, {
       state: {
         startDate: item?.startDate,

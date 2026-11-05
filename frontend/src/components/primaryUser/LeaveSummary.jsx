@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import ExcelJS from "exceljs"
 import { saveAs } from "file-saver"
 import BarLoader from "react-spinners/BarLoader"
@@ -24,6 +24,7 @@ import {
   History,
   ChevronDown,
   ChevronRight,
+  Search,
   X
 } from "lucide-react"
 import Modal from "./Modal"
@@ -32,6 +33,7 @@ import BranchDropdown from "./BranchDropdown"
 import UseFetch from "../../hooks/useFetch"
 import { toast } from "react-toastify"
 import { getLocalStorageItem } from "../../helper/localstorage"
+import Select from "react-select"
 const LeaveSummary = () => {
   const [searchTerm, setSearchTerm] = useState("")
   const [warningMessage, setWarningMessage] = useState("")
@@ -80,7 +82,7 @@ const now=new Date()
   const { data: branchProduct } = UseFetch(
     `/product/getallbranchProduct?branch=${selectedCompanyBranch}`
   )
-const aaa=data?.staffAttendanceStats?.filter((item)=>item?.name==="SISMI P C")
+const aaa=data?.staffAttendanceStats?.filter((item)=>item?.name==="Muhammed Rasik K.M")
 console.log(aaa)
   useEffect(() => {
     if (selectedCategory) {
@@ -249,6 +251,31 @@ console.log(filteredselectedCategory)
     { name: "November", value: 11 },
     { name: "December", value: 12 }
   ]
+  const periodSelectStyles = useMemo(
+    () => ({
+      control: (base, state) => ({
+        ...base,
+        minHeight: "40px",
+        borderRadius: "10px",
+        borderColor: state.isFocused ? "#2563eb" : "#cbd5e1",
+        backgroundColor: "#ffffff",
+        boxShadow: state.isFocused ? "0 0 0 3px rgba(37, 99, 235, 0.14)" : "0 1px 2px rgba(15, 23, 42, 0.04)",
+        cursor: "pointer",
+        "&:hover": { borderColor: state.isFocused ? "#2563eb" : "#94a3b8" }
+      }),
+      valueContainer: (base) => ({ ...base, padding: "0 10px" }),
+      singleValue: (base) => ({ ...base, color: "#1e293b", fontSize: "13px", fontWeight: 600 }),
+      indicatorSeparator: () => ({ display: "none" }),
+      dropdownIndicator: (base) => ({ ...base, color: "#475569", padding: "7px" }),
+      menuPortal: (base) => ({ ...base, zIndex: 80 }),
+      menu: (base) => ({ ...base, marginTop: "6px", borderRadius: "10px", overflow: "hidden", border: "1px solid #dbe5f1", boxShadow: "0 14px 30px rgba(15, 23, 42, 0.16)" }),
+      menuList: (base) => ({ ...base, maxHeight: "220px", padding: "4px" }),
+      option: (base, state) => ({ ...base, borderRadius: "7px", margin: "1px 0", padding: "8px 10px", fontSize: "13px", fontWeight: state.isSelected ? 600 : 500, backgroundColor: state.isSelected ? "#2563eb" : state.isFocused ? "#eff6ff" : "white", color: state.isSelected ? "#ffffff" : "#334155", cursor: "pointer" })
+    }),
+    []
+  )
+  const yearOptions = years.map((year) => ({ value: year, label: String(year) }))
+  const monthOptions = months.map((month) => ({ value: month.value, label: month.name }))
   const selectedUser = (attendeeid) => {
     const filteredAttendance = newattende.filter((id) => {
       return id.userId === attendeeid
@@ -888,8 +915,8 @@ console.log(staffId)
     //     />
     //   )}
     // </div>
-    <div className="h-full bg-[#ADD8E6] overflow-hidden">
-      <div className="flex h-full flex-row overflow-hidden">
+    <div className="h-[calc(100dvh-64px)] min-h-0 overflow-hidden bg-[#ADD8E6]">
+      <div className="flex h-full min-h-0 flex-row overflow-hidden">
         {/* <StaticSidebar
           handleMoreClick={handleMoreClick}
           selectedCompanyBranch={selectedCompanyBranch}
@@ -900,7 +927,7 @@ console.log(staffId)
           setselectedPeriod={setselectedPeriod}
         /> */}
 
-        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {/* <header className="flex items-center justify-between bg-[#ADD8E6]">
             {user?.role?.toLowerCase() === "admin" ? (
               <AdminHeader hide={true} />
@@ -948,12 +975,12 @@ console.log(staffId)
           )}
 
           <div className="flex flex-1 min-h-0 flex-col bg-[#ADD8E6]">
-            <div className="shrink-0 text-center">
-              <h1 className="mb-1 font-bold sm:text-md md:text-2xl">
+            <div className="shrink-0 px-3 pb-3 pt-2 text-center sm:px-5 sm:pt-3">
+              <h1 className="mb-2 text-lg font-bold leading-tight text-slate-900 md:text-xl">
                 User Leave Summary
               </h1>
 
-              <div className="mx-5 mb-3 grid grid-cols-2 gap-2 md:mr-8 md:flex md:flex-row md:items-center md:justify-end md:gap-4">
+              <div className="mx-auto flex max-w-6xl flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center lg:flex-nowrap lg:justify-end">
                 {leavesummaryList && leavesummaryList.length > 0 && (
                   <BranchDropdown
                     branches={userBranches}
@@ -962,7 +989,8 @@ console.log(staffId)
                   />
                 )}
 
-                <div className="w-full md:w-auto">
+                <div className="relative w-full sm:w-56">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     value={
                       selectedStaff !== "" ? selectedStaff[0]?.name : searchTerm
@@ -974,41 +1002,45 @@ console.log(staffId)
                       }
                       setSearchTerm(e.target.value)
                     }}
-                    placeholder="Search..."
-                    className="w-full appearance-none rounded border border-gray-400 bg-white px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:outline-none md:w-auto"
+                    placeholder="Search staff..."
+                    className="w-full appearance-none rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm font-medium text-slate-700 shadow-sm outline-none transition placeholder:font-normal placeholder:text-slate-400 hover:border-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
                   />
                 </div>
 
                 <button
-                  className="rounded bg-blue-600 px-3 py-2 text-sm text-white"
+                  className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100"
                   onClick={() => handleDownload(newattende)}
                 >
                   Download to Excel
                 </button>
 
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="w-full rounded border p-2 md:w-auto"
-                >
-                  {years.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
+                <div className="w-full sm:w-28">
+                  <Select
+                    aria-label="Select year"
+                    classNamePrefix="leave-period-select"
+                    options={yearOptions}
+                    value={yearOptions.find((option) => option.value === selectedYear) || null}
+                    onChange={(option) => setSelectedYear(Number(option?.value || currentYear))}
+                    styles={periodSelectStyles}
+                    isSearchable={false}
+                    menuPortalTarget={document.body}
+                    menuShouldScrollIntoView={false}
+                  />
+                </div>
 
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  className="w-full rounded border p-2 md:w-auto"
-                >
-                  {months.map((month) => (
-                    <option key={month.value} value={month.value}>
-                      {month.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="w-full sm:w-40">
+                  <Select
+                    aria-label="Select month"
+                    classNamePrefix="leave-period-select"
+                    options={monthOptions}
+                    value={monthOptions.find((option) => option.value === selectedMonth) || null}
+                    onChange={(option) => setSelectedMonth(Number(option?.value || currentMonth))}
+                    styles={periodSelectStyles}
+                    isSearchable={false}
+                    menuPortalTarget={document.body}
+                    menuShouldScrollIntoView={false}
+                  />
+                </div>
               </div>
             </div>
 
@@ -1018,28 +1050,29 @@ console.log(staffId)
               </div>
             ) : (
               <div className="min-h-0 flex-1 overflow-hidden">
-                <div className="h-full overflow-y-auto px-4 pb-4">
-                  <div className="rounded-lg shadow-xl">
+                <div className={`h-full min-h-0 min-w-0 px-3 pb-3 sm:px-4 ${selectedName ? "overflow-hidden" : "overflow-y-auto"}`}>
+                  <div className={`min-w-0 rounded-xl shadow-sm ${selectedName ? "flex h-full min-h-0 flex-col overflow-hidden" : ""}`}>
                     {leavesummaryList && leavesummaryList.length > 0 ? (
                       leavesummaryList.map((attendee, index) => (
-                        <div key={index}>
+                        <div key={index} className={selectedName === attendee.name ? "h-full min-h-0 min-w-0" : ""}>
                           {selectedName === null ||
                           selectedName === attendee.name ? (
                             <div
                               ref={
                                 selectedName === attendee.name ? listRef : null
                               }
+                              className={selectedName === attendee.name ? "flex h-full min-h-0 flex-col" : ""}
                             >
                               <div
-                                className={`w-full cursor-pointer rounded-lg border bg-white shadow-lg ${
+                                className={`w-full shrink-0 cursor-pointer rounded-lg border bg-white shadow-lg ${
                                   selectedName === attendee.name
-                                    ? "z-10 md:mr-4"
-                                    : "mb-2"
-                                } md:h-20`}
+                                    ? "sticky top-0 z-20 md:mr-3"
+                                    : "mb-1.5"
+                                } md:h-16`}
                                 onClick={() => handleSelectAttendee(attendee)}
                               >
                                 <div className="w-full md:flex">
-                                  <div className="w-full p-2 text-sm font-semibold text-gray-800 md:w-[225px] md:text-md">
+                                  <div className="flex w-full items-center p-2 text-sm font-semibold text-gray-800 md:w-[225px]">
                                     {attendee.name}
                                   </div>
 
@@ -1056,7 +1089,7 @@ console.log(staffId)
                                           ].map((label, idx) => (
                                             <th
                                               key={idx}
-                                              className="min-w-[100px] py-1 text-center text-sm font-medium text-gray-800"
+                                              className="min-w-[100px] py-0.5 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500"
                                             >
                                               {label}
                                             </th>
@@ -1074,7 +1107,7 @@ console.log(staffId)
                                           ].map((value, idx) => (
                                             <td
                                               key={idx}
-                                              className="px-4 py-2 text-center text-lg font-semibold"
+                                              className="px-4 py-1 text-center text-base font-bold text-slate-800"
                                             >
                                               {value}
                                             </td>
@@ -1089,7 +1122,7 @@ console.log(staffId)
                               {selectedName === attendee.name &&
                                 currentmonthSundays &&
                                 holiday && (
-                                  <div className="mt-2 flex-1">
+                                  <div className="mt-2 flex min-h-0 min-w-0 flex-1">
                                     <ResponsiveTable
                                       attendee={attendee}
                                       user={user}

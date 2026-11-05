@@ -6357,6 +6357,44 @@ const getLeaveTotal = (day) =>
   (day.compensatoryLeave || 0) +
   (day.otherLeave || 0);
 
+// Late/early minutes are calculated from attendance punches before onsite and
+// leave records are applied. Only the portion of the day actually worked by
+// attendance can contribute to late cutting.
+export const getLateCuttingEligibleMinutes = (day = {}) => {
+  const coverage = day.coverage || {};
+  const onsite = coverage.onsite || {};
+  const leave = coverage.leave || {};
+  const fullDayOnsite = onsite.morning && onsite.afternoon;
+  const fullDayLeave = leave.morning && leave.afternoon;
+
+  if (fullDayOnsite || fullDayLeave) return { late: 0, early: 0 };
+
+  return {
+    // Morning onsite replaces the morning attendance requirement.
+    late: onsite.morning ? 0 : Number(day.late || 0),
+    // Afternoon onsite replaces the afternoon attendance requirement.
+    early: onsite.afternoon ? 0 : Number(day.early || 0)
+  };
+};
+
+// Leave Summary business rule: an afternoon-only attendance punch after 1:30
+// combined with a Morning half-day leave still leaves half a day unmarked.
+// This is intentionally applied only by the active Leave Summary endpoint.
+export const getMorningLeaveAfternoonPunchNotMarked = (day = {}) => {
+  const leave = day.coverage?.leave || {};
+  const attendance = day.coverage?.attendance || {};
+  const punchIn = parse12hToMinutes(day.inTime);
+
+  return leave.morning &&
+    !leave.afternoon &&
+    attendance.afternoon &&
+    !attendance.morning &&
+    punchIn != null &&
+    punchIn >= 13 * 60 + 30
+    ? 0.5
+    : null;
+};
+
 const markCoverage = (target, period) => {
   if (period === "Full Day") {
     target.morning = true;
@@ -6987,6 +7025,14 @@ export const GetsomeAll = async (req, res, yearParam = {}, monthParam = {}) => {
 
         recomputeDayFromCoverage(day, user, dateKey);
 
+        const notMarkedOverride = getMorningLeaveAfternoonPunchNotMarked(day);
+        if (notMarkedOverride !== null) {
+          // A Morning half-day leave plus a first punch at/after 1:30 PM is
+          // not eligible for an attendance credit in this report.
+          day.present = 0;
+          day.notMarked = notMarkedOverride;
+        }
+
         const leaveTotal = getLeaveTotal(day);
         if (leaveTotal === 0.5) stats.halfDayLeave += 0.5;
         if (leaveTotal >= 1) stats.fullDayLeave += 1;
@@ -7001,8 +7047,9 @@ export const GetsomeAll = async (req, res, yearParam = {}, monthParam = {}) => {
           day.notMarked = 1;
         }
 
-        if (day.late > 0) stats.late += 1;
-        if (day.early > 0) stats.earlyGoing += 1;
+        const eligibleMinutes = getLateCuttingEligibleMinutes(day);
+        if (eligibleMinutes.late > 0) stats.late += 1;
+        if (eligibleMinutes.early > 0) stats.earlyGoing += 1;
       }
 
       await applySandwichPolicy({
