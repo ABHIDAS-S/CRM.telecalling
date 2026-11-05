@@ -8,6 +8,44 @@ import { FaEdit, FaTrash } from "react-icons/fa"
 import Select from "react-select"
 import ImageInput from "../common/ImageInput"
 import UseFetch from "../../hooks/useFetch"
+import PropTypes from "prop-types"
+
+const ModernSelect = ({ name, control, options, placeholder, styles, onValueChange, isDisabled = false, rules }) => (
+  <Controller
+    name={name}
+    control={control}
+    rules={rules}
+    render={({ field }) => (
+      <Select
+        classNamePrefix="user-add-select"
+        options={options}
+        value={options.find((option) => String(option.value) === String(field.value)) || null}
+        onChange={(option) => {
+          const value = option?.value ?? ""
+          field.onChange(value)
+          onValueChange?.(value)
+        }}
+        placeholder={placeholder}
+        isDisabled={isDisabled}
+        isSearchable
+        styles={styles}
+        menuPortalTarget={document.body}
+        menuShouldScrollIntoView={false}
+      />
+    )}
+  />
+)
+
+ModernSelect.propTypes = {
+  name: PropTypes.string.isRequired,
+  control: PropTypes.object.isRequired,
+  options: PropTypes.array.isRequired,
+  placeholder: PropTypes.string.isRequired,
+  styles: PropTypes.object.isRequired,
+  onValueChange: PropTypes.func,
+  isDisabled: PropTypes.bool,
+  rules: PropTypes.object
+}
 
 const UserAdd = ({
   process,
@@ -56,6 +94,33 @@ const UserAdd = ({
     profileUrl: [],
     documentUrl: []
   })
+
+  const selectStyles = useMemo(
+    () => ({
+      control: (base, state) => ({
+        ...base,
+        minHeight: "38px",
+        borderRadius: "12px",
+        borderColor: state.isFocused ? "#3b82f6" : "#e2e8f0",
+        backgroundColor: state.isDisabled ? "#f8fafc" : "#f8fafc",
+        boxShadow: state.isFocused ? "0 0 0 3px rgba(59, 130, 246, 0.14)" : "0 1px 2px rgba(15, 23, 42, 0.03)",
+        cursor: state.isDisabled ? "not-allowed" : "pointer",
+        "&:hover": { borderColor: state.isFocused ? "#3b82f6" : "#cbd5e1" }
+      }),
+      valueContainer: (base) => ({ ...base, padding: "0 12px" }),
+      placeholder: (base) => ({ ...base, color: "#94a3b8" }),
+      indicatorSeparator: () => ({ display: "none" }),
+      dropdownIndicator: (base) => ({ ...base, color: "#64748b", padding: "8px" }),
+      menuPortal: (base) => ({ ...base, zIndex: 80 }),
+      menu: (base) => ({ ...base, marginTop: "6px", borderRadius: "12px", overflow: "hidden", border: "1px solid #dbe5f1", backgroundColor: "#ffffff", boxShadow: "0 14px 32px rgba(15, 23, 42, 0.16)" }),
+      menuList: (base) => ({ ...base, maxHeight: "200px", padding: "5px", overflowY: "auto", backgroundColor: "#ffffff" }),
+      option: (base, state) => ({ ...base, borderRadius: "8px", margin: "2px 0", padding: "9px 10px", fontSize: "13px", fontWeight: state.isSelected ? 600 : 500, backgroundColor: state.isSelected ? "#2563eb" : state.isFocused ? "#eff6ff" : "transparent", color: state.isSelected ? "#ffffff" : "#334155", cursor: "pointer", transition: "background-color 120ms ease, color 120ms ease" }),
+      singleValue: (base) => ({ ...base, color: "#1e293b", fontSize: "14px", fontWeight: 500 }),
+      noOptionsMessage: (base) => ({ ...base, padding: "12px", color: "#94a3b8", fontSize: "13px" }),
+      loadingMessage: (base) => ({ ...base, padding: "12px", color: "#64748b", fontSize: "13px" })
+    }),
+    []
+  )
 
   const [tableObject, setTableObject] = useState({
     company_id: "",
@@ -170,14 +235,13 @@ console.log(stateOptions)
     }
   }
 
-  const handleCompanyChange = (e) => {
+  const handleCompanyChange = (companyId) => {
     if (isEditMode) {
       // settableEdit(true)
     }
-    const companyId = e.target.value
     setSelectedCompany(companyId)
 
-    setValue("companyName", e.target.value)
+    setValue("companyName", companyId)
     trigger("companyName")
     const foundCompany = company.find((company) => company._id === companyId)
 
@@ -188,14 +252,13 @@ console.log(stateOptions)
     }))
   }
 
-  const handleBranchChange = (e) => {
+  const handleBranchChange = (branchId) => {
     if (isEditMode) {
       // settableEdit(true)
     }
-    const branchId = e.target.value
     setSelectedBranch(branchId)
     setShowTable(true)
-    setValue("branchName", e.target.value)
+    setValue("branchName", branchId)
     trigger("branchName")
     const foundBranch = branches.find((branch) => branch._id === branchId)
 
@@ -373,13 +436,16 @@ console.log(url)
   }
   return (
     <div
-      className="flex flex-col justify-center items-center min-h-screen p-8 bg-[#ADD8E6]"
+      className="flex min-h-screen items-center justify-center bg-[#ADD8E6] p-3 sm:p-5"
       // style={{ backgroundImage: "url('/userbackground.jpg')" }}
     >
-      <div className="w-full p-8 border rounded-lg shadow-lg  bg-white ">
-        <h2 className="text-2xl font-bold text-center mb-2">
+      <div className="w-full max-w-[1500px] rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xl shadow-slate-300/30 sm:p-6">
+        <div className="mb-4 border-b border-slate-100 pb-3 text-center">
+        <h2 className="text-2xl font-bold tracking-tight text-slate-900">
           User Registration
         </h2>
+        <p className="mt-1 text-sm text-slate-500">Create a professional user profile and assign branch access.</p>
+        </div>
         {/* Display Form Message */}
         {formMessage && (
           <div
@@ -392,8 +458,8 @@ console.log(url)
             {formMessage}
           </div>
         )}
-        <form onSubmit={handleSubmit(onSubmit)} autoComplete="off">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 ">
+        <form onSubmit={handleSubmit(onSubmit)} autoComplete="off" className="space-y-5 [&_label]:mb-1 [&_label]:block [&_label]:text-[11px] [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-slate-600 [&>div>div>input]:!mt-0 [&>div>div>input]:!w-full [&>div>div>input]:!rounded-xl [&>div>div>input]:!border-slate-200 [&>div>div>input]:!bg-slate-50 [&>div>div>input]:!px-3 [&>div>div>input]:!py-2 [&>div>div>input]:!text-sm [&>div>div>input]:!text-slate-800 [&>div>div>input]:!shadow-sm [&>div>div>input]:!outline-none [&>div>div>input]:!transition [&>div>div>input]:focus:!border-blue-500 [&>div>div>input]:focus:!bg-white [&>div>div>input]:focus:!ring-4 [&>div>div>input]:focus:!ring-blue-100 [&>div>div>div>input]:!rounded-xl [&>div>div>div>input]:!border-slate-200 [&>div>div>div>input]:!bg-slate-50 [&>div>div>div>input]:!px-3 [&>div>div>div>input]:!py-2 [&>div>div>div>input]:focus:!border-blue-500 [&>div>div>div>input]:focus:!bg-white [&>div>div>div>input]:focus:!ring-4 [&>div>div>div>input]:focus:!ring-blue-100 [&_select]:!mt-0 [&_select]:!w-full [&_select]:!rounded-xl [&_select]:!border-slate-200 [&_select]:!bg-slate-50 [&_select]:!px-3 [&_select]:!py-2 [&_select]:!text-sm [&_select]:!text-slate-800 [&_select]:!shadow-sm [&_select]:!outline-none [&_select]:!transition [&_select]:focus:!border-blue-500 [&_select]:focus:!bg-white [&_select]:focus:!ring-4 [&_select]:focus:!ring-blue-100">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div>
               <label className="block mb-1 font-semibold">Name</label>
               <input
@@ -462,20 +528,7 @@ console.log(url)
             {/* Blood Group Field */}
             <div>
               <label className="block mb-1 font-semibold">Blood Group</label>
-              <select
-                {...register("bloodgroup")}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm outline-none"
-              >
-                <option value="">Select a blood group</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-              </select>
+              <ModernSelect name="bloodgroup" control={control} placeholder="Select blood group" styles={selectStyles} options={["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((value) => ({ value, label: value }))} />
               {errors.bloodgroup && (
                 <p className="text-red-500 text-sm">
                   {errors.bloodgroup.message}
@@ -485,14 +538,7 @@ console.log(url)
             {/* Gender Field */}
             <div>
               <label className="block mb-1 font-semibold">Gender</label>
-              <select
-                {...register("gender", { required: "Gender is required" })}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm outline-none"
-              >
-                <option value="">Select a gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
+              <ModernSelect name="gender" control={control} placeholder="Select gender" styles={selectStyles} rules={{ required: "Gender is required" }} options={["Male", "Female"].map((value) => ({ value, label: value }))} />
               {errors.gender && (
                 <p className="text-red-500 text-sm">{errors.gender.message}</p>
               )}
@@ -514,6 +560,7 @@ console.log(url)
             <div>
               <label className="block mb-1 font-semibold">Country</label>
               <Select
+                classNamePrefix="user-add-select"
                 options={countryOptions}
                 value={selectedCountry}
                 {...register("country")}
@@ -521,18 +568,7 @@ console.log(url)
                   setSelectedCountry(option)
                   setValue("country", option.value)
                 }}
-                styles={{
-                  menu: (provided) => ({
-                    ...provided,
-                    maxHeight: "200px", // Set dropdown max height
-                    overflowY: "auto" // Enable scrolling
-                  }),
-                  menuList: (provided) => ({
-                    ...provided,
-                    maxHeight: "200px", // Ensures dropdown scrolls internally
-                    overflowY: "auto"
-                  })
-                }}
+                styles={selectStyles}
                 menuPortalTarget={document.body} // Prevents nested scrolling issues
                 menuShouldScrollIntoView={false}
               />
@@ -544,6 +580,7 @@ console.log(url)
             <div>
               <label className="block mb-1 font-semibold">State</label>
               <Select
+                classNamePrefix="user-add-select"
                 options={stateOptions}
                 value={selectedState}
                 onChange={(option) => {
@@ -551,6 +588,9 @@ console.log(url)
                   setValue("state", option.value)
                 }}
                 isDisabled={!selectedCountry}
+                styles={selectStyles}
+                menuPortalTarget={document.body}
+                menuShouldScrollIntoView={false}
               />
              
               {errors.state && (
@@ -605,20 +645,7 @@ console.log(url)
                 Department
               </label>
 
-              <select
-                id="department"
-                {...register("department")}
-                onChange={(e) => setSelectedDepartment(e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm focus:border-gray-500 outline-none"
-              >
-                <option value="">-- Select a department --</option>
-
-                {departments?.map((department) => (
-                  <option key={department._id} value={department._id}>
-                    {department.department}
-                  </option>
-                ))}
-              </select>
+              <ModernSelect name="department" control={control} placeholder="Select department" styles={selectStyles} onValueChange={setSelectedDepartment} options={(departments || []).map((department) => ({ value: department._id, label: department.department || "Unnamed department" }))} />
             </div>
             <div className="relative">
               <label htmlFor="password" className="block mb-1 font-semibold">
@@ -661,15 +688,7 @@ console.log(url)
               <label htmlFor="role" className="block mb-1 font-semibold">
                 Role
               </label>
-              <select
-                {...register("role", { required: true })}
-                className="w-full mt-1 block border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm outline-none"
-              >
-                <option value="Staff">Staff</option>
-                <option value="Admin">Admin</option>
-                <option value="Manager">Manager</option>
-                <option value="Team Leader">Team Leader</option>
-              </select>
+              <ModernSelect name="role" control={control} placeholder="Select role" styles={selectStyles} rules={{ required: "Role is required" }} options={["Staff", "Admin", "Manager", "Team Leader"].map((value) => ({ value, label: value }))} />
             </div>
 
             {/* <div>
@@ -780,22 +799,7 @@ console.log(url)
                 Assigned to
               </label>
 
-              <select
-                {...register("assignedto", {
-                  required: "Assigned to is Required"
-                })}
-                className="w-full mt-1 block border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm outline-none max-h-40 overflow-y-auto"
-              >
-                <option value="">-assignedto --</option>
-
-                {users &&
-                  users.length > 0 &&
-                  users?.map((user) => (
-                    <option key={user._id} value={user._id}>
-                      {user.name}
-                    </option>
-                  ))}
-              </select>
+              <ModernSelect name="assignedto" control={control} placeholder="Select reporting manager" styles={selectStyles} rules={{ required: "Assigned to is required" }} options={(users || []).map((staff) => ({ value: staff._id, label: staff.name || "Unnamed user" }))} />
               {errors.assignedto && (
                 <p className="text-red-500 text-sm">
                   {errors.assignedto.message}
@@ -805,13 +809,7 @@ console.log(url)
             {/* Verified Field */}
             <div>
               <label className="block mb-1 font-semibold">Verified</label>
-              <select
-                {...register("isVerified", { required: true })}
-                className="w-full mt-1 block border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm outline-none"
-              >
-                <option value={true}>True</option>
-                <option value={false}>False</option>
-              </select>
+              <ModernSelect name="isVerified" control={control} placeholder="Select verification status" styles={selectStyles} rules={{ required: "Verification status is required" }} options={[{ value: true, label: "Verified" }, { value: false, label: "Not verified" }]} />
             </div>
 
             <ImageInput onSelect={profileImage} tag={"UploadProfile"} />
@@ -859,8 +857,12 @@ console.log(url)
 </div>
           </div>
 
-          <div className="mt-5">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 ">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 sm:p-4">
+            <div className="mb-3">
+              <h3 className="text-sm font-bold text-slate-800">Branch access</h3>
+              <p className="mt-0.5 text-xs text-slate-500">Select the company and branch this user can access.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div>
                 <label
                   htmlFor="companyName"
@@ -869,22 +871,7 @@ console.log(url)
                   Select Company
                 </label>
 
-                <select
-                  id="companyName"
-                  {...register("companyName", {
-                    required: "Company is required"
-                  })}
-                  onChange={handleCompanyChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm focus:border-gray-500 outline-none"
-                >
-                  <option value="">-- Select a company --</option>
-
-                  {company?.map((company) => (
-                    <option key={company._id} value={company._id}>
-                      {company.companyName}
-                    </option>
-                  ))}
-                </select>
+                <ModernSelect name="companyName" control={control} placeholder="Select company" styles={selectStyles} rules={{ required: "Company is required" }} onValueChange={handleCompanyChange} options={(company || []).map((item) => ({ value: item._id, label: item.companyName || "Unnamed company" }))} />
                 {errors.companyName && (
                   <p className="text-red-500 text-sm">
                     {errors.companyName.message}
@@ -899,22 +886,7 @@ console.log(url)
                   Select Branch
                 </label>
 
-                <select
-                  id="branchName"
-                  {...register("branchName", {
-                    required: "branch is required"
-                  })}
-                  onChange={handleBranchChange}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm focus:border-gray-500 outline-none"
-                >
-                  <option value="">-- Select a Branch--</option>
-
-                  {branches?.map((branch) => (
-                    <option key={branch._id} value={branch._id}>
-                      {branch.branchName}
-                    </option>
-                  ))}
-                </select>
+                <ModernSelect name="branchName" control={control} placeholder="Select branch" styles={selectStyles} rules={{ required: "Branch is required" }} onValueChange={handleBranchChange} options={(branches || []).map((branch) => ({ value: branch._id, label: branch.branchName || "Unnamed branch" }))} />
                 {errors.branchName && (
                   <p className="text-red-500 text-sm">
                     {errors.branchName.message}
@@ -924,11 +896,11 @@ console.log(url)
             </div>
             {showTable && (
               <div>
-                <div className="mt-6">
+                <div className="mt-4">
                   <button
                     type="button"
                     onClick={handleTableData}
-                    className="bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition-colors"
+                    className="inline-flex items-center rounded-xl bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-100"
                   >
                     {isEditMode ? (
                       <>
@@ -944,54 +916,56 @@ console.log(url)
                   </button>
                 </div>
 
-                <div className="mt-6 w-lg overflow-y-auto">
-                  <table className="bg-green-300 w-full divide-y divide-gray-200  ">
-                    <thead>
-                      <tr className="text-center">
-                        <th className="  py-3 text-left px-4 text-sm font-medium text-gray-500 uppercase tracking-wide">
+                <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <table className="w-full min-w-[620px] divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
                           Company Name
                         </th>
-                        <th className=" px-4 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
                           Branch Name
                         </th>
 
-                        <th className="pr-10  py-3 text-right text-sm font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
                           Edit
                         </th>
-                        <th className="pr-8  py-3 text-right text-sm font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
                           Delete
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200 ">
+                    <tbody className="divide-y divide-slate-100 bg-white">
                       {tableData && tableData.length > 0 ? (
                         tableData?.map((item, index) => (
-                          <tr key={index} className="text-center">
-                            <td className=" py-4 whitespace-nowrap text-sm text-gray-500 text-left px-4">
+                          <tr key={index} className="transition-colors hover:bg-blue-50/60">
+                            <td className="whitespace-nowrap px-4 py-2.5 text-sm font-medium text-slate-700">
                               {item?.companyName}
                             </td>
 
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 text-left">
+                            <td className="whitespace-nowrap px-4 py-2.5 text-sm text-slate-600">
                               {item?.branchName}
                             </td>
 
-                            <td className=" py-4 whitespace-nowrap text-sm font-medium text-right pr-10">
+                            <td className="whitespace-nowrap px-4 py-2.5 text-center">
                               <button
                                 type="button"
-                                className="text-green-600 hover:text-green-900 mr-2" // Adjust styles as needed
+                                onClick={() => handleEdit(item.branch_id)}
+                                aria-label={`Edit ${item?.branchName || "branch"}`}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100 hover:text-emerald-700"
                               >
-                                <FaEdit
-                                  onClick={() => handleEdit(item.branch_id)}
-                                />
+                                <FaEdit />
                               </button>
                             </td>
 
-                            <td className=" py-4 whitespace-nowrap text-sm font-medium text-right pr-10">
+                            <td className="whitespace-nowrap px-4 py-2.5 text-center">
                               <button
                                 type="button"
-                                className="text-blue-600 hover:text-blue-900 mr-2"
+                                onClick={() => handleDelete(index)}
+                                aria-label={`Remove ${item?.branchName || "branch"}`}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600 transition hover:bg-rose-100 hover:text-rose-700"
                               >
-                                <FaTrash onClick={() => handleDelete(index)} />
+                                <FaTrash />
                               </button>
                             </td>
                           </tr>
@@ -1000,7 +974,7 @@ console.log(url)
                         <tr>
                           <td
                             colSpan="4"
-                            className="py-4 text-center text-sm text-gray-500"
+                            className="px-4 py-8 text-center text-sm text-slate-400"
                           >
                             No branch selected
                           </td>
@@ -1013,10 +987,10 @@ console.log(url)
             )}
           </div>
 
-          <div className="flex justify-center">
+          <div className="flex justify-center border-t border-slate-100 pt-2">
             <button
               type="submit"
-              className=" mt-7 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300"
+              className="mt-3 inline-flex min-w-36 justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-100"
             >
               {isEditMode ? "Update" : "Register"}
             </button>

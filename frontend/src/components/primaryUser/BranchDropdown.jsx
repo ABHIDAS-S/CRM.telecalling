@@ -48,7 +48,7 @@ label = "Select",
   }
 
   return (
-    <div className="relative min-w-48" ref={dropdownRef}>
+    <div className="relative w-full min-w-0 sm:w-48" ref={dropdownRef}>
 {labletrue && (
         <label className="ml-1 mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
           {label}
@@ -60,8 +60,7 @@ label = "Select",
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={`
-          w-full px-4 py-1 text-left bg-white border rounded-lg shadow-sm
-          flex items-center justify-between
+          flex h-10 w-full items-center justify-between rounded-xl border bg-white px-3 text-left text-sm shadow-sm
           transition-all duration-200 ease-in-out
           ${
             isOpen

@@ -590,14 +590,10 @@ const ResponsiveTable = ({
 }) => {
   console.log(attendee)
   return (
-    <div className="relative  flex h-full min-h-0 flex-col rounded-lg border border-gray-300 bg-white">
-      <div className="flex-1 min-h-0 overflow-auto" onScroll={handleScroll}>
+    <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-gray-300 bg-white">
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto" onScroll={handleScroll}>
         <table className="w-full min-w-max border-separate border-spacing-0 text-sm">
-          <thead
-            className={
-              !modalOpen ? "sticky top-0 z-30 bg-blue-200" : "bg-blue-200"
-            }
-          >
+          <thead className="sticky top-0 z-30 bg-blue-200 shadow-sm">
             <tr>
               <th
                 rowSpan={2}
