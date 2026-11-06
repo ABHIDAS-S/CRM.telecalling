@@ -2591,11 +2591,32 @@ console.log(licenses)
   }, [originalCustomerTableData, temporaryCustomerTableData])
   useEffect(() => {
     if (customerData && customerData.length && selectedBranch) {
+      const primaryProductIds = new Set(
+        (leadList || [])
+          .filter(
+            (product) =>
+              String(product?.productorservicetype || "").toLowerCase() ===
+              "primaryproduct"
+          )
+          .map((product) => String(product?._id || ""))
+          .filter(Boolean)
+      )
+
       const options = customerData.flatMap((item) => {
         const branchProducts = (item.selected || []).filter(
-          (sel) =>
-            String(sel?.branch_id?._id || sel?.branch_id || "") ===
-            String(selectedBranch || "")
+          (sel) => {
+            const productId = String(
+              sel?.product_id?._id || sel?.product_id || ""
+            )
+            const isPrimaryProduct =
+              String(sel?.productorservicetype || "").toLowerCase() ===
+                "primaryproduct" || primaryProductIds.has(productId)
+
+            return (
+              String(sel?.branch_id?._id || sel?.branch_id || "") ===
+                String(selectedBranch || "") && isPrimaryProduct
+            )
+          }
         )
         const customerFields = {
           value: item?._id,
@@ -2673,26 +2694,14 @@ console.log(licenses)
             }))
           })
 
-        // A customer without products at this branch can still be selected
-        // when creating a new lead.
-        return productOptions.length
-          ? productOptions
-          : [
-              {
-                ...customerFields,
-                optionId: `${item?._id}-no-product`,
-                license: "",
-                productName: "",
-                searchText: [item?.customerName, item?.mobile]
-                  .filter(Boolean)
-                  .join(" ")
-                  .toLowerCase()
-              }
-            ]
+        // Lead Master should list only customers that have a primary product
+        // for the selected branch; additional and enhanced services are not
+        // customer-list entries in this flow.
+        return productOptions
       })
       setCustomerOptions(options)
     }
-  }, [customerData, selectedBranch])
+  }, [customerData, leadList, selectedBranch])
 
   useEffect(() => {
     console.log("hhh")
