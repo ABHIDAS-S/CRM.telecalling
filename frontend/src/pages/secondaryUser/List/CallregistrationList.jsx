@@ -41,6 +41,7 @@ import {
   BadgeCheck
 } from "lucide-react"
 import { all } from "axios"
+import WebsiteComplaintBadge from "../../../components/secondaryUser/WebsiteComplaintBadge"
 
 const CallregistrationList = () => {
   const navigate = useNavigate()
@@ -970,6 +971,7 @@ show={true}
                                     <td className="break-words border-b border-slate-300 px-2 py-1 align-top text-slate-900">
                                       {item.calls?.customerName?.toUpperCase() ||
                                         "N/A"}
+                                      <WebsiteComplaintBadge call={item} />
                                     </td>
 
                                     <td className="break-words border-b border-slate-300 px-2 py-1 align-top text-slate-900">
@@ -1151,6 +1153,7 @@ show={true}
                                     <td className="break-words border-b border-slate-300 px-2 py-1 align-top text-slate-900">
                                       {item.calls?.customerName?.toUpperCase() ||
                                         "N/A"}
+                                      <WebsiteComplaintBadge call={item} />
                                     </td>
 
                                     <td className="break-words border-b border-slate-300 px-2 py-1 align-top text-slate-900">

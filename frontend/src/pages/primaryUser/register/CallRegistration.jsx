@@ -545,25 +545,9 @@ console.log(matchingProducts)
   }, [calldetails])
 
   const fetchCallDetails = async (callId) => {
-console.log(callId)
     setLoader(true)
-    const response = await fetch(
-      `https://crm.camet.in/api/customer/getcallregister/${callId}`,
-      {
-        method: "GET",
-        credentials: "include" // This allows cookies to be sent with the request
-      }
-    )
-    // const response = await fetch(
-    //   `http://localhost:9000/api/customer/getcallregister/${callId}`,
-    //   {
-    //     method: "GET",
-    //     credentials: "include" // This allows cookies to be sent with the request
-    //   }
-    // )
-    const data = await response.json()
-
-    return data
+    const response = await api.get(`/customer/getcallregister/${callId}`)
+    return response.data
   }
 
   useEffect(() => {
@@ -1155,60 +1139,24 @@ Problem:    \t${selectedText}
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
   }
   const fetchCustomerData = async (query) => {
-    let url
-    if (user.role === "Admin") {
-      // url = `http://localhost:9000/api/customer/getCustomer?search=${query}&role=${user.role}`
-      url = `https://crm.camet.in/api/customer/getCustomer?search=${query}&role=${user.role}`
-    } else {
-      const branches = JSON.stringify(branch)
-
-    
-      // url =
-      //   branches &&
-      //   branches.length > 0 &&
-      //   `http://localhost:9000/api/customer/getCustomer?search=${query}&role=${
-      //     user.role
-      //  }&userBranch=${encodeURIComponent(branches)}`
-      url =
-        branches &&
-        branches.length > 0 &&
-        `https://crm.camet.in/api/customer/getCustomer?search=${query}&role=${
-          user.role
-        }&userBranch=${encodeURIComponent(branches)}`
-    }
-
     try {
-      const response = await fetch(url, {
-        method: "GET",
-        credentials: "include"
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        setCustomerData(result.data)
-console.log(result.data)
-        if (result.data.length > 0) {
-          setMessage("")
-        } else {
-          setMessage(result.message)
-        }
-
-        setSearching(true)
-        const userData = localStorage.getItem("user")
-        const user = JSON.parse(userData)
-        setUser(user)
-      } else {
-        const errorData = await response.json()
-        setCustomerData(errorData.data)
-        setMessage(errorData.message)
-        console.error("Error fetching customer data:", errorData.message)
-      }
+      const params = { search: query, role: user.role }
+      if (user.role !== "Admin") params.userBranch = JSON.stringify(branch)
+      const { data: result } = await api.get("/customer/getCustomer", { params })
+      setCustomerData(result.data || [])
+      setMessage(result.data?.length ? "" : result.message)
+      setSearching(true)
+      const userData = localStorage.getItem("user")
+      setUser(JSON.parse(userData))
     } catch (error) {
+      setCustomerData([])
+      setMessage(error.response?.data?.message || "Unable to search customers. Please try again.")
       console.error("Error fetching customer data:", error.message)
     } finally {
       setloading(false)
     }
   }
+
   const softwareTrades = [
     "Agriculture",
     "Business Services",
