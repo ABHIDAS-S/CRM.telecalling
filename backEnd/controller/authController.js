@@ -6496,12 +6496,7 @@ const recomputeDayFromCoverage = (day, user, dateKey, arr) => {
   day.present = present;
   // coveredTotal represents the uncovered portion of the day: 0, 0.5, or 1.
   day.notMarked = coveredTotal;
-  if (user.name === "Abhishek EV") {
-    console.log("arr,date,converted", arr, dateKey, coveredTotal)
-    //     console.log("coveredmorning", coveredMorning)
-    //  console.log("coveredafter", coveredAfternoon)
-    console.log("workedmorining", workedMorning)
-  }
+
   if (coveredMorning && coveredAfternoon) {
     day.notMarked = 0;
   }
@@ -6584,10 +6579,7 @@ const applyOnsiteToDay = (day, onsiteDoc, user, dateKey) => {
     day.coverage.onsite.morning = true;
     day.coverage.onsite.afternoon = true;
   } else {
-    const period = onsiteDoc.halfDayPeriod || "Afternoon";
-    if (user.name === "") {
-      console.log("datekeyyyyyy", dateKey, period)
-    }
+   
     if (period === "Morning") {
       day.coverage.onsite.morning = true;
     }
@@ -6702,12 +6694,7 @@ const classifyAttendanceDay = ({
       }
     }
   }
-  // if (user.name === "Abhishek EV") {
-  //   console.log("datekyyy", dateKey)
-  //   if (dateKey === "2026-07-20") {
-  //     console.log("07-20 punchIn/punchOut/lateLimit/minOutTime:", { punchIn, punchOut, lateLimit, minOutTime });
-  //   }
-  // }
+
 
   const attendanceCoverage = getAttendanceCoverageByPunch({
     punchIn,
@@ -7010,15 +6997,7 @@ export const GetsomeAll = async (req, res, yearParam = {}, monthParam = {}) => {
           if (onsite.onsiteType === "Full Day") stats.onsite += 1;
           else if (onsite.onsiteType === "Half Day") stats.onsite += 0.5;
         }
-        // if (user.name === "Abhishek EV") {
-        //   // ADD THIS BLOCK HERE
-        //   if (dateKey === "2026-07-20") {
-        //     console.log("07-20 onsite records:", JSON.stringify(dayOnsites));
-        //     console.log("07-20 coverage after onsite:", JSON.stringify(day.coverage));
-        //   }
-        // }
-
-
+   
         for (const leave of dayLeaves) {
           applyLeaveToDay(day, leave, user, dateKey);
         }
