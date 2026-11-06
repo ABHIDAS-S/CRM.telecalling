@@ -808,8 +808,24 @@ console.log(url)
             </div>
             {/* Verified Field */}
             <div>
-              <label className="block mb-1 font-semibold">Verified</label>
-              <ModernSelect name="isVerified" control={control} placeholder="Select verification status" styles={selectStyles} rules={{ required: "Verification status is required" }} options={[{ value: true, label: "Verified" }, { value: false, label: "Not verified" }]} />
+              <label className="block mb-1 font-semibold">Account status</label>
+              <ModernSelect
+                name="isVerified"
+                control={control}
+                placeholder="Select account status"
+                styles={selectStyles}
+                rules={{
+                  validate: (value) =>
+                    typeof value === "boolean" || "Account status is required"
+                }}
+                options={[
+                  { value: true, label: "Active" },
+                  { value: false, label: "Inactive" }
+                ]}
+              />
+              {errors.isVerified && (
+                <p className="mt-1 text-sm text-red-500">{errors.isVerified.message}</p>
+              )}
             </div>
 
             <ImageInput onSelect={profileImage} tag={"UploadProfile"} />
