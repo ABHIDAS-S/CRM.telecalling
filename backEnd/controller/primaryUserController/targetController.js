@@ -3522,7 +3522,7 @@ const buildIncentiveReportData = async ({
   })
     .select(
       `leadId leadDate leadBranch customerName paymentVerified netAmount
-       balanceAmount totalPaidAmount forcefullyClosedTarget leadFor
+       taxAmount discountAmount balanceAmount totalPaidAmount forcefullyClosedTarget leadFor
        paymentHistory activityLog leadBy leadByModel allocationType`
     )
     .lean();
@@ -3604,9 +3604,22 @@ const buildIncentiveReportData = async ({
       service.serviceName || service.name || "",
     ]),
   ]);
+  const getDisplayLeadProducts = (lead) => {
+    const items = objects(lead.leadFor);
+    const primaryProducts = items.filter(
+      (item) =>
+        String(item?.productorservicetype || "").toLowerCase() ===
+        "primaryproduct"
+    );
+
+    // A primary product is the lead's display product. Additional and enhanced
+    // services remain part of the lead's financial/incentive data, but must
+    // not create a separate Product List row or clutter the Lead List label.
+    return primaryProducts.length ? primaryProducts : items;
+  };
   const getLeadProductName = (lead) =>
     [...new Set(
-      objects(lead.leadFor)
+      getDisplayLeadProducts(lead)
         .map((item) =>
           String(item.productorServiceName || "").trim() ||
           productNameMap.get(String(item.productorServiceId || "")) ||
@@ -3638,6 +3651,10 @@ const buildIncentiveReportData = async ({
     [...configuredStaffIds].map((id) => [id, "Staff"])
   );
   const earnedByBranch = new Map();
+  // Keep the supporting values for the report grid in addition to the
+  // incentive total. The displayed lead amount is tax-exclusive and is only
+  // recorded once per lead/allocation; incentive calculations remain separate.
+  const allocationMetricsByBranch = new Map();
   const details = [];
   const awarded = new Set();
 
@@ -3763,6 +3780,10 @@ const buildIncentiveReportData = async ({
       );
 
       const activities = objects(lead.activityLog);
+      const taxExclusiveLeadAmount = Math.max(
+        num(lead.netAmount) - num(lead.taxAmount),
+        0
+      );
       const awardActivity = ({ activity, activityIndex, percentageBaseAmount, eventDate, paymentKey = "quantity" }) => {
         if (activityIndex !== 0 && !isTaskCompletionEvent(activity)) return;
 
@@ -3808,6 +3829,28 @@ const buildIncentiveReportData = async ({
         if (!branchUsers.has(userId)) branchUsers.set(userId, new Map());
         const allocationTotals = branchUsers.get(userId);
         allocationTotals.set(allocationId, num(allocationTotals.get(allocationId)) + incentiveAmount);
+
+        if (!allocationMetricsByBranch.has(branchId)) {
+          allocationMetricsByBranch.set(branchId, new Map());
+        }
+        const branchMetrics = allocationMetricsByBranch.get(branchId);
+        if (!branchMetrics.has(userId)) branchMetrics.set(userId, new Map());
+        const userMetrics = branchMetrics.get(userId);
+        if (!userMetrics.has(allocationId)) {
+          userMetrics.set(allocationId, {
+            leadIds: new Set(),
+            amount: 0,
+            incentive: 0,
+          });
+        }
+        const metric = userMetrics.get(allocationId);
+        const isFirstLeadForAllocation = !metric.leadIds.has(String(lead._id));
+        metric.leadIds.add(String(lead._id));
+        if (isFirstLeadForAllocation) {
+          metric.amount += taxExclusiveLeadAmount;
+        }
+        metric.incentive += incentiveAmount;
+
         details.push({
           userId,
           branchId,
@@ -3821,6 +3864,10 @@ const buildIncentiveReportData = async ({
           incentiveMode,
           configuredValue,
           percentageBaseAmount,
+          netAmount: num(lead.netAmount),
+          taxAmount: num(lead.taxAmount),
+          leadAmount: taxExclusiveLeadAmount,
+          discountAmount: num(lead.discountAmount),
           incentiveAmount,
           amount: incentiveAmount,
         });
@@ -3901,9 +3948,15 @@ const buildIncentiveReportData = async ({
     const users = [...ids]
       .map((userId) => {
         const user = userMap.get(userId);
+        const userMetrics = allocationMetricsByBranch
+          .get(branchId)
+          ?.get(userId);
         const allocations = allocationColumns.map((column) => ({
           ...column,
           achieved: num(branchUsers.get(userId)?.get(column.key)),
+          count: userMetrics?.get(column.key)?.leadIds.size || 0,
+          amount: num(userMetrics?.get(column.key)?.amount),
+          incentive: num(userMetrics?.get(column.key)?.incentive),
         }));
         return {
           userId,
@@ -4028,6 +4081,10 @@ export const getIncentiveLeads = async (req, res) => {
           partyName: detail.partyName,
           productName: detail.productName,
           date: detail.date,
+          netAmount: Number(detail.netAmount || 0),
+          taxAmount: Number(detail.taxAmount || 0),
+          leadAmount: Number(detail.leadAmount || 0),
+          discountAmount: Number(detail.discountAmount || 0),
           allocationMap: new Map(),
         });
       }
@@ -4063,6 +4120,10 @@ export const getIncentiveLeads = async (req, res) => {
         partyName: lead.partyName,
         productName: lead.productName,
         date: lead.date,
+        netAmount: lead.netAmount,
+        taxAmount: lead.taxAmount,
+        leadAmount: lead.leadAmount,
+        discountAmount: lead.discountAmount,
         allocations,
         totalAmount: allocations.reduce(
           (total, allocation) => total + Number(allocation.amount || 0),

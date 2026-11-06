@@ -883,6 +883,12 @@ const leadSchema = new mongoose.Schema(
       ref: "Partner",
       default: null,
     },
+    partnerSelection: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      default: null,
+      set: (value) => (value === "" ? null : value),
+    },
     leadConfirmed: { type: Boolean, default: false },
     leadClosed: { type: Boolean, default: false },
     leadClosedDate: { type: Date, default: null },

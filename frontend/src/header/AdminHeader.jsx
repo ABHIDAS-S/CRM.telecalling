@@ -1618,12 +1618,12 @@ onpasswordClick,
     () => [
       { to: "/admin/masters/company", label: "Company" },
       { to: "/admin/masters/branch", label: "Branch" },
-      { to: "/admin/masters/department", label: "Department" },
       { label: "Product & Service", hasChildren: true },
+      { to: "/admin/masters/partners", label: "Partner Type" },
+      { to: "/admin/masters/department", label: "Department" },
       { to: "/admin/masters/customer", label: "Customer" },
       { label: "Employee", hasChildren: true },
       { to: "/admin/masters/leavemaster", label: "Leave Master" },
-      { to: "/admin/masters/partners", label: "Partners" },
     ],
     []
   )
@@ -1744,7 +1744,7 @@ onpasswordClick,
     <button
       type="button"
       onClick={() => handleSafeNavigate(to)}
-      className={`block w-full rounded-xl px-3 py-2.5 text-left text-[13px] font-medium transition ${
+      className={`block w-full rounded-xl px-3 py-2.5 text-left text-[13px] font-medium leading-5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
         isPathActive(to)
           ? "bg-[#243145] text-white"
           : "text-slate-100 hover:bg-[#1E293B] hover:text-white"
@@ -1755,7 +1755,7 @@ onpasswordClick,
   )
 
   const DesktopChildPanel = ({ items }) => (
-    <div className="invisible absolute left-[calc(100%+8px)] top-0 z-50 min-w-[240px] translate-x-1 rounded-2xl border border-white/10 bg-[#162033] p-2 opacity-0 shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition-all duration-150 group-hover/child:visible group-hover/child:translate-x-0 group-hover/child:opacity-100 group-focus-within/child:visible group-focus-within/child:translate-x-0 group-focus-within/child:opacity-100">
+    <div className="invisible absolute left-[calc(100%+8px)] top-0 z-50 max-h-[calc(100vh-88px)] min-w-[240px] max-w-[min(280px,calc(100vw-24px))] translate-x-1 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[#162033] p-2 opacity-0 shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition-all duration-150 [scrollbar-width:thin] group-hover/child:visible group-hover/child:translate-x-0 group-hover/child:opacity-100 group-focus-within/child:visible group-focus-within/child:translate-x-0 group-focus-within/child:opacity-100">
       {items.map((child) => (
         <DesktopLeafLink key={child.to} to={child.to} label={child.label} />
       ))}
@@ -1763,7 +1763,7 @@ onpasswordClick,
   )
 
   const DesktopDropdown = ({ items }) => (
-    <div className="invisible absolute left-0 top-[calc(100%+12px)] z-50 min-w-[260px] translate-y-1 rounded-2xl border border-white/10 bg-[#162033] p-2 opacity-0 shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition-all duration-150 group-hover/menu:visible group-hover/menu:translate-y-0 group-hover/menu:opacity-100 group-focus-within/menu:visible group-focus-within/menu:translate-y-0 group-focus-within/menu:opacity-100">
+    <div className="invisible absolute left-0 top-[calc(100%+12px)] z-50 min-w-[260px] max-w-[min(320px,calc(100vw-24px))] translate-y-1 overflow-visible rounded-2xl border border-white/10 bg-[#162033] p-2 opacity-0 shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition-all duration-150 group-hover/menu:visible group-hover/menu:translate-y-0 group-hover/menu:opacity-100 group-focus-within/menu:visible group-focus-within/menu:translate-y-0 group-focus-within/menu:opacity-100">
       {items.map((item) => {
         if (!item.hasChildren) {
           return <DesktopLeafLink key={item.to} to={item.to} label={item.label} />
@@ -1776,7 +1776,7 @@ onpasswordClick,
           <div key={item.label} className="group/child relative">
             <button
               type="button"
-              className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-[13px] font-medium text-slate-100 transition hover:bg-[#1E293B]"
+              className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-[13px] font-medium leading-5 text-slate-100 transition hover:bg-[#1E293B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
             >
               <span>{item.label}</span>
               <FiChevronRight className="text-slate-400" size={14} />
@@ -1798,7 +1798,7 @@ onpasswordClick,
   )
 
   const DesktopReportsDropdown = ({ groups }) => (
-    <div className="invisible absolute left-0 top-[calc(100%+12px)] z-50 w-64 translate-y-1 rounded-2xl border border-white/10 bg-[#162033] p-2 opacity-0 shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition-all duration-150 group-hover/menu:visible group-hover/menu:translate-y-0 group-hover/menu:opacity-100 group-focus-within/menu:visible group-focus-within/menu:translate-y-0 group-focus-within/menu:opacity-100">
+    <div className="invisible absolute left-0 top-[calc(100%+12px)] z-50 max-h-[calc(100vh-88px)] w-64 max-w-[calc(100vw-24px)] translate-y-1 overflow-x-hidden overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[#162033] p-2 opacity-0 shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition-all duration-150 [scrollbar-width:thin] group-hover/menu:visible group-hover/menu:translate-y-0 group-hover/menu:opacity-100 group-focus-within/menu:visible group-focus-within/menu:translate-y-0 group-focus-within/menu:opacity-100">
       {groups.map((groupItem, idx) => (
         <div key={groupItem.group} className={idx !== 0 ? "mt-1 border-t border-white/10 pt-2" : ""}>
           <div className="px-3 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wider text-sky-400">
@@ -1844,8 +1844,8 @@ onpasswordClick,
 
   return (
     <>
-      <header className="sticky top-0 z-50  bg-[#ADD8E6] px-4  lg:px-6">
-        <div className="grid h-16 w-full grid-cols-[auto_1fr_auto] items-center gap-4">
+      <header className="sticky top-0 z-50 h-16 border-b border-slate-300/70 bg-[#ADD8E6] px-4 shadow-[0_2px_12px_rgba(15,23,42,0.10)] sm:px-6">
+        <div className="grid h-full w-full grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-4">
           {/* Left */}
           <div className="flex min-w-0 items-center gap-3">
             <button
@@ -1878,7 +1878,7 @@ onpasswordClick,
           </div>
 
           {/* Center nav */}
-          <div className="hidden xl:flex justify-center">
+          <div className="hidden min-w-0 xl:flex justify-center">
             <nav className="flex h-10 items-center gap-1 rounded-full border border-white/10 bg-[#081224] px-2 shadow-[0_8px_24px_rgba(0,0,0,0.22)]">
               <div className="relative flex items-center" onMouseEnter={() => setDashboardMenuOpen(true)} onMouseLeave={() => setDashboardMenuOpen(false)}>
                 <button
@@ -1902,7 +1902,15 @@ onpasswordClick,
                   : isGroupActive(group.items)
 
                 return (
-                  <div key={group.label} className="group/menu relative">
+                  <div
+                    key={group.label}
+                    className="group/menu relative"
+                    onMouseLeave={(event) => {
+                      if (event.currentTarget.contains(document.activeElement)) {
+                        document.activeElement?.blur()
+                      }
+                    }}
+                  >
                     <button
                       type="button"
                       className={`flex items-center gap-1.5 rounded-full px-4 py-1 text-[14px] font-semibold transition ${
@@ -1927,7 +1935,7 @@ onpasswordClick,
           </div>
 
           {/* Right */}
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <div className="hidden xl:flex h-10 items-center gap-1 rounded-full border border-white/10 bg-[#081224] px-2 shadow-[0_8px_24px_rgba(0,0,0,0.22)]">
               <button
                 type="button"
@@ -1982,7 +1990,7 @@ onpasswordClick,
                   <FaUserCircle className="text-[30px] text-slate-300" />
                 )}
 
-                <div className="hidden w-18 text-left sm:block">
+                <div className="hidden w-28 min-w-0 text-left sm:block">
                   <div className="truncate text-[12.5px] font-semibold leading-4 text-white">
                     {user?.name || "Admin User"}
                   </div>

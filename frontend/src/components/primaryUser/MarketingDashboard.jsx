@@ -1,3 +1,4 @@
+import React from "react"
 import {
   Mail,
   MessageSquareText,
@@ -26,7 +27,7 @@ import Sidebar from "./Sidebar"
 import AdminHeader from "../../header/AdminHeader"
 import { BranchSelect } from "./BranchSelect"
 import { toast } from "react-toastify"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useSelector } from "react-redux"
 import UseFetch from "../../hooks/useFetch"
 import AnnouncementBanner from "./AnnouncementBanner"
@@ -38,8 +39,6 @@ import {
 } from "../../helper/localstorage"
 import AvatarEditor from "../common/AvatarEditor"
 import { PerformanceModal } from "./PerformanceModal"
-import TableSkeletonLoader from "../common/SkeletonLoader"
-import SkeletonTable from "../loader/SkeletonTable"
 import api from "../../api/api"
 import { useNavigate } from "react-router-dom"
 
@@ -84,7 +83,116 @@ const getBarStyle = (value, colorA, colorB) => ({
   boxShadow: `inset 1px 0 0 rgba(255,255,255,0.35), inset -1px 0 0 rgba(0,0,0,0.08), 0 3px 8px rgba(15,23,42,0.12)`
 })
 
-const SalesFunnel = ({ stages, onStageClick }) => {
+const isMarketingDepartment = (user) => {
+  const department = user?.department || {}
+  const departmentName = String(
+    department?.department || department?.name || department?.code || ""
+  ).toLowerCase()
+
+  return department?.code === "DEPARTMENT3" || departmentName.includes("marketing")
+}
+
+const LeadViewSelector = ({ value, onChange, canViewOwnLeads }) => {
+  const [isOpen, setIsOpen] = useState(false)
+  const selectorRef = useRef(null)
+  const options = [
+    ...(canViewOwnLeads ? [{ value: "owned", label: "Own Lead", detail: "Leads assigned to you" }] : []),
+    { value: "all", label: "All Lead", detail: "Every lead in this branch" }
+  ]
+  const selectedOption = options.find((option) => option.value === value) || options[0]
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (!selectorRef.current?.contains(event.target)) setIsOpen(false)
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    return () => document.removeEventListener("pointerdown", handlePointerDown)
+  }, [])
+
+  return (
+    <div ref={selectorRef} className="relative z-20">
+      <button
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        className="flex min-w-[168px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-200"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-[9px] font-bold uppercase tracking-wide text-slate-400">Lead view</span>
+          <span className="block truncate text-xs font-semibold text-slate-700">{selectedOption?.label}</span>
+        </span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+
+      {isOpen && (
+        <div
+          role="listbox"
+          className="absolute right-0 mt-2 w-[220px] overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_14px_32px_rgba(15,23,42,0.16)]"
+        >
+          {options.map((option) => {
+            const isSelected = option.value === value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => {
+                  onChange(option.value)
+                  setIsOpen(false)
+                }}
+                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition ${
+                  isSelected ? "bg-blue-50 text-blue-800" : "text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <span className={`h-2 w-2 shrink-0 rounded-full ${isSelected ? "bg-blue-600" : "bg-slate-300"}`} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-xs font-semibold">{option.label}</span>
+                  <span className="block truncate text-[10px] text-slate-400">{option.detail}</span>
+                </span>
+                {isSelected && <span className="text-xs font-bold text-blue-600">✓</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const shimmerClass = "animate-pulse rounded-md bg-slate-100"
+
+const SummaryTilesSkeleton = () => (
+  <>
+    {Array.from({ length: 6 }, (_, index) => (
+      <div key={index} className="min-w-0 rounded-lg border border-slate-200/90 bg-white px-2 py-2 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <span className={`h-6 w-6 ${shimmerClass}`} />
+          <span className={`h-3 w-10 ${shimmerClass}`} />
+        </div>
+        <span className={`mt-2 block h-5 w-12 ${shimmerClass}`} />
+        <span className={`mt-2 block h-3 w-20 ${shimmerClass}`} />
+        <span className={`mt-1 block h-2.5 w-full ${shimmerClass}`} />
+      </div>
+    ))}
+  </>
+)
+
+const PendingTasksSkeleton = () => (
+  Array.from({ length: 5 }, (_, row) => (
+    <tr key={row} className="animate-pulse">
+      {Array.from({ length: 6 }, (_, column) => (
+        <td key={column} className="border-b border-slate-100 px-3 py-3">
+          <span className={`block h-3 ${column === 1 ? "w-28" : "w-16"} ${shimmerClass}`} />
+        </td>
+      ))}
+    </tr>
+  ))
+)
+
+const SalesFunnel = ({ stages, onStageClick, isLoading }) => {
   return (
     <div className="rounded-xl border border-slate-200/90 bg-white p-3 sm:p-3.5" style={{ boxShadow: "0 4px 12px rgba(15,23,42,0.05), inset 0 1px 0 rgba(255,255,255,0.85)" }}>
       <div className="mb-2">
@@ -92,26 +200,36 @@ const SalesFunnel = ({ stages, onStageClick }) => {
         <p className="mt-0.5 text-xs text-slate-500">Current month lead progression from initial contact to conversion</p>
       </div>
 
-      <div className="grid gap-2.5 md:grid-cols-[minmax(140px,0.72fr)_minmax(220px,1.28fr)] md:items-center">
-        <div className="flex min-h-[160px] flex-col items-center justify-center gap-1">
+      {isLoading ? (
+        <div className="grid min-h-[220px] animate-pulse gap-5 md:grid-cols-[minmax(175px,0.85fr)_minmax(190px,1.15fr)] md:items-center">
+          <div className="flex flex-col items-center justify-center gap-2.5">
+            {[100, 84, 68, 52, 42].map((width) => <span key={width} className="h-9 rounded-[4px] bg-slate-100" style={{ width: `${width}%` }} />)}
+          </div>
+          <div className="space-y-3">
+            {Array.from({ length: 5 }, (_, index) => <div key={index} className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-slate-100" /><span className="h-3 flex-1 rounded bg-slate-100" /><span className="h-5 w-9 rounded-full bg-slate-100" /></div>)}
+          </div>
+        </div>
+      ) : <div className="grid gap-2 md:grid-cols-[minmax(175px,0.85fr)_minmax(190px,1.15fr)] md:items-center">
+        <div className="flex min-h-[220px] flex-col items-center justify-center gap-1.5">
           {stages.map((stage) => {
             const isClickable = stage.value > 0
             return (
             <div
-              key={stage.label}
-              role={isClickable ? "button" : undefined}
-              tabIndex={isClickable ? 0 : undefined}
               onClick={() => isClickable && onStageClick?.(stage)}
               onKeyDown={(event) => {
                 if (isClickable && (event.key === "Enter" || event.key === " ")) onStageClick?.(stage)
               }}
-              className={`flex h-7.5 items-center justify-center rounded-md text-sm font-bold text-white shadow-sm ${
+              key={stage.label}
+              role={isClickable ? "button" : undefined}
+              tabIndex={isClickable ? 0 : undefined}
+              className={`flex h-9 items-center justify-center rounded-[4px] border border-white/15 text-sm font-bold text-white ${
                 isClickable ? "cursor-pointer transition-transform hover:-translate-y-0.5 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2" : "cursor-default"
               }`}
               style={{
                 width: `${stage.width}%`,
                 background: stage.color,
-                clipPath: "polygon(0 0, 100% 0, calc(100% - 10px) 100%, 10px 100%)"
+                clipPath: "polygon(0 0, 100% 0, calc(100% - 12px) 100%, 12px 100%)",
+                boxShadow: "0 3px 0 rgba(15,23,42,0.16), 0 7px 12px rgba(15,23,42,0.10)"
               }}
             >
               {stage.value}
@@ -134,28 +252,28 @@ const SalesFunnel = ({ stages, onStageClick }) => {
                 onKeyDown={(event) => {
                   if (isClickable && (event.key === "Enter" || event.key === " ")) onStageClick?.(stage)
                 }}
-                className={`flex items-center gap-2 py-1.5 first:pt-0 last:pb-0 ${
+                className={`flex items-center gap-1.5 py-1.5 first:pt-0 last:pb-0 ${
                   isClickable ? "cursor-pointer rounded-md transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-400" : ""
                 }`}
               >
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: stage.dotColor }} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-semibold text-slate-700">{stage.label}</p>
-                  <p className="mt-px flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                  <p className="mt-px flex items-center gap-0.5 text-[11px] font-medium text-slate-500">
                     <span>{stage.value}</span>
                     <span>|</span>
                     <IndianRupee className="h-2.5 w-2.5" />
                     <span>{formatINR(stage.amount)}</span>
                   </p>
                 </div>
-                <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700">
+                <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
                   {percentage}
                 </span>
               </div>
             )
           })}
         </div>
-      </div>
+      </div>}
     </div>
   )
 }
@@ -189,6 +307,7 @@ const MarketingDashboard = () => {
   const [achievedPoints, setachievedPoints] = useState(0)
   const [todaysCollection, settodaysCollection] = useState([])
   console.log(todaysCollection)
+  const canViewOwnLeads = isMarketingDepartment(user)
   const now = new Date()
   const navigate = useNavigate()
   const [date, setdate] = useState({
@@ -221,12 +340,12 @@ const MarketingDashboard = () => {
   const start = defaultStartDate
   const end = defaultEndDate
   console.log(end)
-  const { data: followup } = UseFetch(
+  const { data: followup, loading: followupLoading } = UseFetch(
     `/lead/getfollowupsummaryReport?branchId=${reduxselectedBranch}&startDate=${start}&endDate=${end}`
   )
-  const { data: salesFunnelData } = UseFetch(
-    reduxselectedBranch &&
-      `/lead/getsalesfunnels?startDate=${defaultStartDate}&endDate=${salesFunnelEndDate}&selectedBranch=${reduxselectedBranch}`
+  const { data: salesFunnelData, loading: salesFunnelLoading } = UseFetch(
+    reduxselectedBranch && user?._id &&
+      `/lead/getsalesfunnels?startDate=${defaultStartDate}&endDate=${salesFunnelEndDate}&selectedBranch=${reduxselectedBranch}&ownLead=${leadCountScope === "owned"}&staffId=${user?._id || ""}`
   )
   const collectionBranchId = reduxselectedBranch || selectedBranch
   const { data: collectiondata, loading: collectionloader } = UseFetch(
@@ -257,8 +376,9 @@ const MarketingDashboard = () => {
   const { data: branchProduct } = UseFetch(
     `/product/getallbranchProduct?branch=${reduxselectedBranch}`
   )
-  const { data: pendingTask } = UseFetch(
-    `/lead//branchwise-marketing-pending-tasks?branchId=${reduxselectedBranch}`
+  const { data: pendingTask, loading: pendingTaskLoading } = UseFetch(
+    reduxselectedBranch && user?._id &&
+      `/lead/branchwise-marketing-pending-tasks?branchId=${reduxselectedBranch}&ownLead=${leadCountScope === "owned"}&staffId=${user?._id || ""}`
   )
   console.log(pendingTask)
   useEffect(() => {
@@ -496,6 +616,7 @@ const MarketingDashboard = () => {
     console.log(storedUser)
     if (storedUser) {
       setUser(storedUser)
+      setLeadCountScope(isMarketingDepartment(storedUser) ? "owned" : "all")
       setselecteduserName(storedUser.name)
       setselectedBranch(storedUser.selected[0].branch_id)
       setbranchOptions((prev) => [
@@ -780,11 +901,11 @@ const MarketingDashboard = () => {
     return stages
   }, {})
   const funnelStages = [
-    ["New Leads", 100, "linear-gradient(135deg, #164cb8, #2563d9)", "#2563d9"],
-    ["Contacted", 84, "linear-gradient(135deg, #2877ea, #428ded)", "#3b82f6"],
-    ["System Study", 68, "linear-gradient(135deg, #5da7f7, #78b9f7)", "#60a5fa"],
-    ["Lost", 52, "linear-gradient(135deg, #87c7fa, #a8d7fb)", "#93c5fd"],
-    ["Converted", 42, "linear-gradient(135deg, #25ba72, #45ce88)", "#34c77d"]
+    ["New Leads", 100, "linear-gradient(180deg, #326fe4 0%, #2459bd 100%)", "#2563d9"],
+    ["Contacted", 84, "linear-gradient(180deg, #4b91ec 0%, #2e72d0 100%)", "#3b82f6"],
+    ["System Study", 68, "linear-gradient(180deg, #84bdf1 0%, #5e97ce 100%)", "#60a5fa"],
+    ["Lost", 52, "linear-gradient(180deg, #a9ccec 0%, #7fa8cf 100%)", "#93c5fd"],
+    ["Converted", 42, "linear-gradient(180deg, #3dcc87 0%, #249f65 100%)", "#34c77d"]
   ].map(([label, width, color, dotColor]) => ({
     label,
     value: funnelNumber(salesFunnelStageMap[label]?.count),
@@ -801,9 +922,8 @@ const MarketingDashboard = () => {
       `/${user?.role === "Admin" ? "admin" : "staff"}/transaction/lead/ownedLeadlist`,
       {
         state: {
-          // Sales Funnel stages are branch-wide metrics, so retain the
-          // existing branch-wide access mode while keeping the URL role-safe.
-          role: "Admin",
+          role: leadCountScope === "all" ? "Admin" : undefined,
+          ownLead: leadCountScope === "owned",
           dates: {
             startDate: defaultStartDate,
             endDate: salesFunnelEndDate
@@ -1069,7 +1189,7 @@ const MarketingDashboard = () => {
           <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
             <section className="mx-auto w-full max-w-[1800px] p-2.5 sm:p-3 lg:p-4">
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-6">
-                {cardDisplay.slice(0, 6).map((card) => (
+                {followupLoading ? <SummaryTilesSkeleton /> : cardDisplay.slice(0, 6).map((card) => (
                   <div
                     key={card.title}
                     onClick={() =>
@@ -1104,36 +1224,21 @@ const MarketingDashboard = () => {
                 ))}
               </div>
               <div className="mt-2.5 flex justify-end">
-                <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                    Lead view
-                  </span>
-                  <span className="relative">
-                    <select
-                      value={leadCountScope}
-                      onChange={(event) => setLeadCountScope(event.target.value)}
-                      className="appearance-none rounded-md bg-slate-50 py-1 pl-2.5 pr-7 text-xs font-semibold text-slate-700 outline-none transition hover:bg-slate-100 focus:ring-2 focus:ring-blue-200"
-                      aria-label="Lead count view"
-                    >
-                      <option value="owned">Owned</option>
-                      <option value="all">All branch leads</option>
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
-                  </span>
-                </label>
+                <LeadViewSelector
+                  value={leadCountScope}
+                  onChange={setLeadCountScope}
+                  canViewOwnLeads={canViewOwnLeads}
+                />
               </div>
               <div
                 className="
     mt-3 grid min-w-0 gap-3 sm:mt-4 sm:gap-4
     grid-cols-1          /* mobile: stacked (one below the other) */
-    lg:grid-cols-2       /* desktop/tablet+: two diagrams side by side */
+    lg:grid-cols-2       /* dashboard panels sit side by side on wide screens */
   "
               >
                 {/* Sales Funnel */}
-                <SalesFunnel stages={funnelStages} onStageClick={handleSalesFunnelStageClick} />
+                <SalesFunnel stages={funnelStages} onStageClick={handleSalesFunnelStageClick} isLoading={salesFunnelLoading} />
 
                 {/* Replaced monthly-performance chart kept out of the layout. */}
                 <div
@@ -1313,7 +1418,7 @@ const MarketingDashboard = () => {
                     >
                       Pending Tasks:
                       <span className="ml-1 font-semibold text-slate-900">
-                        {pendingTask?.length || 0}
+                        {pendingTaskLoading ? "—" : pendingTask?.length || 0}
                       </span>
                     </p>
                   </div>
@@ -1366,7 +1471,7 @@ const MarketingDashboard = () => {
 
                       {/* Table Body */}
                       <tbody>
-                        {pendingTask && pendingTask?.length > 0 ? (
+                        {pendingTaskLoading ? <PendingTasksSkeleton /> : pendingTask && pendingTask?.length > 0 ? (
                           pendingTask.map((task, index) => (
                             <tr
                               key={index}
@@ -1464,7 +1569,7 @@ const MarketingDashboard = () => {
                   </div>
                 </div>
                 <div className="order-2">
-                  <CollectionDetails collections={todaysCollection} />
+                  <CollectionDetails collections={todaysCollection} isLoading={collectionloader} />
                 </div>
               </div>
             </section>
@@ -2054,6 +2159,7 @@ function formatINR(value) {
 
 function CollectionDetails({
   collections = DEFAULT_COLLECTIONS,
+  isLoading = false,
   basePath = "/staff/transaction/lead/verifiedCollections"
 }) {
   console.log(collections)
@@ -2061,7 +2167,6 @@ function CollectionDetails({
 
   function handleNavigate(item) {
     console.log(item)
-    if (item.amount <= 0) return
     navigate(basePath, {
       state: {
         startDate: item?.startDate,
@@ -2085,7 +2190,14 @@ function CollectionDetails({
       </div>
 
       <div className="space-y-3">
-        {collections.map((item) => {
+        {isLoading ? Array.from({ length: 1 }, (_, index) => (
+          <div key={index} className="animate-pulse rounded-xl border border-slate-100 p-3 sm:p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2.5"><span className="h-9 w-9 rounded-lg bg-slate-100" /><div className="space-y-2"><span className="block h-3.5 w-32 rounded bg-slate-100" /><span className="block h-2.5 w-44 rounded bg-slate-100" /></div></div>
+              <span className="h-9 w-full rounded-lg bg-slate-100 sm:w-28" />
+            </div>
+          </div>
+        )) : collections.map((item) => {
           const Icon = item.icon
           const accent = ACCENTS[item.accent] || ACCENTS.teal
           return (

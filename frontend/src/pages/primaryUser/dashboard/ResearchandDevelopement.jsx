@@ -144,6 +144,15 @@ const getCompletedAt = (item) => item.taskCompletedAt || [...(item.taskTimeline 
   .reverse()
   .find((event) => event.event === "Development Completed")?.at
 
+const isCompletedInSelectedPeriod = (item, month, year) => {
+  const completedAt = getCompletedAt(item)
+  if (!completedAt) return false
+
+  const completedDate = new Date(completedAt)
+  return completedDate.getFullYear() === Number(year)
+    && months[completedDate.getMonth()] === month
+}
+
 const codingAndQcTaskId = "689c23493e94902039b97743"
 
 const getIdValue = (value) => String(value?._id || value || "")
@@ -335,24 +344,36 @@ export default function ResearchandDevelopement() {
     }
   }, [])
 
-  const statusCounts = workStatuses.map((status) => ({
-    ...status,
-    count: status.label === "All"
-      ? workItems.length
-      : workItems.filter((item) => status.label === "Overdue" ? isOverdue(item) : item.status === status.label).length
-  }))
-  const filteredWorkItems = workItems.filter((item) => {
-    const matchesStatus = activeStatusFilter === "All"
-      || (activeStatusFilter === "Overdue" ? isOverdue(item) : item.status === activeStatusFilter)
-    if (!matchesStatus) return false
-    if (leadScope === "Owned" && String(item.assignedDeveloperId) !== String(loggedUser?._id)) return false
-    if (activeStatusFilter !== "Completed") return true
+  const scopedWorkItems = workItems.filter((item) =>
+    leadScope !== "Owned" || String(item.assignedDeveloperId) === String(loggedUser?._id)
+  )
 
-    const completedAt = getCompletedAt(item)
-    if (!completedAt) return false
-    const completedDate = new Date(completedAt)
-    return completedDate.getFullYear() === Number(year) && months[completedDate.getMonth()] === month
-  }).sort((left, right) => {
+  const matchesStatus = (item, status) => {
+    if (status === "Completed") {
+      // The month selector is an all-leads report filter. A developer's own
+      // completed work remains visible regardless of when it was completed.
+      return item.status === "Completed"
+        && (leadScope === "Owned" || isCompletedInSelectedPeriod(item, month, year))
+    }
+    if (status === "Overdue") return isOverdue(item)
+    // An overdue task is shown in the Overdue bucket, not counted twice as
+    // both In Progress and Overdue.
+    if (status === "In Progress") return item.status === status && !isOverdue(item)
+    return item.status === status
+  }
+
+  const statusCounts = workStatuses.map((status) => {
+    const count = status.label === "All"
+      ? workStatuses
+        .filter((item) => item.label !== "All")
+        .reduce((total, item) => total + scopedWorkItems.filter((work) => matchesStatus(work, item.label)).length, 0)
+      : scopedWorkItems.filter((item) => matchesStatus(item, status.label)).length
+
+    return { ...status, count }
+  })
+  const filteredWorkItems = scopedWorkItems.filter((item) =>
+    activeStatusFilter === "All" || matchesStatus(item, activeStatusFilter)
+  ).sort((left, right) => {
     if (!["In Progress", "Pending", "Overdue"].includes(activeStatusFilter)) return 0
     const leftTime = new Date(left.expectedCompletionDate).getTime()
     const rightTime = new Date(right.expectedCompletionDate).getTime()
@@ -584,7 +605,7 @@ export default function ResearchandDevelopement() {
         <section aria-label="Work status" className="grid shrink-0 grid-cols-2 gap-6 md:grid-cols-6">
           {statusCounts.map(({ label, count, icon: Icon, accent }) => {
             const isActive = activeStatusFilter === label
-            return <button type="button" key={label} onClick={() => { setActiveStatusFilter(label); if (label === "New") setLeadScope("All"); setCompletedFilterMenu(null) }} aria-pressed={isActive} className={`group flex min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-left shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-300 ${isActive ? "border-blue-400 bg-blue-50 shadow-md ring-1 ring-blue-200" : "border-slate-100 bg-white hover:-translate-y-0.5 hover:shadow-md"}`}>
+            return <button type="button" key={label} onClick={() => { setActiveStatusFilter(label); setCompletedFilterMenu(null) }} aria-pressed={isActive} className={`group flex min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-left shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-300 ${isActive ? "border-blue-400 bg-blue-50 shadow-md ring-1 ring-blue-200" : "border-slate-100 bg-white hover:-translate-y-0.5 hover:shadow-md"}`}>
               <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ring-1 ${accentStyles[accent]}`}><Icon size={15} strokeWidth={2.2} /></span>
               <p className="min-w-0 flex-1 truncate text-xs font-medium text-slate-600">{label}</p>
               <span className="text-lg font-bold leading-none tracking-tight text-slate-900">{String(count).padStart(2, "0")}</span>
@@ -598,13 +619,13 @@ export default function ResearchandDevelopement() {
               <span className="grid h-9 w-9 place-items-center rounded-lg bg-blue-50 text-blue-600"><FolderKanban size={18} /></span>
               <div><h2 className="text-sm font-semibold text-slate-900">{activeStatusFilter} leads</h2><p className="text-xs text-slate-500">Click a status tile to change the list</p></div>
             </div>
-            {!['All', 'New'].includes(activeStatusFilter) && <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="flex w-full items-center gap-2 sm:w-auto">
               <div className="relative min-w-0 flex-1 sm:w-28 sm:flex-none"><button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "scope" ? null : "scope")} className="flex h-8 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"><span className="inline-flex items-center gap-1.5"><SlidersHorizontal size={13} className="text-blue-600" />{leadScope}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "scope" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} /></button>{completedFilterMenu === "scope" && <div className="absolute right-0 top-10 z-30 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"><p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Lead visibility</p>{["All", "Owned"].map((scope) => <button type="button" key={scope} onClick={() => { setLeadScope(scope); setCompletedFilterMenu(null) }} className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${leadScope === scope ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}><span>{scope === "All" ? "All leads" : "Assigned to me"}</span>{leadScope === scope && <CheckCircle2 size={13} />}</button>)}</div>}</div>
-            {activeStatusFilter === "Completed" && <div className="flex items-center gap-2">
+            {activeStatusFilter === "Completed" && leadScope === "All" && <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-50 text-slate-500"><CalendarDays size={15} /></span>
               <div className="relative min-w-0 flex-1 sm:w-32 sm:flex-none"><button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "month" ? null : "month")} className="flex h-8 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"><span>{month}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "month" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} /></button>{completedFilterMenu === "month" && <div className="absolute right-0 top-10 z-30 grid w-64 grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><p className="col-span-3 px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Select month</p>{months.map((item) => <button type="button" key={item} onClick={() => { setMonth(item); setCompletedFilterMenu(null) }} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${month === item ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>{item.slice(0, 3)}</button>)}</div>}</div>
               <div className="relative w-24 shrink-0"><button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "year" ? null : "year")} className="flex h-8 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"><span>{year}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "year" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} /></button>{completedFilterMenu === "year" && <div className="absolute right-0 top-10 z-30 w-28 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">{[2025, 2026, 2027, 2028].map((item) => <button type="button" key={item} onClick={() => { setYear(String(item)); setCompletedFilterMenu(null) }} className={`w-full rounded-lg px-2 py-2 text-left text-xs font-semibold transition ${year === String(item) ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>{item}</button>)}</div>}</div>
-            </div>}</div>}
+            </div>}</div>
           </div>
 
           <div className="hidden min-h-0 flex-1 overflow-y-auto overflow-x-hidden md:block">

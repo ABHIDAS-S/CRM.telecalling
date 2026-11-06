@@ -799,30 +799,27 @@ export const PaymentHistoryModal = ({
             </div>
           ) : (
             <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200">
-              <table className="w-full min-w-[760px] table-fixed border-collapse text-sm">
+              <table className="w-full min-w-[900px] table-fixed border-collapse text-sm">
                 <colgroup>
                   <col
                     className={
-                      !verifiedLead && showAction ? "w-[22%]" : "w-[25%]"
+                      showAction ? "w-[18%]" : "w-[20%]"
+                    }
+                  />
+                  {verifiedLead && <col className={showAction ? "w-[16%]" : "w-[18%]"} />}
+                  <col
+                    className={
+                      showAction ? "w-[18%]" : "w-[20%]"
                     }
                   />
                   <col
                     className={
-                      !verifiedLead && showAction ? "w-[20%]" : "w-[23%]"
+                      showAction ? "w-[14%]" : "w-[16%]"
                     }
                   />
-                  <col
-                    className={
-                      !verifiedLead && showAction ? "w-[14%]" : "w-[17%]"
-                    }
-                  />
-                  <col
-                    className={
-                      !verifiedLead && showAction ? "w-[29%]" : "w-[35%]"
-                    }
-                  />
+                  <col className={verifiedLead ? (showAction ? "w-[22%]" : "w-[26%]") : (showAction ? "w-[38%]" : "w-[44%]")} />
 
-                  {showAction && <col className="w-[15%]" />}
+                  {showAction && <col className="w-[12%]" />}
                 </colgroup>
 
                 <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm">
@@ -830,6 +827,8 @@ export const PaymentHistoryModal = ({
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                       Payment date
                     </th>
+
+                    {verifiedLead && <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Verified date</th>}
 
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
                       Received by
@@ -843,9 +842,7 @@ export const PaymentHistoryModal = ({
                       Bank remarks
                     </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">
-                      Actions
-                    </th>
+                    {showAction && <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">Actions</th>}
                   </tr>
                 </thead>
 
@@ -867,6 +864,10 @@ export const PaymentHistoryModal = ({
                     const isPaymentVerified =
                       checkverified?.[rowOriginalIndex] ??
                       Boolean(row?.paymentVerified)
+                    const verifiedDate =
+                      isPaymentVerified && row?.verifiedAt
+                        ? formatDate(row.verifiedAt)
+                        : "—"
 
                     return (
                       <tr
@@ -878,6 +879,16 @@ export const PaymentHistoryModal = ({
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">
                           {formatDate(row?.paymentDate)}
                         </td>
+
+                        {verifiedLead && <td className="whitespace-nowrap px-4 py-3 text-sm">
+                          {isPaymentVerified && row?.verifiedAt ? (
+                            <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                              {verifiedDate}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">{verifiedDate}</span>
+                          )}
+                        </td>}
 
                         <td className="px-4 py-3">
                           <span

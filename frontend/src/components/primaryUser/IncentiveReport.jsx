@@ -1,6 +1,6 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { Search, TrendingUp, Users } from "lucide-react";
+import { ArrowLeftRight, Search, TrendingUp, Users } from "lucide-react";
 import { useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import { BranchSelect } from "./BranchSelect";
@@ -11,10 +11,67 @@ import PropTypes from "prop-types";
 
 const formatAmount = formatDisplayCurrency;
 
+const TruncatedTooltip = ({ value, className = "" }) => {
+  const text = String(value || "—");
+
+  return (
+    <div className="relative min-w-0">
+      <span tabIndex={0} className={`peer block truncate outline-none ${className}`}>
+        {text}
+      </span>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-0 top-full z-[70] mt-1 w-max max-w-[22rem] -translate-y-1 whitespace-normal rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium normal-case tracking-normal text-white opacity-0 shadow-lg ring-1 ring-slate-700 transition-all duration-150 peer-hover:translate-y-0 peer-hover:opacity-100 peer-focus:translate-y-0 peer-focus:opacity-100"
+      >
+        {text}
+        <span className="absolute -top-1 left-3 h-2 w-2 rotate-45 bg-slate-900" />
+      </span>
+    </div>
+  );
+};
+
+TruncatedTooltip.propTypes = {
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  className: PropTypes.string,
+};
+
 const getUserTotal = (allocations = []) =>
   allocations.reduce(
     (sum, allocation) => sum + Number(allocation?.achieved || 0),
     0
+  );
+
+const incentiveGroups = [
+  { key: "lead", label: "Lead", fields: ["Lead Nos", "Lead Amount", "Incentive"] },
+  { key: "followup", label: "Follow-Up Closing", fields: ["Lead Nos", "Lead Amount", "Incentive"] },
+  { key: "systemStudy", label: "System Study & Demo", fields: ["Lead Nos", "Lead Amount", "Incentive Amount"] },
+  { key: "testing", label: "Testing & Implementation", fields: ["Lead Nos", "Lead Amount", "Incentive Amount"] },
+  { key: "coding", label: "Coding & QC", fields: ["Lead Nos", "Lead Amount", "Incentive Amount"] }
+];
+
+const getAllocationGroup = (allocation = {}) => {
+  const value = `${allocation?.label || ""} ${allocation?.key || ""}`.toLowerCase();
+
+  if (value.includes("follow") && value.includes("clos")) return "followup";
+  if (value.includes("system") || value.includes("demo")) return "systemStudy";
+  if (value.includes("testing") || value.includes("implement")) return "testing";
+  if (value.includes("coding") || value.includes("qc")) return "coding";
+  if (value.includes("lead")) return "lead";
+  return null;
+};
+
+const getGroupMetrics = (allocations = [], groupKey) =>
+  allocations.reduce(
+    (metrics, allocation) => {
+      if (getAllocationGroup(allocation) !== groupKey) return metrics;
+      metrics.count += Number(allocation?.count || 0);
+      metrics.amount += Number(allocation?.amount || 0);
+      metrics.incentive += Number(
+        allocation?.incentive ?? allocation?.achieved ?? 0
+      );
+      return metrics;
+    },
+    { count: 0, amount: 0, incentive: 0 }
   );
 
 const getInitials = (name = "") =>
@@ -276,7 +333,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
         </div>
       </section>
 
-      <main className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-white p-3 shadow-sm ring-1 ring-black/5 sm:p-4">
+      <main className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-white p-3 shadow-sm ring-1 ring-black/5 lg:flex lg:flex-col lg:overflow-hidden sm:p-4">
         {(isRefreshing || isOffline) && branches.length > 0 && (
           <div className="mb-3 flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
             <span>{isOffline ? "Offline — showing the last loaded report." : "Updating report…"}</span>
@@ -320,21 +377,9 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
         ) : (
           filteredBranches.map((branch) => {
             const users = Array.isArray(branch?.users) ? branch.users : [];
-            const columns = users[0]?.allocations || [];
 
             return (
-              <section key={branch.branchId} className="mb-5 last:mb-0">
-                {!isSelfReport && (
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-700">
-                      {branch.branchName || "Unnamed branch"}
-                    </h2>
-                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
-                      {users.length} staff
-                    </span>
-                  </div>
-                )}
-
+              <section key={branch.branchId} className="mb-5 last:mb-0 lg:mb-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
                 <div className="space-y-2 lg:hidden">
                   {users.map((user) => {
                     const total = getUserTotal(user?.allocations);
@@ -366,20 +411,15 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                           </p>
                         </div>
 
-                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-gray-100 pt-3">
-                          {columns.map((column) => {
-                            const allocation = user?.allocations?.find(
-                              (item) => item.key === column.key
-                            );
-
+                        <div className="mt-3 grid grid-cols-1 gap-2 border-t border-gray-100 pt-3">
+                          {incentiveGroups.map((group) => {
+                            const metrics = getGroupMetrics(user?.allocations, group.key);
                             return (
-                              <div key={column.key} className="min-w-0">
-                                <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                                  {column.label}
-                                </p>
-                                <p className="mt-0.5 text-center text-xs font-semibold text-gray-700">
-                                  {formatAmount(allocation?.achieved)}
-                                </p>
+                              <div key={group.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-2 text-xs">
+                                <p className="truncate font-semibold text-gray-500">{group.label}</p>
+                                <span className="text-right text-gray-600">{metrics.count} Nos</span>
+                                <span className="text-right text-gray-600">{formatAmount(metrics.amount)}</span>
+                                <span className="text-right font-semibold text-gray-800">{formatAmount(metrics.incentive)}</span>
                               </div>
                             );
                           })}
@@ -389,20 +429,81 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                   })}
                 </div>
 
-                <div className="hidden overflow-x-auto rounded-xl border border-gray-200 lg:block">
-                  <table className="w-full min-w-[860px] table-fixed border-collapse text-sm">
-                    <thead className="border-b-2 border-slate-300 bg-blue-100 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2">
+                    <p className="text-xs font-semibold text-slate-700">
+                      Staff incentive breakdown
+                    </p>
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                      <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" />
+                      Scroll inside the table to view every Tasks
+                    </p>
+                  </div>
+
+                  <div
+                    className="min-h-64 max-w-full overflow-auto overscroll-contain lg:min-h-0 lg:flex-1"
+                    tabIndex={0}
+                    aria-label="Scrollable incentive breakdown table. Scroll vertically for staff and horizontally for categories."
+                  >
+                  <table className="w-full min-w-[1776px] table-fixed border-separate border-spacing-0 text-xs tabular-nums">
+                    <colgroup>
+                      <col className="w-48" />
+                      {incentiveGroups.flatMap((group) => [
+                          <col key={`${group.key}-count`} className="w-16" />,
+                          <col key={`${group.key}-amount`} className="w-28" />,
+                          <col key={`${group.key}-incentive`} className="w-28" />
+                      ])}
+                      <col className="w-36" />
+                    </colgroup>
+                    <thead className="border-b-2 border-slate-300 text-[9px] font-semibold uppercase tracking-wide text-slate-600">
                       <tr>
-                        <th className="w-56 px-4 py-3 text-left">Staff</th>
-                        {columns.map((column) => (
+                        <th rowSpan="2" className="sticky left-0 top-0 z-30 h-12 whitespace-nowrap border-r border-slate-300 bg-amber-300 px-2 py-0.5 text-left text-[8px] leading-none text-slate-900 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)]">
+                          Employee Name
+                        </th>
+                        {incentiveGroups.map((group, index) => (
                           <th
-                            key={column.key}
-                            className="min-w-[90px] px-2 py-3 text-center"
+                            key={group.key}
+                            colSpan="3"
+                            className={`sticky top-0 z-20 h-6 whitespace-nowrap border-r border-slate-300 px-1 py-0 text-center text-[8px] leading-none text-slate-900 ${
+                              index === 0
+                                ? "bg-orange-200"
+                                : index === 1
+                                  ? "bg-emerald-100"
+                                  : index === 2
+                                    ? "bg-slate-300"
+                                    : index === 3
+                                      ? "bg-amber-200"
+                                      : "bg-orange-100"
+                            }`}
                           >
-                            {column.label}
+                            {group.label}
                           </th>
                         ))}
-                        <th className="w-28 px-4 py-3 text-right">Amount</th>
+                        <th rowSpan="2" className="sticky right-0 top-0 z-30 h-12 whitespace-nowrap bg-indigo-100 px-2 py-0.5 text-right text-[8px] leading-none text-slate-900 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)]">
+                          Total Incentive Amt
+                        </th>
+                      </tr>
+                      <tr>
+                        {incentiveGroups.flatMap((group, groupIndex) =>
+                          group.fields.map((field, fieldIndex) => (
+                            <th
+                              key={`${group.key}-${field}`}
+                               className={`sticky top-6 z-20 h-6 whitespace-nowrap border-r border-slate-300 px-1 py-0 text-center text-[8px] leading-none ${
+                                groupIndex === 0
+                                  ? "bg-orange-100"
+                                  : groupIndex === 1
+                                    ? "bg-emerald-50"
+                                    : groupIndex === 2
+                                      ? "bg-slate-200"
+                                      : groupIndex === 3
+                                        ? "bg-amber-100"
+                                        : "bg-orange-50"
+                              } ${fieldIndex === 2 ? "border-r-2" : ""}`}
+                            >
+                              {field}
+                            </th>
+                          ))
+                        )}
                       </tr>
                     </thead>
 
@@ -422,47 +523,61 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                                 handleOpenUserLeads(user);
                               }
                             }}
-                            className="cursor-pointer border-t-2 border-slate-300 bg-white transition-colors hover:bg-blue-50/70 focus:bg-blue-50/70 focus:outline-none"
+                            className="group cursor-pointer border-t border-slate-200 bg-white transition-colors hover:bg-blue-50/70 focus:bg-blue-50/70 focus:outline-none"
                           >
-                            <td className="px-4 py-3">
-                              <div className="flex min-w-0 items-center gap-2.5">
-                                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-[10px] font-bold text-white">
-                                  {getInitials(user?.name)}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="truncate text-xs font-semibold text-gray-900">
-                                    {user?.name || "—"}
-                                  </p>
-                                  <p className="truncate text-[10px] text-gray-400">
-                                    {user?.designation || "—"}
-                                  </p>
-                                </div>
-                              </div>
+                            <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors hover:z-50 focus-within:z-50 group-hover:bg-blue-50/70 group-focus:bg-blue-50/70">
+                              <TruncatedTooltip value={user?.name} />
                             </td>
 
-                            {columns.map((column) => {
-                              const allocation = user?.allocations?.find(
-                                (item) => item.key === column.key
-                              );
-
-                              return (
-                                <td
-                                  key={column.key}
-                                  className="px-2 py-3 text-center text-xs font-semibold text-gray-700"
-                                >
-                                  {formatAmount(allocation?.achieved)}
+                            {incentiveGroups.flatMap((group) => {
+                              const metrics = getGroupMetrics(user?.allocations, group.key);
+                              return [
+                                <td key={`${group.key}-count`} className="whitespace-nowrap border-r border-slate-200 px-1.5 py-2 text-center font-medium text-slate-700">
+                                  {metrics.count}
+                                </td>,
+                                <td key={`${group.key}-amount`} className="whitespace-nowrap border-r border-slate-200 px-1.5 py-2 text-right font-medium text-slate-700">
+                                  {formatAmount(metrics.amount)}
+                                </td>,
+                                <td key={`${group.key}-incentive`} className="whitespace-nowrap border-r-2 border-slate-300 px-1.5 py-2 text-right font-semibold text-slate-900">
+                                  {formatAmount(metrics.incentive)}
                                 </td>
-                              );
+                              ];
                             })}
 
-                            <td className="px-4 py-3 text-right text-sm font-bold text-gray-900">
+                            <td className="sticky right-0 z-10 whitespace-nowrap bg-white px-3 py-2 text-right text-xs font-bold text-slate-900 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors group-hover:bg-blue-50/70 group-focus:bg-blue-50/70">
                               {formatAmount(total)}
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
+                    <tfoot className="border-t-2 border-slate-400 bg-slate-50 text-xs font-bold text-slate-800">
+                      <tr>
+                        <td className="sticky left-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)]">Total</td>
+                        {incentiveGroups.flatMap((group) => {
+                          const metrics = users.reduce(
+                            (total, user) => {
+                              const userMetrics = getGroupMetrics(user?.allocations, group.key);
+                              total.count += userMetrics.count;
+                              total.amount += userMetrics.amount;
+                              total.incentive += userMetrics.incentive;
+                              return total;
+                            },
+                            { count: 0, amount: 0, incentive: 0 }
+                          );
+                          return [
+                            <td key={`${group.key}-total-count`} className="whitespace-nowrap border-r border-slate-200 px-1.5 py-2 text-center">{metrics.count}</td>,
+                            <td key={`${group.key}-total-amount`} className="whitespace-nowrap border-r border-slate-200 px-1.5 py-2 text-right">{formatAmount(metrics.amount)}</td>,
+                            <td key={`${group.key}-total-incentive`} className="whitespace-nowrap border-r-2 border-slate-300 px-1.5 py-2 text-right">{formatAmount(metrics.incentive)}</td>
+                          ];
+                        })}
+                        <td className="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-3 py-2 text-right shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)]">
+                          {formatAmount(users.reduce((sum, user) => sum + getUserTotal(user?.allocations), 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
+                  </div>
                 </div>
               </section>
             );

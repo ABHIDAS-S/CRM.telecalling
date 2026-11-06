@@ -630,6 +630,23 @@ export const GetallPartners = async (req, res) => {
     console.log("error:", error.message)
   }
 }
+
+export const GetPartnerCustomers = async (req, res) => {
+  try {
+    const customers = await Customer.find({ isPartner: true })
+      .select("customerName mobile isPartner isActive")
+      .sort({ customerName: 1 })
+      .lean()
+
+    return res.status(200).json({
+      message: "Partner customers found",
+      data: customers
+    })
+  } catch (error) {
+    console.log("error:", error.message)
+    return res.status(500).json({ message: "Internal server error" })
+  }
+}
 export const GetallServices = async (req, res) => {
   try {
     const services = await Service.find({})
@@ -1413,6 +1430,8 @@ export const CustomerRegister = async (req, res) => {
     landline,
     registrationType,
     gstNo,
+    isPartner = false,
+    partnerSelection,
     isActive = "Running"
   } = customerData
   if (tabledata && tabledata?.length > 0) {
@@ -1438,9 +1457,17 @@ export const CustomerRegister = async (req, res) => {
   }
 
   try {
+    const customerIsPartner = isPartner === true || isPartner === "true"
     const normalizedPartner =
-      customerData.partner && customerData.partner.trim() !== ""
+      customerIsPartner &&
+      customerData.partner &&
+      customerData.partner.trim() !== ""
         ? customerData.partner
+        : null
+    const normalizedPartnerSelection =
+      partnerSelection &&
+      String(partnerSelection).trim() !== ""
+        ? partnerSelection
         : null
     const customer = new Customer({
       customerName,
@@ -1458,7 +1485,9 @@ export const CustomerRegister = async (req, res) => {
       registrationType,
       gstNo,
       isActive: isActive || "Running",
+      isPartner: customerIsPartner,
       partner: normalizedPartner,
+      partnerSelection: normalizedPartnerSelection,
       contactPerson,
       selected: tabledata
     })
@@ -1841,9 +1870,30 @@ export const CustomerEdit = async (req, res) => {
       Update only normal customer fields.
       Prevent request values from accidentally changing selected directly.
     */
-    const { selected, isActive, ...safeCustomerData } = customerData
+    const {
+      selected,
+      isActive,
+      isPartner,
+      partner,
+      partnerSelection,
+      ...safeCustomerData
+    } = customerData
 
     Object.assign(existingCustomer, safeCustomerData)
+
+    if (isPartner !== undefined) {
+      const customerIsPartner = isPartner === true || isPartner === "true"
+      existingCustomer.isPartner = customerIsPartner
+      existingCustomer.partner = customerIsPartner && partner ? partner : null
+    }
+
+    if (isPartner === undefined && partner !== undefined) {
+      existingCustomer.partner = partner || null
+    }
+
+    if (partnerSelection !== undefined) {
+      existingCustomer.partnerSelection = partnerSelection || null
+    }
 
     // Keep the stored status when an older client does not send this field.
     if (isActive !== undefined) {
@@ -2282,6 +2332,8 @@ export const GetAllCustomer = async (req, res) => {
           landline: 1,
           email: 1,
           partner: 1,
+          partnerSelection: 1,
+          isPartner: 1,
           gstNo: 1,
           registrationType: 1,
           city: 1,
