@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from "react"
 import { FaPhone } from "react-icons/fa"
 import { PropagateLoader } from "react-spinners"
+import WebsiteComplaintBadge from "./WebsiteComplaintBadge"
 
 // Production Reusable Cell Architecture for handling Truncation and Clean Tooltips
 const TruncatedTooltipCell = ({ value, className = "" }) => {
@@ -191,7 +192,10 @@ export default function CallDataExtendedTable({
                         </button>
                       </td>
 
-                      <TruncatedTooltipCell value={call.timedata?.token} className="text-slate-900 font-semibold tracking-wide" />
+                      <td className="break-words border-b border-slate-300 px-2 py-1.5 align-middle text-slate-900 font-semibold tracking-wide">
+                        {call.timedata?.token || "N/A"}
+                        <WebsiteComplaintBadge call={call} />
+                      </td>
                       {showCustomerColumn && <TruncatedTooltipCell value={call?.customerName} className="text-slate-900 font-medium" />}
                       
                       <td className="break-words border-b border-slate-300 px-2 py-1.5 align-middle text-slate-900 leading-tight">
