@@ -12,7 +12,7 @@ import PropTypes from "prop-types";
 const formatAmount = formatDisplayCurrency;
 
 const TruncatedTooltip = ({ value, className = "" }) => {
-  const text = String(value || "—");
+  const text = String(value || "—").toUpperCase();
 
   return (
     <div className="relative min-w-0">
@@ -398,7 +398,7 @@ export default function IncentiveReport({ selectedYear, selectedPeriod }) {
                             </div>
                             <div className="min-w-0">
                               <p className="truncate text-sm font-semibold text-gray-900">
-                                {user?.name || "—"}
+                                {String(user?.name || "—").toUpperCase()}
                               </p>
                               <p className="truncate text-[11px] text-gray-400">
                                 {user?.designation || "—"}

@@ -939,7 +939,14 @@ const handleMetricTab = (tab) => {
   )
 }
 
-function AchievedLeadsModal({ userName, leads, loggedUser, onClose, onEventLog, onViewLead }) {
+function AchievedLeadsModal({
+  userName,
+  leads,
+  loggedUser,
+  onClose,
+  onEventLog,
+  onViewLead
+}) {
   const navigate = useNavigate()
 console.log("h")
   const location = useLocation()
@@ -1071,9 +1078,12 @@ console.log(lead?.categoryItems)
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-green-700">
                       ₹ {Number(
-                        lead.forcefullyClosedTarget
-                          ? lead.netAmount
-                          : lead.achievedValue
+                        String(lead.measurementType || "").toLowerCase() ===
+                        "amount"
+                          ? lead.forcefullyClosedTarget
+                            ? lead.netAmount
+                            : lead.achievedValue
+                          : lead.netAmount || lead.verifiedCategoryAmount || 0
                       ).toLocaleString("en-IN")}
                     </td>
                   </tr>

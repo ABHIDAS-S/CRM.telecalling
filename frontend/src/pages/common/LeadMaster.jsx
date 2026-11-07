@@ -17,6 +17,66 @@ import Breadcrumb from "../../components/common/Breadcrumb"
 import { Loader } from "lucide-react"
 import * as XLSX from "xlsx"
 import FullScreenLoader from "../../components/common/FullScreenLoader"
+
+const modernMenuSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: 40,
+    borderRadius: 8,
+    borderColor: state.isFocused ? "#1B2A4A" : "#e2e8f0",
+    boxShadow: state.isFocused ? "0 0 0 4px rgba(27, 42, 74, 0.1)" : "0 1px 2px rgba(15, 23, 42, 0.05)",
+    cursor: state.isDisabled ? "not-allowed" : "pointer",
+    backgroundColor: state.isDisabled ? "#f1f5f9" : "#ffffff",
+    "&:hover": { borderColor: state.isFocused ? "#1B2A4A" : "#cbd5e1" }
+  }),
+  valueContainer: (base) => ({ ...base, padding: "0 10px" }),
+  singleValue: (base) => ({ ...base, color: "#334155", fontWeight: 500 }),
+  placeholder: (base) => ({ ...base, color: "#94a3b8" }),
+  indicatorSeparator: () => ({ display: "none" }),
+  dropdownIndicator: (base) => ({ ...base, color: "#94a3b8", padding: 8 }),
+  menu: (base) => ({
+    ...base,
+    zIndex: 30,
+    overflow: "hidden",
+    borderRadius: 10,
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 12px 24px rgba(15, 23, 42, 0.14)"
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  option: (base, state) => ({
+    ...base,
+    padding: "10px 12px",
+    color: state.isSelected ? "#ffffff" : "#334155",
+    backgroundColor: state.isSelected
+      ? "#1B2A4A"
+      : state.isFocused
+        ? "#eff6ff"
+        : "#ffffff",
+    cursor: "pointer"
+  })
+}
+
+function ModernMenuSelect({
+  options,
+  value,
+  onChange,
+  isDisabled = false,
+  placeholder = "Select an option"
+}) {
+  return (
+    <Select
+      options={options}
+      value={options.find((option) => option.value === value) || null}
+      onChange={(option) => onChange(option?.value || "")}
+      isDisabled={isDisabled}
+      isSearchable={false}
+      placeholder={placeholder}
+      styles={modernMenuSelectStyles}
+      menuPortalTarget={typeof document === "undefined" ? null : document.body}
+      noOptionsMessage={() => "No options available"}
+    />
+  )
+}
 // import { parse } from "path"
 // ─────────────────────────────────────────────────────────────────────────────
 // DropdownPortal — keeps dropdown aligned on scroll/resize
@@ -5418,14 +5478,18 @@ convertexcel
                   </div>
 
                   <div className="flex md:justify-end items-end">
-                    <select
-                      {...registerMain("leadBranch")}
+                    <div className="min-w-[150px]">
+                      <ModernMenuSelect
                       value={selectedBranch}
-                      disabled={isReadOnly}
-                      onChange={(e) => {
-                        console.log(e.target.value)
+                      isDisabled={isReadOnly}
+                      options={(companybranches || []).map((branch) => ({
+                        value: branch._id,
+                        label: branch.branchName
+                      }))}
+                      onChange={(branchId) => {
+                        console.log(branchId)
                         setDuplicateWarning("")
-                        setSelectedBranch(e.target.value)
+                        setSelectedBranch(branchId)
                         console.log("hhh")
                         //           dispatch(setsliceselectedBranch(e.target.value))
                         // console.log("hhh")
@@ -5454,14 +5518,9 @@ convertexcel
                           leadId: ""
                         })
                       }}
-                      className={`h-[38px] min-w-[140px] rounded border border-gray-300 bg-[#1B2A4A] px-3 text-sm text-white outline-none hover:bg-[#243660] ${isReadOnly ? "cursor-not-allowed" : "cursor-pointer"}`}
-                    >
-                      {companybranches?.map((b, i) => (
-                        <option key={i} value={b._id}>
-                          {b.branchName}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Select branch"
+                    />
+                    </div>
                   </div>
                 </div>
 
@@ -5525,20 +5584,26 @@ convertexcel
                     <label className="block text-xs font-semibold text-gray-600 mb-1">
                       Source of Lead
                     </label>
-                    <select
-                      disabled={isReadOnly}
-                      {...registerMain("source", {
-                        required: "Source is Required"
-                      })}
-                      className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${isReadOnly ? "cursor-not-allowed" : "cursor-pointer"}`}
-                    >
-                      <option value="">Select Source</option>
-                      <option value="whatsapp">WhatsApp</option>
-                      <option value="instagram">Instagram</option>
-                      <option value="facebook">Facebook</option>
-                      <option value="Direct">Direct</option>
-                      <option value="justDial">Just Dial</option>
-                    </select>
+                    <Controller
+                      name="source"
+                      control={controlMain}
+                      rules={{ required: "Source is Required" }}
+                      render={({ field }) => (
+                        <ModernMenuSelect
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          isDisabled={isReadOnly}
+                          placeholder="Select source"
+                          options={[
+                            { value: "whatsapp", label: "WhatsApp" },
+                            { value: "instagram", label: "Instagram" },
+                            { value: "facebook", label: "Facebook" },
+                            { value: "Direct", label: "Direct" },
+                            { value: "justDial", label: "Just Dial" }
+                          ]}
+                        />
+                      )}
+                    />
                     {errorsMain.source && (
                       <p className="text-red-500 text-xs mt-1">
                         {errorsMain.source.message}
@@ -5549,28 +5614,26 @@ convertexcel
                     <label className="block text-xs font-semibold text-gray-600 mb-1">
                       Partner
                     </label>
-                    <select
-                      {...registerMain("partnerSelection")}
-                      disabled={isReadOnly}
-                      className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
-                        isReadOnly
-                          ? "cursor-not-allowed opacity-70"
-                          : "cursor-pointer"
-                      }`}
-                    >
-                      <option value="">Select Partner</option>
-                      {partnerCustomerOptions.map((partnerCustomer) => (
-                        <option
-                          key={partnerCustomer.customerId}
-                          value={partnerCustomer.value}
-                        >
-                          {partnerCustomer.label}
-                          {partnerCustomer.mobile
-                            ? ` - ${partnerCustomer.mobile}`
-                            : ""}
-                        </option>
-                      ))}
-                    </select>
+                    <Controller
+                      name="partnerSelection"
+                      control={controlMain}
+                      render={({ field }) => (
+                        <ModernMenuSelect
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          isDisabled={isReadOnly}
+                          placeholder="Select partner"
+                          options={partnerCustomerOptions.map((partnerCustomer) => ({
+                            value: partnerCustomer.value,
+                            label: `${partnerCustomer.label}${
+                              partnerCustomer.mobile
+                                ? ` - ${partnerCustomer.mobile}`
+                                : ""
+                            }`
+                          }))}
+                        />
+                      )}
+                    />
                     {errorsMain.partnerSelection && (
                       <p className="text-red-500 text-xs mt-1">
                         {errorsMain.partnerSelection.message}
@@ -5585,19 +5648,21 @@ convertexcel
                       <label className="block text-xs font-semibold text-gray-600 mb-1">
                         Allocation Type
                       </label>
-                      <select
-                        disabled={!isSelfAllocationChangable}
-                        {...registerMain("allocationType", {
-                          required: "Allocation type is required"
-                        })}
-                        className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
-                          !isSelfAllocationChangable
-                            ? "cursor-not-allowed opacity-70"
-                            : ""
-                        }`}
-                      >
-                        <option value="followup">Followup</option>
-                      </select>
+                      <Controller
+                        name="allocationType"
+                        control={controlMain}
+                        rules={{ required: "Allocation type is required" }}
+                        render={({ field }) => (
+                          <ModernMenuSelect
+                            value={field.value || "followup"}
+                            onChange={field.onChange}
+                            isDisabled={!isSelfAllocationChangable}
+                            options={[
+                              { value: "followup", label: "Followup" }
+                            ]}
+                          />
+                        )}
+                      />
                       {errorsMain.allocationType && (
                         <p className="text-red-500 text-xs mt-1">
                           {errorsMain.allocationType.message}
@@ -6105,32 +6170,43 @@ convertexcel
                           Self Allocation / Other
                         </label>
 
-                        <select
-                          disabled={!isSelfAllocationChangable}
-                          {...registerMain("selfAllocation", {
-                            setValueAs: (v) => v === "true",
-                            validate: (v) =>
-                              v === true || v === false
+                        <Controller
+                          name="selfAllocation"
+                          control={controlMain}
+                          defaultValue={false}
+                          rules={{
+                            validate: (value) =>
+                              value === true || value === false
                                 ? true
-                                : "This field is required",
-                            onChange: (e) => {
-                              setValueMain("allocationType", "followup")
-                              setselfAllocation(e.target.value === "true")
-                            }
-                          })}
-                          defaultValue="false" // default is Allocate To Other
-                          className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
-                            !isSelfAllocationChangable
-                              ? "cursor-not-allowed opacity-70"
-                              : "cursor-pointer"
-                          }`}
-                        >
-                          {/* always allow 'Allocate To Other' */}
-                          {canSelfAllocate && (
-                            <option value="true">Self Allocate</option>
+                                : "This field is required"
+                          }}
+                          render={({ field }) => (
+                            <ModernMenuSelect
+                              value={field.value ? "true" : "false"}
+                              isDisabled={!isSelfAllocationChangable}
+                              onChange={(value) => {
+                                const isSelfAllocated = value === "true"
+                                field.onChange(isSelfAllocated)
+                                setValueMain("allocationType", "followup")
+                                setselfAllocation(isSelfAllocated)
+                              }}
+                              options={[
+                                ...(canSelfAllocate
+                                  ? [
+                                      {
+                                        value: "true",
+                                        label: "Self Allocate"
+                                      }
+                                    ]
+                                  : []),
+                                {
+                                  value: "false",
+                                  label: "Allocate To Other"
+                                }
+                              ]}
+                            />
                           )}
-                          <option value="false">Allocate To Other</option>
-                        </select>
+                        />
                         {errorsMain.selfAllocation && (
                           <p className="text-red-500 text-xs mt-1">
                             {errorsMain.selfAllocation.message}
@@ -6159,16 +6235,23 @@ convertexcel
                         <label className="text-xs font-semibold text-gray-600 italic whitespace-nowrap">
                           Lead by:
                         </label>
-                        <select
-                          {...registerMain("leadBy")}
-                          className="border border-gray-300 rounded px-2 py-1 text-sm bg-[#EEF2F8] outline-none"
-                        >
-                          {allstaff?.map((u) => (
-                            <option key={u._id} value={u._id}>
-                              {u.name}
-                            </option>
-                          ))}
-                        </select>
+                        <Controller
+                          name="leadBy"
+                          control={controlMain}
+                          render={({ field }) => (
+                            <div className="min-w-[180px]">
+                              <ModernMenuSelect
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                options={(allstaff || []).map((user) => ({
+                                  value: user._id,
+                                  label: user.name
+                                }))}
+                                placeholder="Select staff"
+                              />
+                            </div>
+                          )}
+                        />
                       </div>
                     ) : (
                       <div className="flex items-center">

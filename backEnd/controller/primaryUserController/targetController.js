@@ -2338,14 +2338,21 @@ export const gettargetResult = async (req, res) => {
       endMonth
     );
 
-    // Targets are now credited by payment date. Keep the lead-date branch of
+    // Targets are credited by verified-payment date. Keep the lead-date branch of
     // this query for the existing incentive flow, and include payments made in
     // the selected target period so an older lead can be credited correctly.
     const leads = await LeadMaster.find({
       leadBranch: selectedBranch,
       $or: [
         { leadDate: activePeriodRange },
-        { "paymentHistory.paymentDate": activePeriodRange },
+        {
+          paymentHistory: {
+            $elemMatch: {
+              paymentVerified: true,
+              verifiedAt: activePeriodRange,
+            },
+          },
+        },
         { forcefullyClosedTargetDate: activePeriodRange },
       ],
     })
@@ -2610,10 +2617,13 @@ export const gettargetResult = async (req, res) => {
 
       objects(lead.paymentHistory)
         .map((payment, index) => ({ payment, index }))
-        .filter(({ payment }) => payment.paymentVerified === true)
+        .filter(
+          ({ payment }) =>
+            payment.paymentVerified === true && getVerifiedAt(payment)
+        )
         .sort((left, right) =>
-          getPaymentDate(left.payment)?.getTime() -
-          getPaymentDate(right.payment)?.getTime()
+          getVerifiedAt(left.payment)?.getTime() -
+          getVerifiedAt(right.payment)?.getTime()
         )
         .forEach(({ payment, index }) => {
           const categoryAmount = objects(payment.paymentEntries).reduce(
@@ -2642,8 +2652,8 @@ export const gettargetResult = async (req, res) => {
       [...getVerifiedCategoryAmountsByPayment(lead, configCategoryId).values()]
         .reduce((total, amount) => total + amount, 0);
 
-    const getPaymentDate = (payment) => {
-      const date = new Date(payment?.paymentDate);
+    const getVerifiedAt = (payment) => {
+      const date = new Date(payment?.verifiedAt);
       return Number.isNaN(date.getTime()) ? null : date;
     };
 
@@ -2664,10 +2674,10 @@ export const gettargetResult = async (req, res) => {
       );
 
       for (const [index, payment] of objects(lead.paymentHistory).entries()) {
-        const paymentDate = getPaymentDate(payment);
+        const verifiedAt = getVerifiedAt(payment);
         if (
           payment.paymentVerified !== true ||
-          !isDateInTargetMonth(paymentDate, targetMonth)
+          !isDateInTargetMonth(verifiedAt, targetMonth)
         ) {
           continue;
         }
@@ -2678,13 +2688,14 @@ export const gettargetResult = async (req, res) => {
       return total;
     };
 
-    const getLastPaymentDate = (lead) => {
-      const paymentDates = objects(lead.paymentHistory)
-        .map(getPaymentDate)
+    const getLastVerifiedDate = (lead) => {
+      const verifiedDates = objects(lead.paymentHistory)
+        .filter((payment) => payment.paymentVerified === true)
+        .map(getVerifiedAt)
         .filter(Boolean);
 
-      if (!paymentDates.length) return null;
-      return new Date(Math.max(...paymentDates.map((date) => date.getTime())));
+      if (!verifiedDates.length) return null;
+      return new Date(Math.max(...verifiedDates.map((date) => date.getTime())));
     };
 
     const isLeadFullyVerified = (lead) => {
@@ -2905,8 +2916,8 @@ export const gettargetResult = async (req, res) => {
 
           That staff/admin does not need a target configured.
         */
-        // Target achievement is determined by payment month, not lead date.
-        // `leads` also includes older leads that received a payment this month.
+        // Target achievement is determined by verification month, not lead date.
+        // `leads` also includes older leads with a payment verified this month.
         for (const lead of leads) {
           const categoryItems = getLeadCategoryItems(
             lead,
@@ -2961,7 +2972,7 @@ export const gettargetResult = async (req, res) => {
               lead.balanceAmount !== "" &&
               num(lead.balanceAmount) === 0 &&
               num(lead.totalPaidAmount) >= num(lead.netAmount);
-            const lastPaymentDate = getLastPaymentDate(lead);
+            const lastVerifiedDate = getLastVerifiedDate(lead);
             const forcefullyClosedTargetSourceDate =
               lead.forcefullyClosedTargetDate || lead.leadDate;
             const forcefullyClosedTargetDate = forcefullyClosedTargetSourceDate
@@ -2987,11 +2998,11 @@ export const gettargetResult = async (req, res) => {
                   : 0;
             } else {
               // Normal quantity leads are credited once, in the month of
-              // their final payment, only after full verified payment.
+              // their final verified payment, only after full verified payment.
               leadAchievement =
                 isFullyVerified &&
                 isFullyPaid &&
-                isDateInTargetMonth(lastPaymentDate, targetMonth) &&
+                isDateInTargetMonth(lastVerifiedDate, targetMonth) &&
                 lead.leadClosed === true &&
                 closingActivity.followupClosed === true
                   ? 1
@@ -3518,7 +3529,14 @@ const buildIncentiveReportData = async ({
 
   const leads = await LeadMaster.find({
     leadBranch: { $in: branchIds },
-    "paymentHistory.paymentDate": { $gte: periodStart, $lte: periodEnd },
+    paymentHistory: {
+      $elemMatch: {
+        paymentVerified: true,
+        // Earlier verified payments are needed when a task is completed later
+        // in this reporting period and must receive a one-time catch-up.
+        verifiedAt: { $lte: periodEnd },
+      },
+    },
   })
     .select(
       `leadId leadDate leadBranch customerName paymentVerified netAmount
@@ -3684,11 +3702,14 @@ const buildIncentiveReportData = async ({
 
     objects(lead.paymentHistory)
       .map((payment, index) => ({ payment, index }))
-      .filter(({ payment }) => payment.paymentVerified === true)
+      .filter(
+        ({ payment }) =>
+          payment.paymentVerified === true && validDate(payment.verifiedAt)
+      )
       .sort(
         (left, right) =>
-          validDate(left.payment.paymentDate)?.getTime() -
-          validDate(right.payment.paymentDate)?.getTime()
+          validDate(left.payment.verifiedAt)?.getTime() -
+          validDate(right.payment.verifiedAt)?.getTime()
       )
       .forEach(({ payment, index }) => {
         const categoryAmount = getPaymentCategoryAmount(payment, categoryId);
@@ -3878,17 +3899,66 @@ const buildIncentiveReportData = async ({
           lead,
           categoryId
         );
-        for (const [paymentIndex, payment] of payments.entries()) {
-          if (payment.paymentVerified !== true || !isWithinPeriod(payment.paymentDate, config)) continue;
-          const paymentAmount = cappedPaymentAmounts.get(paymentIndex) || 0;
-          if (paymentAmount <= 0) continue;
-          for (const [activityIndex, activity] of activities.entries()) {
-            if (!isWithinPeriod(activityCompletedAt(lead, activity, activityIndex), config)) continue;
+        const verifiedPayments = payments
+          .map((payment, paymentIndex) => ({
+            payment,
+            paymentIndex,
+            verifiedAt: validDate(payment.verifiedAt),
+          }))
+          .filter(
+            ({ payment, verifiedAt }) =>
+              payment.paymentVerified === true && verifiedAt
+          );
+
+        for (const [activityIndex, activity] of activities.entries()) {
+          const completedAt = validDate(
+            activityCompletedAt(lead, activity, activityIndex)
+          );
+          const isEligibleActivity =
+            activityIndex === 0 || isTaskCompletionEvent(activity);
+
+          if (!completedAt || !isEligibleActivity) continue;
+
+          // A task completed in this target period receives a one-time
+          // catch-up for all payments verified before its completion.
+          if (isWithinPeriod(completedAt, config)) {
+            const catchUpAmount = verifiedPayments
+              .filter(({ verifiedAt }) => verifiedAt <= completedAt)
+              .reduce(
+                (total, { paymentIndex }) =>
+                  total + (cappedPaymentAmounts.get(paymentIndex) || 0),
+                0
+              );
+
+            if (catchUpAmount > 0) {
+              awardActivity({
+                activity,
+                activityIndex,
+                percentageBaseAmount: catchUpAmount,
+                eventDate: completedAt,
+                paymentKey: `catch-up-${activityIndex}`,
+              });
+            }
+          }
+
+          // After a task is complete, every later verified payment in the
+          // target period earns that task's configured percentage.
+          for (const { payment, paymentIndex, verifiedAt } of verifiedPayments) {
+            if (
+              verifiedAt <= completedAt ||
+              !isWithinPeriod(verifiedAt, config)
+            ) {
+              continue;
+            }
+
+            const paymentAmount = cappedPaymentAmounts.get(paymentIndex) || 0;
+            if (paymentAmount <= 0) continue;
+
             awardActivity({
               activity,
               activityIndex,
               percentageBaseAmount: paymentAmount,
-              eventDate: payment.paymentDate,
+              eventDate: verifiedAt,
               paymentKey: String(payment._id || paymentIndex),
             });
           }
@@ -3896,9 +3966,9 @@ const buildIncentiveReportData = async ({
       } else {
         if (!fullyPaidEligible) continue;
         const lastVerifiedPayment = payments
-          .filter((payment) => payment.paymentVerified === true && validDate(payment.paymentDate))
-          .sort((left, right) => validDate(right.paymentDate) - validDate(left.paymentDate))[0];
-        if (!lastVerifiedPayment || !isWithinPeriod(lastVerifiedPayment.paymentDate, config)) continue;
+          .filter((payment) => payment.paymentVerified === true && validDate(payment.verifiedAt))
+          .sort((left, right) => validDate(right.verifiedAt) - validDate(left.verifiedAt))[0];
+        if (!lastVerifiedPayment || !isWithinPeriod(lastVerifiedPayment.verifiedAt, config)) continue;
         for (const [activityIndex, activity] of activities.entries()) {
           awardActivity({
             activity,
@@ -3906,7 +3976,7 @@ const buildIncentiveReportData = async ({
             percentageBaseAmount: lead.forcefullyClosedTarget === true
               ? num(lead.netAmount)
               : getLeadVerifiedCategoryAmount(lead, categoryId),
-            eventDate: lastVerifiedPayment.paymentDate,
+            eventDate: lastVerifiedPayment.verifiedAt,
           });
         }
       }

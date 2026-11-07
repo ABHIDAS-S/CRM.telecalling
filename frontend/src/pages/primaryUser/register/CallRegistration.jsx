@@ -1786,8 +1786,12 @@ const ProductCircleCard = ({
                       <input
                         type="text"
                         id="customerName"
+                        name="customer-search"
                         value={search}
                         onChange={handleInputChange}
+                        autoComplete="off"
+                        spellCheck={false}
+                        aria-autocomplete="none"
                         className="mt-1 block w-full rounded-md border border-gray-300 p-1.5 pr-10 text-sm shadow-sm outline-none focus:border-gray-500"
                         placeholder="Enter name or license..."
                       />
