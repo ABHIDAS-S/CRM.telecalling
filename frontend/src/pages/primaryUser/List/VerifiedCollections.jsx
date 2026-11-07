@@ -608,6 +608,7 @@ console.log(endDate)
                 type="button"
                 onClick={() => {
                   setpaymentHistoryList(item.paymentHistory)
+                  setselectedData(item)
                   setselectedLeadId(item.leadId)
                   checkIsForcefullyClosed(
                     item.leadDate,
@@ -934,7 +935,7 @@ console.log(endDate)
           data={paymentHistoryList}
           showAction={false}
           isChecked={isChecked}
-          isforcefullyclosed={isforcefullyclosed}
+          isforcefullyclosed={Boolean(selectedData?.forcefullyClosedTarget)}
           balanceAmount={balanceAmount}
           onClose={setpaymentHistoryModal}
           leadid={leadId}

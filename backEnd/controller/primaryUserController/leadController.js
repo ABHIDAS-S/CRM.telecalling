@@ -2857,6 +2857,7 @@ export const UpdatepaymentVerification = async (req, res) => {
       index,
       isverified,
       verifiedBy,
+      verifyDate,
       unVerify = false,
     } = req.body;
 
@@ -2923,10 +2924,17 @@ export const UpdatepaymentVerification = async (req, res) => {
         });
       }
 
+      const selectedVerifyDate = verifyDate ? new Date(verifyDate) : new Date();
+      if (Number.isNaN(selectedVerifyDate.getTime())) {
+        return res.status(400).json({
+          message: "A valid verify date is required",
+        });
+      }
+
       payment.paymentVerified = isverified;
       payment.paymentVerifiedBy = verifiedBy;
       payment.paymentverifiedModel = verifiedModel;
-      payment.verifiedAt = new Date();
+      payment.verifiedAt = selectedVerifyDate;
     }
 
     // =========================
@@ -8714,7 +8722,7 @@ export const GetleadById = async (req, res) => {
 export const ApprovedforcefullyClosedTarget = async (req, res) => {
   try {
     const { leadDocId } = req.query
-    const { verifyDate, paymentHistoryIndexes = [] } = req.body
+    const { verifyDate } = req.body
 
     if (!leadDocId) {
       return res
@@ -8736,22 +8744,8 @@ export const ApprovedforcefullyClosedTarget = async (req, res) => {
         .json({ success: false, message: "Lead not found" })
     }
 
-    const validIndexes = [...new Set(paymentHistoryIndexes)]
-      .map(Number)
-      .filter(
-        (index) =>
-          Number.isInteger(index) &&
-          index >= 0 &&
-          index < lead.paymentHistory.length &&
-          lead.paymentHistory[index]?.paymentVerified === true
-      )
-
     lead.forcefullyClosedTarget = true
     lead.forcefullyClosedTargetDate = selectedVerifyDate
-
-    validIndexes.forEach((index) => {
-      lead.paymentHistory[index].verifiedAt = selectedVerifyDate
-    })
 
     await lead.save()
 
@@ -8760,8 +8754,7 @@ export const ApprovedforcefullyClosedTarget = async (req, res) => {
       message: "Verify date saved successfully",
       data: {
         leadDocId,
-        forcefullyClosedTargetDate: lead.forcefullyClosedTargetDate,
-        updatedPayments: validIndexes.length
+        forcefullyClosedTargetDate: lead.forcefullyClosedTargetDate
       }
     })
   } catch (error) {
@@ -14702,6 +14695,8 @@ export const GetcollectionLeads = async (req, res) => {
         netAmount: 1,
         balanceAmount: 1,
         totalPaidAmount: 1,
+        forcefullyClosedTarget: 1,
+        forcefullyClosedTargetDate: 1,
         leadBy: 1,
         leadByModel: 1,
         leadFor: 1,

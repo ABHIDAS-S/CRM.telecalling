@@ -62,6 +62,7 @@ export default function CollectionUpdate() {
   console.log("hh")
   const [showFullName, setShowFullName] = useState(false)
   const [tableData, setTableData] = useState([])
+  const [isCollectionPrepared, setIsCollectionPrepared] = useState(false)
   const [filteredLeads, setFilteredLeads] = useState([])
   const [searchInitialized, setSearchInitialized] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState("all")
@@ -140,6 +141,13 @@ export default function CollectionUpdate() {
   )
 
   const { data: partners } = UseFetch("/customer/getallpartners")
+  const isCollectionLoading =
+    loading ||
+    !loggedUser ||
+    !selectedreduxbranch ||
+    !Array.isArray(collectionlead) ||
+    !Array.isArray(partners) ||
+    !isCollectionPrepared
 
   useEffect(() => {
     if (companybranches && companybranches.length > 0) {
@@ -268,12 +276,16 @@ export default function CollectionUpdate() {
   console.log("Hh")
   useEffect(() => {
     if (
-      collectionlead &&
-      collectionlead.length > 0 &&
-      partners &&
-      partners.length > 0 &&
-      loggedUser
+      loading ||
+      !Array.isArray(collectionlead) ||
+      !Array.isArray(partners) ||
+      !loggedUser
     ) {
+      setIsCollectionPrepared(false)
+      return
+    }
+
+    if (collectionlead.length > 0) {
       console.log(loggedUser?.department)
       if (
         loggedUser?.department?._id === "670c863652847bbebbd35743" ||
@@ -309,8 +321,14 @@ export default function CollectionUpdate() {
       }
 
       setPartner(partners)
+    } else {
+      setTableData([])
+      setforcefullyClosedLeads([])
+      setPartner(partners)
     }
-  }, [collectionlead, partners, loggedUser])
+
+    setIsCollectionPrepared(true)
+  }, [collectionlead, partners, loggedUser, loading, verifiedLead])
   const normalizeTableData = (data) => {
     if (Array.isArray(data)) {
       return [{ staffName: null, leads: data }]
@@ -690,6 +708,7 @@ export default function CollectionUpdate() {
                   setpaymentHistoryList(
                     item.allPaymentHistory || item.paymentHistory || []
                   )
+                  setselectedCollection(item)
                   setselectedLeadId(item.leadId)
                   checkIsForcefullyClosed(
                     item.leadDate,
@@ -1180,7 +1199,7 @@ export default function CollectionUpdate() {
               </div>
 
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                {leadsForSearch.length} total
+                {isCollectionLoading ? "Loading…" : `${leadsForSearch.length} total`}
               </span>
             </div>
 
@@ -1209,7 +1228,7 @@ export default function CollectionUpdate() {
                     (group) => group?.leads?.length > 0
                   )
 
-                  if (loading) {
+                  if (isCollectionLoading) {
                     return <SkeletonTable />
                   }
 

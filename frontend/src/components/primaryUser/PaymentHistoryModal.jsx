@@ -47,6 +47,8 @@ export const PaymentHistoryModal = ({
 
   const [submitLoading, setsubmitLoading] = useState(false)
   const [verifyDate, setVerifyDate] = useState("")
+  const [rowVerifyDates, setRowVerifyDates] = useState({})
+  const [closeLeadChoice, setCloseLeadChoice] = useState("no")
 
   const toDateInputValue = (date) => {
     if (!date) return ""
@@ -62,17 +64,32 @@ export const PaymentHistoryModal = ({
   }
 
   useEffect(() => {
-    if (!verifiedLead) {
-      setVerifyDate("")
-      return
-    }
-
     const verifiedPayments = data.filter((payment) => payment?.paymentVerified)
     const paymentForDefaultDate =
       verifiedPayments[verifiedPayments.length - 1] || data[data.length - 1]
 
-    setVerifyDate(toDateInputValue(paymentForDefaultDate?.paymentDate))
-  }, [data, verifiedLead])
+    setVerifyDate(
+      toDateInputValue(
+        selectedLead?.forcefullyClosedTargetDate ||
+          paymentForDefaultDate?.verifiedAt ||
+          paymentForDefaultDate?.paymentDate
+      )
+    )
+  }, [data, selectedLead?.forcefullyClosedTargetDate])
+
+  useEffect(() => {
+    const forcefullyClosed = Boolean(
+      selectedLead?.forcefullyClosedTarget ||
+        selectedLead?.forcefullyClosedTargetDate ||
+        isforcefullyclosed
+    )
+
+    setCloseLeadChoice(forcefullyClosed ? "yes" : "no")
+  }, [
+    isforcefullyclosed,
+    selectedLead?.forcefullyClosedTarget,
+    selectedLead?.forcefullyClosedTargetDate
+  ])
 
   const formatDate = (dateString) => {
     const date = new Date(dateString)
@@ -203,15 +220,11 @@ export const PaymentHistoryModal = ({
       return
     }
 
-    const paymentHistoryIndexes = data
-      .filter((payment) => payment?.paymentVerified)
-      .map((payment, index) => payment?.originalIndex ?? index)
-
     try {
       setsubmitLoading(true)
       await api.post(
         `/lead/approveforcefullyclosetarget?leadDocId=${leadDocId}`,
-        { verifyDate, paymentHistoryIndexes }
+        { verifyDate }
       )
       toast.success("Verify date saved successfully")
       refresh()
@@ -223,7 +236,11 @@ export const PaymentHistoryModal = ({
     }
   }
 
-  const handleVerify = async (index, isCurrentlyVerified) => {
+  const handleVerify = async (
+    index,
+    isCurrentlyVerified,
+    selectedVerifyDate
+  ) => {
     console.log(index)
     console.log(!isCurrentlyVerified)
     console.log(loggedUser?._id)
@@ -234,7 +251,8 @@ export const PaymentHistoryModal = ({
         isverified: !isCurrentlyVerified,
         index: index,
         leadId: leadDocId,
-        verifiedBy: loggedUser?._id
+        verifiedBy: loggedUser?._id,
+        verifyDate: selectedVerifyDate
       }
       const response = await api.put("/lead/paymentverification", payload)
       console.log(response.status)
@@ -316,6 +334,11 @@ export const PaymentHistoryModal = ({
     0
   )
   const hasExcessAmount = selectedLead?.excessAmount > 0
+  const isForcefullyClosed = Boolean(
+    selectedLead?.forcefullyClosedTarget ||
+      selectedLead?.forcefullyClosedTargetDate ||
+      isforcefullyclosed
+  )
   console.log(data)
   return (
     // <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50">
@@ -619,7 +642,7 @@ export const PaymentHistoryModal = ({
       aria-modal="true"
       aria-labelledby="payment-history-title"
     >
-      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:max-w-6xl sm:rounded-2xl">
+      <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:max-w-6xl sm:rounded-2xl">
         {/* Header */}
         <div className="relative shrink-0 overflow-hidden bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 px-4 py-3 sm:px-6 sm:py-4">
           <div className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-white/10 blur-3xl" />
@@ -631,12 +654,20 @@ export const PaymentHistoryModal = ({
               </span>
 
               <div className="min-w-0">
-                <h2
-                  id="payment-history-title"
-                  className="truncate text-base font-bold text-white sm:text-xl"
-                >
-                  Payment History
-                </h2>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <h2
+                    id="payment-history-title"
+                    className="truncate text-base font-bold text-white sm:text-xl"
+                  >
+                    Payment History
+                  </h2>
+                  {isForcefullyClosed && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-100 ring-1 ring-amber-200/40">
+                      <AlertTriangle className="h-3 w-3" />
+                      Forcefully closed
+                    </span>
+                  )}
+                </div>
 
                 <p className="truncate text-xs text-blue-100 sm:text-sm">
                   Lead ID: {leadid || "—"}
@@ -662,10 +693,10 @@ export const PaymentHistoryModal = ({
 
         {/* Loading indicator */}
         {submitLoading && (
-          <div className="shrink-0 border-b border-blue-100 bg-blue-50 px-4 py-2.5">
-            <div className="flex items-center justify-center gap-2 text-sm font-medium text-blue-700">
-              <PropagateLoader color="#2563eb" size={7} />
-              <span>Updating payment details...</span>
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/10 backdrop-blur-[1px]">
+            <div className="flex items-center gap-2 rounded-full border border-blue-100 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-lg">
+              <PropagateLoader color="#2563eb" size={6} />
+              <span>Saving changes…</span>
             </div>
           </div>
         )}
@@ -798,15 +829,14 @@ export const PaymentHistoryModal = ({
               </p>
             </div>
           ) : (
-            <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-200">
-              <table className="w-full min-w-[900px] table-fixed border-collapse text-sm">
+            <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200">
+              <table className="w-full table-fixed border-collapse text-sm">
                 <colgroup>
                   <col
                     className={
                       showAction ? "w-[18%]" : "w-[20%]"
                     }
                   />
-                  {verifiedLead && <col className={showAction ? "w-[16%]" : "w-[18%]"} />}
                   <col
                     className={
                       showAction ? "w-[18%]" : "w-[20%]"
@@ -817,32 +847,33 @@ export const PaymentHistoryModal = ({
                       showAction ? "w-[14%]" : "w-[16%]"
                     }
                   />
-                  <col className={verifiedLead ? (showAction ? "w-[22%]" : "w-[26%]") : (showAction ? "w-[38%]" : "w-[44%]")} />
+                  <col className={showAction ? "w-[22%]" : "w-[26%]"} />
 
                   {showAction && <col className="w-[12%]" />}
+                  <col className={showAction ? "w-[16%]" : "w-[18%]"} />
                 </colgroup>
 
                 <thead className="sticky top-0 z-10 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
+                    <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide">
                       Payment date
                     </th>
 
-                    {verifiedLead && <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">Verified date</th>}
-
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide">
+                    <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide">
                       Received by
                     </th>
 
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide">
+                    <th className="px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-wide">
                       Amount
                     </th>
 
-                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">
+                    <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wide">
                       Bank remarks
                     </th>
 
-                    {showAction && <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide">Actions</th>}
+                    {showAction && <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wide">Actions</th>}
+
+                    <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide">Date verify</th>
                   </tr>
                 </thead>
 
@@ -864,10 +895,11 @@ export const PaymentHistoryModal = ({
                     const isPaymentVerified =
                       checkverified?.[rowOriginalIndex] ??
                       Boolean(row?.paymentVerified)
-                    const verifiedDate =
-                      isPaymentVerified && row?.verifiedAt
-                        ? formatDate(row.verifiedAt)
-                        : "—"
+                    const rowVerifyDate =
+                      rowVerifyDates[rowOriginalIndex] ??
+                      (isPaymentVerified
+                        ? toDateInputValue(row?.verifiedAt)
+                        : toDateInputValue(new Date()))
 
                     return (
                       <tr
@@ -876,21 +908,11 @@ export const PaymentHistoryModal = ({
                           index % 2 === 0 ? "bg-white" : "bg-slate-50/70"
                         }`}
                       >
-                        <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">
+                        <td className="whitespace-nowrap px-3 py-3 text-sm text-slate-600">
                           {formatDate(row?.paymentDate)}
                         </td>
 
-                        {verifiedLead && <td className="whitespace-nowrap px-4 py-3 text-sm">
-                          {isPaymentVerified && row?.verifiedAt ? (
-                            <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
-                              {verifiedDate}
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">{verifiedDate}</span>
-                          )}
-                        </td>}
-
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-3">
                           <span
                             title={receivedByName}
                             className="inline-flex max-w-full truncate rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-100"
@@ -899,7 +921,7 @@ export const PaymentHistoryModal = ({
                           </span>
                         </td>
 
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-3 py-3 text-right">
                           {isEditing && ispermissionEdit ? (
                             <input
                               type="number"
@@ -930,7 +952,7 @@ export const PaymentHistoryModal = ({
                           )}
                         </td>
 
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-3 py-3 text-center">
                           {isEditing && ispermissionEdit ? (
                             <input
                               type="text"
@@ -1028,7 +1050,11 @@ export const PaymentHistoryModal = ({
                                         <button
                                           type="button"
                                           onClick={() =>
-                                            handleVerify(rowOriginalIndex, false)
+                                            handleVerify(
+                                              rowOriginalIndex,
+                                              false,
+                                              rowVerifyDate
+                                            )
                                           }
                                           disabled={submitLoading}
                                           className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-amber-500 px-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1121,6 +1147,25 @@ export const PaymentHistoryModal = ({
                             </div>
                           </td>
                         )}
+                        <td className="px-3 py-3 text-sm">
+                          <label className="flex flex-col gap-1 text-xs font-semibold text-emerald-800">
+                            <span className="sr-only">Date verify</span>
+                            <input
+                              type="date"
+                              value={rowVerifyDate}
+                              onChange={(event) => {
+                                const value = event.target.value
+                                setRowVerifyDates((previousDates) => ({
+                                  ...previousDates,
+                                  [rowOriginalIndex]: value
+                                }))
+                              }}
+                              disabled={submitLoading || !isdepartmentisAccountant}
+                              className="h-8 w-full min-w-0 rounded-md border border-emerald-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+                              aria-label={`Date verify for payment ${index + 1}`}
+                            />
+                          </label>
+                        </td>
                       </tr>
                     )
                   })}
@@ -1139,25 +1184,80 @@ export const PaymentHistoryModal = ({
 
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-3">
             {isdepartmentisAccountant && verifiedLead && (
-              <div className="flex flex-wrap items-end gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-                <label className="flex flex-col gap-1 text-xs font-semibold text-emerald-800">
-                  Verify date
-                  <input
-                    type="date"
-                    value={verifyDate}
-                    onChange={(event) => setVerifyDate(event.target.value)}
-                    disabled={submitLoading}
-                    className="h-8 rounded-md border border-emerald-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={handleSaveVerifyDate}
-                  disabled={submitLoading || !verifyDate}
-                  className="inline-flex h-8 items-center rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Save verify date
-                </button>
+              <div
+                role="group"
+                aria-label="Close lead and calculate incentive"
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-2 shadow-sm"
+              >
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <span className="text-xs font-bold text-slate-900">
+                    Close Lead &amp; Calculate Incentive?
+                  </span>
+
+                  <div className="flex items-center gap-3">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700">
+                      <input
+                        type="radio"
+                        name="close-lead-choice"
+                        value="yes"
+                        checked={closeLeadChoice === "yes"}
+                        onChange={() => setCloseLeadChoice("yes")}
+                        disabled={submitLoading || isForcefullyClosed}
+                        className="h-3.5 w-3.5 border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      Yes
+                    </label>
+
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700">
+                      <input
+                        type="radio"
+                        name="close-lead-choice"
+                        value="no"
+                        checked={closeLeadChoice === "no"}
+                        onChange={() => setCloseLeadChoice("no")}
+                        disabled={submitLoading || isForcefullyClosed}
+                        className="h-3.5 w-3.5 border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      No
+                    </label>
+                  </div>
+
+                  {closeLeadChoice === "yes" && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-900">
+                        Close target
+                        <input
+                          type="date"
+                          value={verifyDate}
+                          onChange={(event) => setVerifyDate(event.target.value)}
+                          disabled={submitLoading || isForcefullyClosed}
+                          className="h-7 rounded-md border border-emerald-300 bg-white px-1.5 text-xs font-medium text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+                          aria-label="Close target date"
+                        />
+                      </label>
+                      {isForcefullyClosed ? (
+                        <span className="inline-flex h-7 items-center rounded-md bg-amber-100 px-2.5 text-[11px] font-bold text-amber-800">
+                          Forcefully closed
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleSaveVerifyDate}
+                          disabled={submitLoading || !verifyDate}
+                          className="inline-flex h-7 items-center rounded-md bg-emerald-600 px-2.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Confirm
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {closeLeadChoice === "no" && !isForcefullyClosed && (
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                    Collection is recorded without closing the lead or calculating incentive.
+                  </p>
+                )}
               </div>
             )}
 
