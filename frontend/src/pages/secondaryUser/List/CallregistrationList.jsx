@@ -61,6 +61,8 @@ const [annoucementsubmitloader,setannouncementLoader]=useState(false)
   console.log(filteredCalls?.length)
   const [loading, setLoading] = useState(false)
   const [selectedCompanyBranch, setSelectedCompanyBranch] = useState(null)
+  const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false)
+  const branchMenuRef = useRef(null)
   const [selectedcompanybranchId, setselectedcompanybranchId] = useState(null)
   const [showNotification, setShowNotification] = useState(false)
   const [oldPendingCallsCount, setoldpendingCallCount] = useState(0)
@@ -101,6 +103,19 @@ console.log(users)
 console.log("ddddddddddddddddddd",announcementlist)
 
   const socketRef = useRef(null)
+
+  useEffect(() => {
+    if (!isBranchMenuOpen) return undefined
+
+    const closeBranchMenu = (event) => {
+      if (!branchMenuRef.current?.contains(event.target)) {
+        setIsBranchMenuOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", closeBranchMenu)
+    return () => document.removeEventListener("mousedown", closeBranchMenu)
+  }, [isBranchMenuOpen])
 
   useEffect(() => {
     if (selectedCategory) {
@@ -716,7 +731,7 @@ announcements={announcement}
           {showNotification && (
             <NotificationPopup onClose={() => setShowNotification(false)} />
           )}
-          <div className="px-4">
+          <div className="px-2 md:px-3">
             
                 <AnnouncementBanner
                   announcementlist={announcement}
@@ -726,17 +741,17 @@ show={true}
                 />
               
           </div>
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2 md:p-3">
-            <div className="flex min-h-0 flex-1 flex-col rounded-xl bg-neutral-50 px-3 py-2 shadow-lg md:px-4">
-              <div className="mb-2 flex shrink-0 flex-col gap-2 px-1 lg:flex-row lg:items-start lg:justify-between lg:px-2">
-                <div className="flex w-full flex-col gap-2 lg:max-w-2xl">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-1.5 md:p-2">
+            <div className="flex min-h-0 flex-1 flex-col rounded-xl bg-neutral-50 p-2 shadow-lg md:p-2.5">
+              <div className="mb-1 flex shrink-0 flex-col gap-1.5 px-0.5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex w-full flex-col gap-1.5 lg:max-w-2xl">
+                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
                     <div className="relative flex-1">
                       <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                       <input
                         type="text"
                         onChange={handleChange}
-                        className="w-full rounded-full border border-gray-300 py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="h-8 w-full rounded-full border border-gray-300 py-1 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Search for..."
                       />
                     </div>
@@ -748,28 +763,42 @@ show={true}
                           `/${users?.role?.toLowerCase()}/transaction/call-registration`
                         )
                       }
-                      className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition-all hover:bg-blue-700"
+                      className="h-8 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white shadow-md transition-all hover:bg-blue-700"
                     >
                       Call
                     </button>
 
-                    <select
-                      onChange={(e) => {
-                        setLoading(true)
-                        setFilteredCalls([])
-                        setSelectedCompanyBranch(e.target.value)
-                      }}
-                      className="min-w-[140px] cursor-pointer rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {loggedUserBranches?.map((branch) => (
-                        <option
-                          key={branch.value || branch.label}
-                          value={branch.label}
-                        >
-                          {branch.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div ref={branchMenuRef} className="relative min-w-[170px]">
+                      <button
+                        type="button"
+                        onClick={() => setIsBranchMenuOpen((open) => !open)}
+                        className="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-blue-200 bg-gradient-to-r from-blue-50 to-white px-2.5 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        aria-haspopup="listbox"
+                        aria-expanded={isBranchMenuOpen}
+                      >
+                        <span className="min-w-0 truncate"><span className="mr-1 text-[9px] font-bold uppercase tracking-wide text-blue-500">Branch</span>{selectedCompanyBranch || "Select branch"}</span>
+                        <ChevronDown size={14} className={`shrink-0 text-blue-600 transition-transform ${isBranchMenuOpen ? "rotate-180" : ""}`} />
+                      </button>
+                      {isBranchMenuOpen && <div role="listbox" className="absolute left-0 top-10 z-50 w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                        <p className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">Available branches</p>
+                        <div className="max-h-56 overflow-y-auto">
+                          {loggedUserBranches?.map((branch) => {
+                            const isSelected = branch.label === selectedCompanyBranch
+                            return <button
+                              type="button"
+                              role="option"
+                              aria-selected={isSelected}
+                              key={branch.value || branch.label}
+                              onClick={() => { setLoading(true); setFilteredCalls([]); setSelectedCompanyBranch(branch.label); setIsBranchMenuOpen(false) }}
+                              className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${isSelected ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? "bg-white" : "bg-blue-400"}`} />
+                              <span className="truncate">{branch.label}</span>
+                            </button>
+                          })}
+                        </div>
+                      </div>}
+                    </div>
                   </div>
                 </div>
 
@@ -778,36 +807,36 @@ show={true}
                     <table className="min-w-max text-center text-xs md:text-sm">
                       <tbody>
                         <tr className="border-b bg-gray-50">
-                          <td className="px-3 py-1.5 font-bold text-[#010bff]">
+                          <td className="px-2 py-1 font-bold text-[#010bff]">
                             Total Calls
                           </td>
-                          <td className="px-3 py-1.5 font-bold text-purple-700">
+                          <td className="px-2 py-1 font-bold text-purple-700">
                             Colleague Solved
                           </td>
-                          <td className="px-3 py-1.5 font-bold text-red-600">
+                          <td className="px-2 py-1 font-bold text-red-600">
                             Pending Calls
                           </td>
-                          <td className="px-3 py-1.5 font-bold text-green-600">
+                          <td className="px-2 py-1 font-bold text-green-600">
                             Solved Calls
                           </td>
-                          <td className="px-3 py-1.5 font-bold text-gray-600">
+                          <td className="px-2 py-1 font-bold text-gray-600">
                             Total Duration
                           </td>
                         </tr>
                         <tr>
-                          <td className="px-3 py-1.5 text-[#010bff]">
+                          <td className="px-2 py-1 text-[#010bff]">
                             {userCallStatus?.totalCalls}
                           </td>
-                          <td className="px-3 py-1.5 text-purple-700">
+                          <td className="px-2 py-1 text-purple-700">
                             {userCallStatus?.collegeSolvedCalls}
                           </td>
-                          <td className="px-3 py-1.5 text-red-600">
+                          <td className="px-2 py-1 text-red-600">
                             {userCallStatus?.pendingCalls}
                           </td>
-                          <td className="px-3 py-1.5 text-green-600">
+                          <td className="px-2 py-1 text-green-600">
                             {userCallStatus?.solvedCalls}
                           </td>
-                          <td className="px-3 py-1.5 text-gray-600">
+                          <td className="px-2 py-1 text-gray-600">
                             {formatDuration(userCallStatus?.totalDuration)}
                           </td>
                         </tr>
@@ -817,9 +846,9 @@ show={true}
                 </div>
               </div>
 
-              <hr className="mb-2 shrink-0 border-t border-gray-300" />
+              <hr className="mb-1 shrink-0 border-t border-gray-300" />
 
-              <div className="mb-2 flex items-center gap-2">
+              <div className="mb-1 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => applyFilter("All")}
@@ -833,9 +862,10 @@ show={true}
                 </button>
               </div>
 
-              <div className="mb-2 grid shrink-0 grid-cols-2 gap-4 lg:grid-cols-4">
+              <div className="mb-1 grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
                 <Tiles
                   title="Pending Calls"
+                  compact
                   count={oldPendingCallsCount}
                   subtitle="Awaiting follow-up"
                   icon={<PhoneMissed size={12} strokeWidth={2.2} />}
@@ -849,6 +879,7 @@ show={true}
 
                 <Tiles
                   title="Today Pending Calls"
+                  compact
                   count={todaypendingCallsCount}
                   subtitle="Scheduled today"
                   icon={<PhoneIncoming size={12} strokeWidth={2.2} />}
@@ -862,6 +893,7 @@ show={true}
 
                 <Tiles
                   title="Solved Calls"
+                  compact
                   count={solvedCallsCount}
                   subtitle="Resolved"
                   icon={<BadgeCheck size={12} strokeWidth={2.2} />}
@@ -875,6 +907,7 @@ show={true}
 
                 <Tiles
                   title="Online Calls"
+                  compact
                   count={onlineCallsCount}
                   subtitle="Online"
                   icon={<PhoneCall size={12} strokeWidth={2.2} />}

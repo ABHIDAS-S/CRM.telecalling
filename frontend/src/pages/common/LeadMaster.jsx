@@ -2754,10 +2754,21 @@ console.log(licenses)
             }))
           })
 
-        // Lead Master should list only customers that have a primary product
-        // for the selected branch; additional and enhanced services are not
-        // customer-list entries in this flow.
-        return productOptions
+        // Preserve the product-specific options, but do not hide customers
+        // that have not yet been assigned a primary product. They must remain
+        // selectable so a lead can be created and products added afterwards.
+        if (productOptions.length) return productOptions
+
+        return [{
+          ...customerFields,
+          optionId: `${item?._id}-no-product`,
+          license: "",
+          productName: "",
+          searchText: [item?.customerName, item?.mobile]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+        }]
       })
       setCustomerOptions(options)
     }

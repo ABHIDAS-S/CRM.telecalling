@@ -11,7 +11,9 @@ import {
   FaSearch,
   FaRegFileExcel,
   FaFilePdf,
-  FaPrint
+  FaPrint,
+  FaChevronDown,
+  FaBuilding
 } from "react-icons/fa"
 import { Link } from "react-router-dom"
 import debounce from "lodash.debounce"
@@ -25,6 +27,7 @@ const UserListform = () => {
   console.log(users)
   const [allusers, setallusers] = useState([])
   const [selectedBranch, setselectedBranch] = useState(null)
+  const [isBranchMenuOpen, setIsBranchMenuOpen] = useState(false)
   const [loggeduser, setloggeduser] = useState(null)
   const { data, loading } = UseFetch("/auth/getallUsers")
   console.log(data)
@@ -81,8 +84,8 @@ const UserListform = () => {
 
     // Reset to initial count after filtering
   }, 300)
-  const handlebranchChange = (e) => {
-    const [id, label] = e.target.value.split("||")
+  const handlebranchChange = (value) => {
+    const [id] = value.split("||")
     setselectedBranch(id)
     if (searchQuery) {
       const filteredbyquery = allusers.filter((user) =>
@@ -641,20 +644,38 @@ const UserListform = () => {
           <span className="hidden sm:inline">Print</span>
         </button>
 
-        <select
-          onChange={(e) => handlebranchChange(e)}
-          className="h-8 min-w-0 w-full rounded-lg border border-gray-200 bg-white px-3 text-xs text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 sm:ml-auto sm:w-52"
-        >
-          {loggeduser &&
-            loggeduser?.selected?.map((branch) => (
-              <option
-                key={branch._id}
-                value={`${branch.branch_id}||${branch.branchName}`}
-              >
-                {branch?.branchName}
-              </option>
-            ))}
-        </select>
+        <div className="relative w-full sm:ml-auto sm:w-56">
+          <button
+            type="button"
+            onClick={() => setIsBranchMenuOpen((open) => !open)}
+            className="flex h-9 w-full items-center gap-2 rounded-lg border border-sky-200 bg-gradient-to-r from-sky-50 to-white px-3 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-sky-300 hover:shadow focus:outline-none focus:ring-2 focus:ring-sky-300"
+            aria-expanded={isBranchMenuOpen}
+            aria-haspopup="listbox"
+          >
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-sky-100 text-sky-600"><FaBuilding className="h-3 w-3" /></span>
+            <span className="min-w-0 flex-1"><span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Branch</span><span className="truncate">{loggeduser?.selected?.find((branch) => String(branch.branch_id) === String(selectedBranch))?.branchName || "Select branch"}</span></span>
+            <FaChevronDown className={`h-3 w-3 shrink-0 text-sky-600 transition-transform ${isBranchMenuOpen ? "rotate-180" : ""}`} />
+          </button>
+          {isBranchMenuOpen && <div role="listbox" className="absolute right-0 top-11 z-40 w-full overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+            <p className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Choose a branch</p>
+            <div className="max-h-56 overflow-y-auto">
+              {loggeduser?.selected?.map((branch) => {
+                const isSelected = String(branch.branch_id) === String(selectedBranch)
+                return <button
+                  key={branch._id || branch.branch_id}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => { handlebranchChange(`${branch.branch_id}||${branch.branchName}`); setIsBranchMenuOpen(false) }}
+                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${isSelected ? "bg-sky-500 text-white shadow-sm" : "text-slate-600 hover:bg-sky-50 hover:text-sky-700"}`}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? "bg-white" : "bg-sky-400"}`} />
+                  <span className="truncate">{branch.branchName}</span>
+                </button>
+              })}
+            </div>
+          </div>}
+        </div>
       </div>
     </div>
   </div>

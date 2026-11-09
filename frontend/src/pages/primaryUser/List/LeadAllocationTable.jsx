@@ -858,7 +858,7 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
   console.log(tasks)
   console.log(reduxselectedBranch)
   return (
-    <div className="flex  h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden bg-[#ADD8E6]">
       {/* <StaticSidebar
         handleMoreClick={handleMoreClick}
         selectedCompanyBranch={selectedCompanyBranch}
@@ -931,13 +931,17 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
         )}
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col bg-[#ADD8E6] overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden bg-[#ADD8E6] p-2 sm:p-4">
           {/* Top Bar with Title and Controls */}
-          <div className="flex justify-between items-center mx-3 md:mx-5 mt-3 mb-3">
-            <h2 className="text-lg font-bold">
-              {approvedToggleStatus ? "Approved" : "Pending"} Allocation List
-            </h2>
-            <div className="flex justify-end ml-auto gap-6 items-center">
+          <div className="mb-3 flex shrink-0 flex-col gap-3 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 px-4 py-3.5 text-white shadow-lg sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300">Lead management</p>
+              <h2 className="mt-0.5 text-lg font-bold tracking-tight sm:text-xl">
+                {approvedToggleStatus ? "Approved" : "Pending"} Allocation List
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-300">Review incoming leads and assign the right owner with confidence.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               {/* Branch Dropdown */}
               {/* <select
                 onChange={(e) => {
@@ -956,15 +960,10 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                 aria-pressed={approvedToggleStatus}
                 aria-label="Toggle Approval Status"
                 onClick={toggleStatus}
-                className={`${
-                  approvedToggleStatus ? "bg-green-500" : "bg-gray-300"
-                } w-11 h-6 flex items-center rounded-full transition-colors duration-300`}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
               >
-                <div
-                  className={`${
-                    approvedToggleStatus ? "translate-x-5" : "translate-x-0"
-                  } w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300`}
-                ></div>
+                <span>{approvedToggleStatus ? "Approved" : "Pending"}</span>
+                <span className={`flex h-5 w-9 items-center rounded-full p-0.5 transition-colors ${approvedToggleStatus ? "bg-emerald-400" : "bg-slate-500"}`}><span className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${approvedToggleStatus ? "translate-x-4" : "translate-x-0"}`} /></span>
               </button>
               <button
                 onClick={() =>
@@ -982,32 +981,32 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                         }
                       })
                 }
-                className="bg-black text-white py-1 px-3 rounded-lg shadow-lg hover:bg-gray-600"
+                className="rounded-lg bg-sky-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-300"
               >
-                New Lead
+                <span className="inline-flex items-center gap-1.5"><Users size={14} /> New Lead</span>
               </button>
             </div>
           </div>
 
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-auto mb-3">
-            <div className="mx-5">
+          <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-slate-200/80 bg-white/70 p-2 shadow-sm sm:p-3">
+            <div>
               {loading || toggleLoading ? (
                 <SkeletonTable rows={5} columns={8} />
               ) : tableData && Object.keys(tableData).length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {Object.entries(tableData).map(([staffName, leads]) => (
                     <div
                       key={staffName}
-                      className="bg-white rounded-lg border border-gray-200 overflow-hidden"
+                      className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_4px_16px_rgba(15,23,42,0.08)]"
                     >
                       {/* Group header */}
-                      <div className="bg-gray-50 px-4 py-1 border-b">
+                      <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-indigo-50 px-4 py-1.5">
                         <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold text-blue-600">
+                          <div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-100 text-xs font-bold text-indigo-700">{String(staffName || "?").slice(0, 1).toUpperCase()}</span><h3 className="text-sm font-bold text-slate-800">
                             {staffName}
-                          </h3>
-                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
+                          </h3></div>
+                          <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
                             {leads.length} Lead{leads.length !== 1 ? "s" : ""}
                           </span>
                         </div>
@@ -1015,34 +1014,34 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
 
                       {/* Table */}
                       <div className="overflow-x-auto">
-                        <table className="border-collapse border border-gray-400 w-full text-sm">
-                          <thead className="whitespace-nowrap bg-blue-900 text-white">
-                            <tr>
-                              <th className="border border-r-0 border-gray-400 px-4 py-2">
+                        <table className="w-full min-w-[900px] border-collapse table-fixed text-sm text-slate-700">
+                          <thead className="whitespace-nowrap bg-slate-900 text-white">
+                            <tr className="[&>th]:!border [&>th]:!border-slate-500 [&>th]:!px-3 [&>th]:!py-1.5 [&>th]:text-center [&>th]:text-xs [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-wide">
+                              <th className="w-[54px] border border-r-0 border-gray-400 px-4 py-2">
                                 SNO.
                               </th>
-                              <th className="border border-r-0 border-gray-400 px-4 py-2">
+                              <th className="w-[150px] border border-r-0 border-gray-400 px-4 py-2">
                                 Name
                               </th>
-                              <th className="border border-r-0 border-l-0 border-gray-400 px-4 py-2 max-w-[200px] min-w-[200px]">
+                              <th className="w-[150px] border border-r-0 border-l-0 border-gray-400 px-4 py-2">
                                 Mobile
                               </th>
-                              <th className="border border-r-0 border-l-0 border-gray-400 px-4 py-2">
+                              <th className="w-[125px] border border-r-0 border-l-0 border-gray-400 px-4 py-2">
                                 Phone
                               </th>
                               {/* <th className="border border-r-0 border-l-0 border-gray-400 px-4 py-2">
                                 Email
                               </th> */}
-                              <th className="border border-r-0 border-l-0 border-gray-400 px-4 py-2 min-w-[100px]">
+                              <th className="w-[100px] border border-r-0 border-l-0 border-gray-400 px-4 py-2">
                                 Lead Id
                               </th>
-                              <th className="border border-t-0 w-36">
+                              <th className="w-[135px] border border-t-0">
                                 Allocation Type
                               </th>
-                              <th className="border border-gray-400 px-4 py-2 w-[100px] text-nowrap">
+                              <th className="w-[100px] border border-gray-400 px-4 py-2 text-nowrap">
                                 Action
                               </th>
-                              <th className="border border-gray-400 px-4 py-2 w-32">
+                              <th className="w-[110px] border border-gray-400 px-4 py-2">
                                 Net Amount
                               </th>
                               {/* <th className="border border-r-0 border-l-0 border-gray-400 px-4 py-2 w-32">
@@ -1055,7 +1054,7 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                             {leads.map((item, index) => (
                               <React.Fragment key={item._id}>
                                 {/* Row 1 */}
-                                <tr className="bg-white border border-gray-400 border-b-0 hover:bg-gray-50 transition-colors text-center">
+                                <tr className="bg-white text-center align-middle transition-colors hover:bg-indigo-50/40 [&>td]:!border [&>td]:!border-slate-300 [&>td]:!px-3 [&>td]:!py-1">
                                   <td className="px-4 border border-b-0 border-gray-400" />
                                   <td
                                     onClick={() =>
@@ -1115,7 +1114,7 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                                 </tr>
 
                                 {/* Row 2 (labels) */}
-                                <tr className="font-semibold bg-gray-200 text-center">
+                                <tr className="bg-slate-100 text-center align-middle font-semibold text-slate-700 [&>td]:!border [&>td]:!border-slate-300 [&>td]:!px-3 [&>td]:!py-0.5 [&>td]:text-xs">
                                   <td className="px-4 border border-b-0 border-t-0 border-gray-400 text-black">
                                     {index + 1}
                                   </td>
@@ -1154,7 +1153,7 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                                           [item._id]: ""
                                         }))
                                       }}
-                                      className="py-0.5 border border-gray-400 rounded-md focus:outline-none cursor-pointer"
+                                      className="h-7 w-full rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                                     >
                                       <option>Select Type</option>
                                       {filteredtasklist &&
@@ -1204,14 +1203,14 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                                 </tr>
 
                                 {/* Row 3 (values) */}
-                                <tr className="bg-white text-center">
+                                <tr className="bg-white text-center align-middle text-slate-700 [&>td]:!border [&>td]:!border-slate-300 [&>td]:!px-3 [&>td]:!py-0.5">
                                   <td className="border border-t-0 border-r-0 border-b-0 border-gray-400 px-4 py-0.5" />
                                   <td className="border border-t-0 border-r-0 border-b-0 border-gray-400 px-4 py-0.5 text-black">
                                     {item?.leadBy?.name || "-"}
                                   </td>
                                   <td className="border border-t-0 border-r-0 border-l-0 border-b-0 border-gray-400 px-4 py-0.5 text-md">
                                     <div className="text-center">
-                                      <div className="inline-block">
+                                      <div className="w-full min-w-0">
                                         {/* <Select
                                           options={allocationOptions}
                                           value={
@@ -1232,18 +1231,18 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                                               [item._id]: ""
                                             }))
                                           }}
-                                          className="w-44"
+                                          className="w-full min-w-0"
                                           styles={{
                                             control: (base) => ({
                                               ...base,
-                                              minHeight: "28px",
-                                              height: "28px",
+                                              minHeight: "26px",
+                                              height: "26px",
                                               boxShadow: "none",
-                                              borderColor: "red",
+                                              borderColor: "#cbd5e1",
                                               paddingTop: "0px",
                                               paddingBottom: "0px",
                                               cursor: "pointer",
-                                              "&:hover": { borderColor: "red" }
+                                              "&:hover": { borderColor: "#818cf8" }
                                             }),
                                             option: (base, state) => ({
                                               ...base,
@@ -1260,7 +1259,7 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                                             }),
                                             indicatorsContainer: (base) => ({
                                               ...base,
-                                              height: "30px"
+                                              height: "26px"
                                             }),
                                             menu: (provided) => ({
                                               ...provided,
@@ -1297,18 +1296,18 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                                               [item._id]: ""
                                             }))
                                           }}
-                                          className="w-44"
+                                          className="w-full min-w-0"
                                           styles={{
                                             control: (base) => ({
                                               ...base,
-                                              minHeight: "28px",
-                                              height: "28px",
+                                              minHeight: "26px",
+                                              height: "26px",
                                               boxShadow: "none",
-                                              borderColor: "red",
+                                              borderColor: "#cbd5e1",
                                               paddingTop: "0px",
                                               paddingBottom: "0px",
                                               cursor: "pointer",
-                                              "&:hover": { borderColor: "red" }
+                                              "&:hover": { borderColor: "#818cf8" }
                                             }),
                                             option: (base, state) => ({
                                               ...base,
@@ -1325,7 +1324,7 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                                             }),
                                             indicatorsContainer: (base) => ({
                                               ...base,
-                                              height: "30px"
+                                              height: "26px"
                                             }),
                                             menu: (provided) => ({
                                               ...provided,

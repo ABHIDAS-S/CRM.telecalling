@@ -144,13 +144,18 @@ const getCompletedAt = (item) => item.taskCompletedAt || [...(item.taskTimeline 
   .reverse()
   .find((event) => event.event === "Development Completed")?.at
 
-const isCompletedInSelectedPeriod = (item, month, year) => {
-  const completedAt = getCompletedAt(item)
-  if (!completedAt) return false
+const getReportDate = (item) =>
+  getCompletedAt(item) ||
+  item.allocationDate ||
+  item.followupClosedDate ||
+  item.taskStartedAt ||
+  item.expectedCompletionDate
 
-  const completedDate = new Date(completedAt)
-  return completedDate.getFullYear() === Number(year)
-    && months[completedDate.getMonth()] === month
+const isInSelectedPeriod = (item, month, year) => {
+  const reportDate = new Date(getReportDate(item))
+  return !Number.isNaN(reportDate.getTime()) &&
+    reportDate.getFullYear() === Number(year) &&
+    months[reportDate.getMonth()] === month
 }
 
 const codingAndQcTaskId = "689c23493e94902039b97743"
@@ -345,16 +350,12 @@ export default function ResearchandDevelopement() {
   }, [])
 
   const scopedWorkItems = workItems.filter((item) =>
-    leadScope !== "Owned" || String(item.assignedDeveloperId) === String(loggedUser?._id)
+    (leadScope !== "Owned" || String(item.assignedDeveloperId) === String(loggedUser?._id)) &&
+    isInSelectedPeriod(item, month, year)
   )
 
   const matchesStatus = (item, status) => {
-    if (status === "Completed") {
-      // The month selector is an all-leads report filter. A developer's own
-      // completed work remains visible regardless of when it was completed.
-      return item.status === "Completed"
-        && (leadScope === "Owned" || isCompletedInSelectedPeriod(item, month, year))
-    }
+    if (status === "Completed") return item.status === "Completed"
     if (status === "Overdue") return isOverdue(item)
     // An overdue task is shown in the Overdue bucket, not counted twice as
     // both In Progress and Overdue.
@@ -594,11 +595,28 @@ export default function ResearchandDevelopement() {
       <div className="mx-auto flex h-full min-h-0 max-w-7xl flex-col">
         <AnnouncementBanner announcementlist={announcement} setopenannoucementpopup={setOpenAnnouncementPopup} />
 
-        <header className="mb-3 shrink-0 border-l-2 border-blue-500 pl-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-600 sm:text-xs">Research & Development</p>
-          <div className="mt-0.5 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2.5">
-            <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">My Work Summary</h1>
-            <p className="text-xs text-slate-500 sm:text-sm">A quick view of your current work status.</p>
+        <header className="mb-3 flex shrink-0 flex-col gap-3 border-l-2 border-blue-500 pl-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-600 sm:text-xs">Research & Development</p>
+            <div className="mt-0.5 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2.5">
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">My Work Summary</h1>
+              <p className="text-xs text-slate-500 sm:text-sm">A quick view of your current work status.</p>
+            </div>
+          </div>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-600 text-white shadow-sm"><CalendarDays size={16} /></span>
+            <div className="relative min-w-0 flex-1 sm:w-36 sm:flex-none">
+              <button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "report-month" ? null : "report-month")} className="flex h-9 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                <span><span className="mr-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Month</span>{month}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "report-month" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} />
+              </button>
+              {completedFilterMenu === "report-month" && <div className="absolute right-0 top-11 z-40 grid w-64 grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><p className="col-span-3 px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Select reporting month</p>{months.map((item) => <button type="button" key={item} onClick={() => { setMonth(item); setCompletedFilterMenu(null) }} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${month === item ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>{item.slice(0, 3)}</button>)}</div>}
+            </div>
+            <div className="relative w-28 shrink-0">
+              <button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "report-year" ? null : "report-year")} className="flex h-9 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                <span><span className="mr-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Year</span>{year}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "report-year" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} />
+              </button>
+              {completedFilterMenu === "report-year" && <div className="absolute right-0 top-11 z-40 w-28 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">{[2025, 2026, 2027, 2028].map((item) => <button type="button" key={item} onClick={() => { setYear(String(item)); setCompletedFilterMenu(null) }} className={`w-full rounded-lg px-2 py-2 text-left text-xs font-semibold transition ${year === String(item) ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>{item}</button>)}</div>}
+            </div>
           </div>
         </header>
 
@@ -621,7 +639,7 @@ export default function ResearchandDevelopement() {
             </div>
             <div className="flex w-full items-center gap-2 sm:w-auto">
               <div className="relative min-w-0 flex-1 sm:w-28 sm:flex-none"><button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "scope" ? null : "scope")} className="flex h-8 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"><span className="inline-flex items-center gap-1.5"><SlidersHorizontal size={13} className="text-blue-600" />{leadScope}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "scope" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} /></button>{completedFilterMenu === "scope" && <div className="absolute right-0 top-10 z-30 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"><p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Lead visibility</p>{["All", "Owned"].map((scope) => <button type="button" key={scope} onClick={() => { setLeadScope(scope); setCompletedFilterMenu(null) }} className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${leadScope === scope ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}><span>{scope === "All" ? "All leads" : "Assigned to me"}</span>{leadScope === scope && <CheckCircle2 size={13} />}</button>)}</div>}</div>
-            {activeStatusFilter === "Completed" && leadScope === "All" && <div className="flex items-center gap-2">
+            {false && activeStatusFilter === "Completed" && leadScope === "All" && <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-50 text-slate-500"><CalendarDays size={15} /></span>
               <div className="relative min-w-0 flex-1 sm:w-32 sm:flex-none"><button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "month" ? null : "month")} className="flex h-8 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"><span>{month}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "month" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} /></button>{completedFilterMenu === "month" && <div className="absolute right-0 top-10 z-30 grid w-64 grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><p className="col-span-3 px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Select month</p>{months.map((item) => <button type="button" key={item} onClick={() => { setMonth(item); setCompletedFilterMenu(null) }} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${month === item ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>{item.slice(0, 3)}</button>)}</div>}</div>
               <div className="relative w-24 shrink-0"><button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "year" ? null : "year")} className="flex h-8 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"><span>{year}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "year" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} /></button>{completedFilterMenu === "year" && <div className="absolute right-0 top-10 z-30 w-28 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">{[2025, 2026, 2027, 2028].map((item) => <button type="button" key={item} onClick={() => { setYear(String(item)); setCompletedFilterMenu(null) }} className={`w-full rounded-lg px-2 py-2 text-left text-xs font-semibold transition ${year === String(item) ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>{item}</button>)}</div>}</div>
