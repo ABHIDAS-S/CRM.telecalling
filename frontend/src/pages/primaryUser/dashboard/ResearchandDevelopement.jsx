@@ -357,17 +357,15 @@ export default function ResearchandDevelopement() {
   const matchesStatus = (item, status) => {
     if (status === "Completed") return item.status === "Completed"
     if (status === "Overdue") return isOverdue(item)
-    // An overdue task is shown in the Overdue bucket, not counted twice as
-    // both In Progress and Overdue.
-    if (status === "In Progress") return item.status === status && !isOverdue(item)
+    // Overdue is a date condition of an active task, so it remains part of
+    // In Progress while also being available through the Overdue tile.
+    if (status === "In Progress") return item.status === status
     return item.status === status
   }
 
   const statusCounts = workStatuses.map((status) => {
     const count = status.label === "All"
-      ? workStatuses
-        .filter((item) => item.label !== "All")
-        .reduce((total, item) => total + scopedWorkItems.filter((work) => matchesStatus(work, item.label)).length, 0)
+      ? scopedWorkItems.length
       : scopedWorkItems.filter((item) => matchesStatus(item, status.label)).length
 
     return { ...status, count }
@@ -412,7 +410,17 @@ export default function ResearchandDevelopement() {
     setModal("allocation")
   }
 
+  const canOperateTask = (item) =>
+    String(item?.assignedDeveloperId) === String(loggedUser?._id)
+
+  const requireAssignedDeveloper = (item) => {
+    if (canOperateTask(item)) return true
+    toast.error("Only the allocated developer can work on or update this task")
+    return false
+  }
+
   const openUpdate = (item) => {
+    if (!requireAssignedDeveloper(item)) return
     setSelectedWork(item)
     setUpdate({
       status: item.status === "New" ? "Pending" : item.status,
@@ -484,6 +492,7 @@ export default function ResearchandDevelopement() {
   }
 
   const startTask = async (item) => {
+    if (!requireAssignedDeveloper(item)) return
     try {
       const response = await api.post("/lead/rnd-task-update", {
         leadDocId: item.leadDocId,
@@ -498,6 +507,7 @@ export default function ResearchandDevelopement() {
   }
 
   const openEndTask = (item) => {
+    if (!requireAssignedDeveloper(item)) return
     setEndTaskWork(item)
     setTaskDescription("")
     setModal("end-task")
@@ -575,6 +585,7 @@ export default function ResearchandDevelopement() {
   }
 
   const rejectTask = async (item) => {
+    if (item.assignedDeveloperId && !requireAssignedDeveloper(item)) return
     if (!window.confirm(`Reject the Coding & QC task for lead ${item.id}?`)) return
 
     try {

@@ -933,15 +933,15 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
         {/* Main Content Area */}
         <div className="flex flex-1 flex-col overflow-hidden bg-[#ADD8E6] p-2 sm:p-4">
           {/* Top Bar with Title and Controls */}
-          <div className="mb-3 flex shrink-0 flex-col gap-3 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 px-4 py-3.5 text-white shadow-lg sm:px-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300">Lead management</p>
-              <h2 className="mt-0.5 text-lg font-bold tracking-tight sm:text-xl">
+          <div className="mb-2 flex shrink-0 flex-col gap-2 rounded-xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 px-4 py-2.5 text-white shadow-md sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 sm:flex sm:items-baseline sm:gap-2.5">
+              <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-300">Lead management</p>
+              <h2 className="text-base font-bold tracking-tight sm:text-lg">
                 {approvedToggleStatus ? "Approved" : "Pending"} Allocation List
               </h2>
-              <p className="mt-0.5 text-xs text-slate-300">Review incoming leads and assign the right owner with confidence.</p>
+              <p className="hidden text-[11px] text-slate-300 lg:block">Review and assign incoming leads.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               {/* Branch Dropdown */}
               {/* <select
                 onChange={(e) => {
@@ -960,7 +960,7 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                 aria-pressed={approvedToggleStatus}
                 aria-label="Toggle Approval Status"
                 onClick={toggleStatus}
-                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
               >
                 <span>{approvedToggleStatus ? "Approved" : "Pending"}</span>
                 <span className={`flex h-5 w-9 items-center rounded-full p-0.5 transition-colors ${approvedToggleStatus ? "bg-emerald-400" : "bg-slate-500"}`}><span className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${approvedToggleStatus ? "translate-x-4" : "translate-x-0"}`} /></span>
@@ -981,7 +981,7 @@ const itemid=item?.allocatedTo?.id??item?.allocatedTo?._id
                         }
                       })
                 }
-                className="rounded-lg bg-sky-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-300"
+                className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-300"
               >
                 <span className="inline-flex items-center gap-1.5"><Users size={14} /> New Lead</span>
               </button>

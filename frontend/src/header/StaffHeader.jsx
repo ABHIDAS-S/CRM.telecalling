@@ -214,11 +214,6 @@ export default function StaffHeader({
         control: permissions.CallRegistration ?? false
       },
       {
-        to: "/staff/support&department",
-        label: "Support Department",
-        control: permissions.SupportDepartment ?? false
-      },
-      {
         to: "/staff/transaction/leave-application",
         label: "Leave Application",
         control: permissions.LeaveApplication ?? false
@@ -448,7 +443,7 @@ console.log(user?.department?.code)
       ? [{ to: "/staff/reports/researchandDevelopment", label: "Research & Development Dashboard" }]
       : []),
     ...(permissions.SupportDashboard
-      ? [{ to: "/staff/support&department", label: "Support Department Dashboard" }]
+      ? [{ to: "/staff/support&department", label: "Support Department" }]
       : [])
   ].filter(
     (item, index, items) =>
@@ -597,7 +592,7 @@ console.log(user?.department?.code)
 
   return (
     <>
-      <header className="sticky top-0 z-50 h-16 border-b border-slate-300/70 bg-[#ADD8E6] px-4 shadow-[0_2px_12px_rgba(15,23,42,0.10)] sm:px-6">
+      <header className="sticky top-0 z-50 h-16 border-b border-white/10 bg-black px-4 shadow-[0_2px_12px_rgba(15,23,42,0.28)] sm:px-6">
         <div className="grid h-full w-full grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-4">
           {/* Left */}
           <div className="flex min-w-0 items-center gap-3">

@@ -1652,7 +1652,25 @@ const ProductCircleCard = ({
     }),
     menu: (base) => ({
       ...base,
-      zIndex: 9999
+      zIndex: 9999,
+      overflow: "hidden",
+      borderRadius: "10px",
+      border: "1px solid #dfe5ee",
+      boxShadow: "0 14px 30px rgba(15, 23, 42, 0.14)"
+    }),
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+    menuList: (base) => ({ ...base, padding: "4px" }),
+    option: (base, state) => ({
+      ...base,
+      borderRadius: "7px",
+      padding: "8px 10px",
+      fontSize: "12px",
+      backgroundColor: state.isSelected
+        ? "#e0ecff"
+        : state.isFocused
+          ? "#f1f5f9"
+          : "white",
+      color: state.isSelected ? "#1d4ed8" : "#334155"
     })
   }
   const renderRows = (statusType) => {
@@ -2470,29 +2488,35 @@ const ProductCircleCard = ({
                               Call Notes
                             </label>
 
-                            <select
-                              {...register("callnote", {
-                                required: "please select a callnote",
-                                onChange: (e) =>
-                                  hanldeCheckforsamecallnoteforsamecustomer(
-                                    e.target.value
-                                  )
-                              })}
-                              className="mt-1 block w-full rounded-md border border-gray-300 p-1.5 text-sm shadow-sm outline-none"
+                            <Controller
+                              name="callnote"
+                              control={control}
+                              rules={{ required: "please select a callnote" }}
                               defaultValue=""
-                            >
-                              <option value="" disabled>
-                                Select Callnote
-                              </option>
-                              {callnote.map((callnotes) => (
-                                <option
-                                  key={callnotes._id}
-                                  value={`${callnotes._id}|${callnotes.callNotes}`}
-                                >
-                                  {callnotes.callNotes}
-                                </option>
-                              ))}
-                            </select>
+                              render={({ field }) => {
+                                const options = callnote.map((note) => ({
+                                  value: `${note._id}|${note.callNotes}`,
+                                  label: note.callNotes
+                                }))
+                                return (
+                                  <Select
+                                    inputId="callnote"
+                                    className="mt-1"
+                                    options={options}
+                                    value={options.find((option) => option.value === field.value) || null}
+                                    onChange={(option) => {
+                                      const value = option?.value || ""
+                                      field.onChange(value)
+                                      hanldeCheckforsamecallnoteforsamecustomer(value)
+                                    }}
+                                    placeholder="Select call note"
+                                    styles={compactSelectStyles}
+                                    menuPortalTarget={document.body}
+                                    menuPosition="fixed"
+                                  />
+                                )
+                              }}
+                            />
 
                             {errors.callnote && (
                               <span className="mt-1 block text-xs text-red-600">
@@ -2562,14 +2586,19 @@ const ProductCircleCard = ({
                             >
                               Status
                             </label>
-                            <select
-                              {...register("status", { required: true })}
-                              className="mt-1 block w-full rounded-md border border-gray-300 p-1.5 text-sm shadow-sm outline-none"
+                            <Controller
+                              name="status"
+                              control={control}
+                              rules={{ required: true }}
                               defaultValue="pending"
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="solved">Solved</option>
-                            </select>
+                              render={({ field }) => {
+                                const options = [
+                                  { value: "pending", label: "Pending" },
+                                  { value: "solved", label: "Solved" }
+                                ]
+                                return <Select inputId="status" className="mt-1" options={options} value={options.find((option) => option.value === field.value) || options[0]} onChange={(option) => field.onChange(option?.value)} styles={compactSelectStyles} menuPortalTarget={document.body} menuPosition="fixed" />
+                              }}
+                            />
                           </div>
                         </div>
 
@@ -2600,13 +2629,19 @@ const ProductCircleCard = ({
                           >
                             Email Send
                           </label>
-                          <select
-                            {...register("emailSend", { required: true })}
-                            className="mt-1 block w-24 rounded-md border border-gray-300 p-1.5 text-sm shadow-sm outline-none"
-                          >
-                            <option value={true}>True</option>
-                            <option value={false}>False</option>
-                          </select>
+                          <Controller
+                            name="emailSend"
+                            control={control}
+                            rules={{ required: true }}
+                            defaultValue="true"
+                            render={({ field }) => {
+                              const options = [
+                                { value: "true", label: "Yes" },
+                                { value: "false", label: "No" }
+                              ]
+                              return <Select inputId="emailSend" className="mt-1 w-28" options={options} value={options.find((option) => option.value === String(field.value)) || options[0]} onChange={(option) => field.onChange(option?.value)} styles={compactSelectStyles} menuPortalTarget={document.body} menuPosition="fixed" />
+                            }}
+                          />
                         </div>
 
                         <Link
@@ -2799,18 +2834,14 @@ const ProductCircleCard = ({
 
                       {popupType === "Primaryproduct" && (
                         <PopupField label="Software Trade">
-                          <select
-                            {...register("softwareTrade")}
-                            disabled={true}
-                            className={compactPopupInputClass}
-                          >
-                            <option value="">Select Software Trade</option>
-                            {softwareTrades.map((trade, index) => (
-                              <option key={index} value={trade}>
-                                {trade}
-                              </option>
-                            ))}
-                          </select>
+                          <Controller
+                            name="softwareTrade"
+                            control={control}
+                            render={({ field }) => {
+                              const options = softwareTrades.map((trade) => ({ value: trade, label: trade }))
+                              return <Select inputId="softwareTrade" isDisabled options={options} value={options.find((option) => option.value === field.value) || null} styles={compactSelectStyles} />
+                            }}
+                          />
                         </PopupField>
                       )}
 
@@ -2844,13 +2875,17 @@ const ProductCircleCard = ({
                       )}
 
                       <PopupField label="Status">
-                        <select
-                          {...register("isActive")}
-                          className={compactPopupInputClass}
-                        >
-                          <option value="Running">Active</option>
-                          <option value="Deactive">Deactive</option>
-                        </select>
+                        <Controller
+                          name="isActive"
+                          control={control}
+                          render={({ field }) => {
+                            const options = [
+                              { value: "Running", label: "Active" },
+                              { value: "Deactive", label: "Deactive" }
+                            ]
+                            return <Select inputId="isActive" options={options} value={options.find((option) => option.value === field.value) || options[0]} onChange={(option) => field.onChange(option?.value)} styles={compactSelectStyles} menuPortalTarget={document.body} menuPosition="fixed" />
+                          }}
+                        />
                       </PopupField>
 
                       {popupType === "Additionalservice" && (

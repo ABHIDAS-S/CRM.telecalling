@@ -12605,6 +12605,15 @@ export const GetStaffCallList = async (req, res) => {
                       attendee?.callerId?.toString() === completedByCallerId
                   ) !== -1
 
+                const callStart = new Date(calls?.timedata?.startTime).getTime()
+                const callEnd = new Date(calls?.timedata?.endTime).getTime()
+                const totalDurationSeconds =
+                  !Number.isNaN(callStart) &&
+                  !Number.isNaN(callEnd) &&
+                  callEnd >= callStart
+                    ? Math.floor((callEnd - callStart) / 1000)
+                    : 0
+
                 return {
                   callDate: call.calldate,
                   callerId: callerIdString || null,
@@ -12624,6 +12633,7 @@ export const GetStaffCallList = async (req, res) => {
                         : 1,
                   solvedCalls: isColleagueSolved ? 1 : 0,
                   datecalls: 1,
+                  totalDurationSeconds,
                   pendingCalls: calls.formdata.completedBy?.[0] ? 0 : 1,
                   todaysCalls: callDate === today ? 1 : 0,
                   selected: matchedUser ? matchedUser.selected : false
