@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import MyDatePicker from "../../../components/common/MyDatePicker"
 import { PropagateLoader } from "react-spinners"
 import { BarLoader } from "react-spinners"
@@ -477,8 +477,16 @@ console.log(filteredselectedCategory)
 
   useEffect(() => {
     if (isModalOpen && selectedCustomer) {
-      const customerData = callList
-        .filter((customer) => String(customer._id) === String(selectedCustomer)) // Filter for the selected customer
+      const selectedCustomerRecord =
+        callList.find(
+          (customer) =>
+            String(customer._id) === String(selectedCustomer.id) &&
+            customer.customerName === selectedCustomer.name
+        ) ||
+        callList.find((customer) => customer.customerName === selectedCustomer.name)
+
+      const customerData = selectedCustomerRecord
+        ? [selectedCustomerRecord]
         .map((customer) => {
           const today = new Date().toISOString().slice(0, 10) // Get today's date in YYYY-MM-DD format
 
@@ -517,7 +525,8 @@ console.log(filteredselectedCategory)
             todaysCalls,
             allCalls // Detailed call records for listing in a table
           }
-        })[0] // Assuming there's only one customer with this name
+        })[0]
+        : null
 
       if (!customerData) {
         setCustomerCalls(null)
@@ -883,16 +892,16 @@ setActiveUserId(userId)
     setIsToggled(!isToggled)
     setTotalCalls(0)
   }
-  const openModal = (id) => {
+  const openModal = (item) => {
     setExpandedCallRows({})
     setCalls([])
     setUserCalls([])
     setCustomerCalls(null)
     setResult({})
     if (isToggled) {
-      setSelectedUser(id)
+      setSelectedUser(item)
     } else {
-      setSelectedCustomer(id)
+      setSelectedCustomer({ id: item.customerId, name: item.customerName })
     }
     setIsModalOpen(true)
   }
@@ -1133,9 +1142,7 @@ console.log(selectedBranch)
                           <td className="px-3 py-2.5 text-center text-xs">
                             <button
                               onClick={() =>
-                                openModal(
-                                  isToggled ? item.name : item.customerId
-                                )
+                                openModal(isToggled ? item.name : item)
                               }
                               className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100 hover:text-indigo-900"
                             >
@@ -1217,14 +1224,15 @@ console.log(selectedBranch)
                 <tbody className="divide-gray-200">
                   {isToggled ? (
                     userCalls?.length > 0 ? (
-                      userCalls?.map((call) =>
-                        call?.callregistration.map((reg) => {
+                      userCalls?.map((call, customerIndex) =>
+                        call?.callregistration.map((reg, registrationIndex) => {
+                          const rowKey = `user-${reg?._id || reg?.timedata?.token || `${call?.customerid?._id || customerIndex}-${reg?.timedata?.startTime || registrationIndex}`}`
                           return (
-                            <>
-                              <tr key={reg._id} className={`transition-colors ${getCallTone(reg)}`}>
+                            <Fragment key={rowKey}>
+                              <tr className={`transition-colors ${getCallTone(reg)}`}>
                                 <td className="border-b border-slate-300 px-1 py-1 text-center align-middle">
-                                  <button type="button" onClick={() => setExpandedCallRows((prev) => ({ ...prev, [`user-${reg._id}`]: !prev[`user-${reg._id}`] }))} className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-400 bg-white/90 text-[9px] font-bold text-slate-700 shadow-sm transition hover:bg-white">
-                                    <span className={`transition-transform ${expandedCallRows[`user-${reg._id}`] ? "rotate-180" : ""}`}>▼</span>
+                                  <button type="button" onClick={() => setExpandedCallRows((prev) => ({ ...prev, [rowKey]: !prev[rowKey] }))} className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-400 bg-white/90 text-[9px] font-bold text-slate-700 shadow-sm transition hover:bg-white">
+                                    <span className={`transition-transform ${expandedCallRows[rowKey] ? "rotate-180" : ""}`}>▼</span>
                                   </button>
                                 </td>
                                 <td className="break-words border-b border-slate-300 px-2 py-1 align-top text-slate-900">{call?.customerid?.customerName || "N/A"}</td>
@@ -1236,7 +1244,7 @@ console.log(selectedBranch)
                                 <td className="whitespace-nowrap border-b border-slate-300 px-2 py-1 align-top text-slate-800">{formatCallDateTime(reg?.timedata?.endTime)}</td>
                                 <td className="whitespace-nowrap border-b border-slate-300 px-2 py-1 align-top font-medium text-slate-800">{formatCallDuration(reg?.timedata?.startTime, reg?.timedata?.endTime)}</td>
                               </tr>
-                              {expandedCallRows[`user-${reg._id}`] && <tr className="bg-slate-200 text-left">
+                              {expandedCallRows[rowKey] && <tr className="bg-slate-200 text-left">
                                 <td colSpan={9} className="border-b border-slate-300 px-3 py-2">
                                   <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-3">
                                     <div className="min-w-0"><span className="block text-[9px] font-bold uppercase tracking-wide text-slate-500">Description</span><span className="block truncate text-slate-800" title={reg?.formdata?.description || "N/A"}>{reg?.formdata?.description || "N/A"}</span></div>
@@ -1245,7 +1253,7 @@ console.log(selectedBranch)
                                   </div>
                                 </td>
                               </tr>}
-                            </>
+                            </Fragment>
                           )
                         })
                       )
@@ -1257,13 +1265,14 @@ console.log(selectedBranch)
                       </tr>
                     )
                   ) : (
-                    Calls.map((call) => {
+                    Calls.map((call, index) => {
+                      const rowKey = `customer-${call?._id || call?.timedata?.token || `${call?.timedata?.startTime || "call"}-${index}`}`
                       return (
-                        <>
-                          <tr key={call._id} className={`transition-colors ${getCallTone(call)}`}>
+                        <Fragment key={rowKey}>
+                          <tr className={`transition-colors ${getCallTone(call)}`}>
                             <td className="border-b border-slate-300 px-1 py-1 text-center align-middle">
-                              <button type="button" onClick={() => setExpandedCallRows((prev) => ({ ...prev, [`customer-${call._id}`]: !prev[`customer-${call._id}`] }))} className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-400 bg-white/90 text-[9px] font-bold text-slate-700 shadow-sm transition hover:bg-white">
-                                <span className={`transition-transform ${expandedCallRows[`customer-${call._id}`] ? "rotate-180" : ""}`}>▼</span>
+                              <button type="button" onClick={() => setExpandedCallRows((prev) => ({ ...prev, [rowKey]: !prev[rowKey] }))} className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-400 bg-white/90 text-[9px] font-bold text-slate-700 shadow-sm transition hover:bg-white">
+                                <span className={`transition-transform ${expandedCallRows[rowKey] ? "rotate-180" : ""}`}>▼</span>
                               </button>
                             </td>
                             <td className="break-words border-b border-slate-300 px-2 py-1 align-top text-slate-900">{customerCalls?.customerName || "N/A"}</td>
@@ -1275,7 +1284,7 @@ console.log(selectedBranch)
                             <td className="whitespace-nowrap border-b border-slate-300 px-2 py-1 align-top text-slate-800">{formatCallDateTime(call?.timedata?.endTime)}</td>
                             <td className="whitespace-nowrap border-b border-slate-300 px-2 py-1 align-top font-medium text-slate-800">{formatCallDuration(call?.timedata?.startTime, call?.timedata?.endTime)}</td>
                           </tr>
-                          {expandedCallRows[`customer-${call._id}`] && <tr className="bg-slate-200 text-left">
+                          {expandedCallRows[rowKey] && <tr className="bg-slate-200 text-left">
                             <td colSpan={9} className="border-b border-slate-300 px-3 py-2">
                               <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-3">
                                 <div className="min-w-0"><span className="block text-[9px] font-bold uppercase tracking-wide text-slate-500">Description</span><span className="block truncate text-slate-800" title={call?.formdata?.description || "N/A"}>{call?.formdata?.description || "N/A"}</span></div>
@@ -1284,7 +1293,7 @@ console.log(selectedBranch)
                               </div>
                             </td>
                           </tr>}
-                        </>
+                        </Fragment>
                       )
                     })
                   )}
