@@ -3695,6 +3695,72 @@ const buildIncentiveReportData = async ({
         ? total + num(entry.receivedAmount)
         : total;
     }, 0);
+  // Payment receipts are stored tax-inclusive. Percentage incentives must be
+  // calculated on the tax-exclusive receipt amount, while fixed incentives
+  // and collection caps continue to use the original inclusive value.
+  const getEntryTaxRate = (lead, entry) => {
+    const productId = String(entry?.productorServiceId || "");
+    const leadItem = objects(lead.leadFor).find(
+      (item) => String(item?.productorServiceId || "") === productId
+    );
+    const leadTaxableAmount = Math.max(
+      num(lead.netAmount) - num(lead.taxAmount),
+      0
+    );
+    const derivedLeadRate = leadTaxableAmount > 0
+      ? (num(lead.taxAmount) / leadTaxableAmount) * 100
+      : 0;
+    const inclusiveAmount = num(
+      leadItem?.taxinclusiveamount ?? leadItem?.actualNetAmount
+    );
+    const exclusiveAmount = num(
+      leadItem?.taxexclusiveAmount ?? leadItem?.productPrice
+    );
+    const derivedItemRate = exclusiveAmount > 0 && inclusiveAmount >= exclusiveAmount
+      ? ((inclusiveAmount - exclusiveAmount) / exclusiveAmount) * 100
+      : 0;
+
+    return [
+      entry?.leadTax,
+      entry?.taxRate,
+      entry?.tax,
+      entry?.hsn,
+      leadItem?.leadTax,
+      leadItem?.taxRate,
+      leadItem?.hsn,
+      leadItem?.actualHsn,
+      derivedItemRate,
+      derivedLeadRate,
+    ]
+      .map((value) => Number(value))
+      .find((value) => Number.isFinite(value) && value >= 0) || 0;
+  };
+  const getTaxExclusiveCategoryPaymentAmount = (
+    lead,
+    payment,
+    categoryId,
+    cappedInclusiveAmount
+  ) => {
+    let remainingInclusiveAmount = Math.max(num(cappedInclusiveAmount), 0);
+
+    return objects(payment.paymentEntries).reduce((total, entry) => {
+      if (
+        remainingInclusiveAmount <= 0 ||
+        categoryMap.get(String(entry.productorServiceId || "")) !==
+          String(categoryId)
+      ) {
+        return total;
+      }
+
+      const inclusiveAmount = Math.min(
+        num(entry.receivedAmount),
+        remainingInclusiveAmount
+      );
+      remainingInclusiveAmount -= inclusiveAmount;
+      const taxRate = getEntryTaxRate(lead, entry);
+      return total + inclusiveAmount / (1 + taxRate / 100);
+    }, 0);
+  };
   const getCappedVerifiedCategoryAmountsByPayment = (lead, categoryId) => {
     const cappedAmounts = new Map();
     const netAmount = Math.max(num(lead.netAmount), 0);
@@ -3724,9 +3790,26 @@ const buildIncentiveReportData = async ({
 
     return cappedAmounts;
   };
-  const getLeadVerifiedCategoryAmount = (lead, categoryId) =>
-    [...getCappedVerifiedCategoryAmountsByPayment(lead, categoryId).values()]
-      .reduce((total, amount) => total + amount, 0);
+  const getLeadVerifiedTaxExclusiveCategoryAmount = (lead, categoryId) => {
+    const cappedAmounts = getCappedVerifiedCategoryAmountsByPayment(
+      lead,
+      categoryId
+    );
+
+    return objects(lead.paymentHistory).reduce(
+      (total, payment, paymentIndex) =>
+        payment.paymentVerified === true
+          ? total +
+            getTaxExclusiveCategoryPaymentAmount(
+              lead,
+              payment,
+              categoryId,
+              cappedAmounts.get(paymentIndex) || 0
+            )
+          : total,
+      0
+    );
+  };
   const isCompleted = (activity) =>
     activity.taskClosed === true ||
     activity.followupClosed === true ||
@@ -3763,6 +3846,10 @@ const buildIncentiveReportData = async ({
     (activityIndex === 0 ? lead.leadDate : null);
 
   for (const lead of leads) {
+    // A discounted lead still contributes to target achievement (calculated
+    // elsewhere), but must never create an incentive of any type.
+    if (num(lead.discountAmount) > 0) continue;
+
     const payments = objects(lead.paymentHistory);
     const fullyPaidEligible =
       num(lead.netAmount) > 0 &&
@@ -3925,8 +4012,14 @@ const buildIncentiveReportData = async ({
             const catchUpAmount = verifiedPayments
               .filter(({ verifiedAt }) => verifiedAt <= completedAt)
               .reduce(
-                (total, { paymentIndex }) =>
-                  total + (cappedPaymentAmounts.get(paymentIndex) || 0),
+                (total, { payment, paymentIndex }) =>
+                  total +
+                  getTaxExclusiveCategoryPaymentAmount(
+                    lead,
+                    payment,
+                    categoryId,
+                    cappedPaymentAmounts.get(paymentIndex) || 0
+                  ),
                 0
               );
 
@@ -3953,11 +4046,19 @@ const buildIncentiveReportData = async ({
 
             const paymentAmount = cappedPaymentAmounts.get(paymentIndex) || 0;
             if (paymentAmount <= 0) continue;
+            const taxExclusivePaymentAmount =
+              getTaxExclusiveCategoryPaymentAmount(
+                lead,
+                payment,
+                categoryId,
+                paymentAmount
+              );
+            if (taxExclusivePaymentAmount <= 0) continue;
 
             awardActivity({
               activity,
               activityIndex,
-              percentageBaseAmount: paymentAmount,
+              percentageBaseAmount: taxExclusivePaymentAmount,
               eventDate: verifiedAt,
               paymentKey: String(payment._id || paymentIndex),
             });
@@ -3974,8 +4075,8 @@ const buildIncentiveReportData = async ({
             activity,
             activityIndex,
             percentageBaseAmount: lead.forcefullyClosedTarget === true
-              ? num(lead.netAmount)
-              : getLeadVerifiedCategoryAmount(lead, categoryId),
+              ? taxExclusiveLeadAmount
+              : getLeadVerifiedTaxExclusiveCategoryAmount(lead, categoryId),
             eventDate: lastVerifiedPayment.verifiedAt,
           });
         }

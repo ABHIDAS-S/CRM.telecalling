@@ -1881,28 +1881,42 @@ const LeadFollowUp = () => {
           const neverFollowupLeads = leads.filter((lead) => {
             const logs = lead.activityLog || []
 
-            // 1️⃣ Get last followup allocation index
-            const lastFollowupIndex = [...logs]
+            // Use the same definition as the Marketing Dashboard: the most
+            // recent active follow-up allocation with no follow-up activity
+            // and no task allocation after it.
+            const lastFollowupAllocation = [...logs]
               .map((log, index) => ({ ...log, index }))
-              .filter((log) => log.taskTo === "followup")
-              .pop()?.index
+              .filter(
+                (log) =>
+                  log.taskTo === "followup" &&
+                  log.taskallocatedTo &&
+                  log.allocationChanged !== true
+              )
+              .pop()
 
-            // ❌ No followup task at all
-            if (lastFollowupIndex === undefined) return false
+            if (!lastFollowupAllocation) return false
 
-            // 2️⃣ Get logs AFTER last followup allocation
-            const logsAfterFollowup = logs.slice(lastFollowupIndex + 1)
+            const logsAfterFollowup = logs.slice(lastFollowupAllocation.index + 1)
 
-            // 3️⃣ Check if any nextFollowUpDate exists after that
             const hasNextFollowupDate = logsAfterFollowup.some(
               (log) =>
                 log.nextFollowUpDate &&
                 new Date(log.nextFollowUpDate) > new Date("2000-01-01")
             )
+            const hasTaskAllocationAfterFollowup = logsAfterFollowup.some(
+              (log) => Boolean(log.taskallocatedTo)
+            )
+            const followupWasClosed =
+              Boolean(lastFollowupAllocation.followupClosed) ||
+              logsAfterFollowup.some((log) => Boolean(log.followupClosed))
 
-            // 4️⃣ If NOT → it's never followup
             return (
-              !hasNextFollowupDate && !lead.leadConvertedDate && !lead.leadLost
+              !hasNextFollowupDate &&
+              !hasTaskAllocationAfterFollowup &&
+              !followupWasClosed &&
+              !lead.leadConvertedDate &&
+              !lead.leadLost &&
+              !lead.leadClosed
             )
           })
           const groupedLeads = {}

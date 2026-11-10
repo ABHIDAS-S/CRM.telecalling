@@ -832,12 +832,19 @@ export const UpdateServices = async (req, res) => {
 export const GetselectedDateCalls = async (req, res) => {
   try {
     const { startDate, endDate } = req.query
+    const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1)
+    const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 50, 1), 100)
+    const skip = (page - 1) * limit
 
     const start = new Date(startDate);
 
     start.setHours(0, 0, 0, 0); // Start of the day
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999); // End of the day
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+      return res.status(400).json({ message: "A valid start and end date are required" })
+    }
 
 
     // const customerCalls = await CallRegistration.aggregate([
@@ -1053,11 +1060,124 @@ export const GetselectedDateCalls = async (req, res) => {
     //     }
     //   }
     // ])
+    // Summary only needs matching calls and their product names. Filter and
+    // paginate before the product lookup so long reports return immediately.
+    const summaryRangePipeline = [
+      {
+        $match: {
+          "callregistration.timedata.startTime": { $gte: start, $lte: end }
+        }
+      },
+      {
+        $project: {
+          customerName: 1,
+          callregistration: {
+            $filter: {
+              input: "$callregistration",
+              as: "call",
+              cond: {
+                $and: [
+                  { $ne: ["$$call.timedata.startTime", null] },
+                  { $gte: ["$$call.timedata.startTime", start] },
+                  { $lte: ["$$call.timedata.startTime", end] }
+                ]
+              }
+            }
+          }
+        }
+      },
+      { $match: { callregistration: { $ne: [] } } }
+    ]
+
+    const summaryCustomerCalls = await CallRegistration.aggregate([
+        ...summaryRangePipeline,
+        { $skip: skip },
+        { $limit: limit + 1 },
+      {
+        $lookup: {
+          from: "products",
+          localField: "callregistration.product",
+          foreignField: "_id",
+          as: "productDetails"
+        }
+      },
+      {
+        $addFields: {
+          callregistration: {
+            $map: {
+              input: "$callregistration",
+              as: "registration",
+              in: {
+                $mergeObjects: [
+                  "$$registration",
+                  {
+                    productdetails: {
+                      $arrayElemAt: [
+                        {
+                          $filter: {
+                            input: "$productDetails",
+                            as: "product",
+                            cond: { $eq: ["$$product._id", "$$registration.product"] }
+                          }
+                        },
+                        0
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          customerName: 1,
+          callregistration: {
+            $map: {
+              input: "$callregistration",
+              as: "registration",
+              in: {
+                product: "$$registration.product",
+                productdetails: {
+                  productName: "$$registration.productdetails.productName"
+                },
+                license: "$$registration.license",
+                branchName: "$$registration.branchName",
+                timedata: "$$registration.timedata",
+                formdata: {
+                  status: "$$registration.formdata.status",
+                  incomingNumber: "$$registration.formdata.incomingNumber",
+                  description: "$$registration.formdata.description",
+                  solution: "$$registration.formdata.solution"
+                }
+              }
+            }
+          }
+        }
+      }
+      ]).allowDiskUse(true)
+
+    const hasMore = summaryCustomerCalls.length > limit
+    const pagedCustomerCalls = hasMore
+      ? summaryCustomerCalls.slice(0, limit)
+      : summaryCustomerCalls
+
+    return res.status(200).json({
+      message: "customercalls found",
+      data: pagedCustomerCalls,
+      pagination: {
+        page,
+        limit,
+        hasMore
+      }
+    })
+
     const customerCalls = await CallRegistration.aggregate([
       {
         $match: {
           callregistration: { $exists: true, $ne: [] },
-          "callregistration.formdata.attendedBy": { $type: "array" }
+          "callregistration.timedata.startTime": { $gte: start, $lte: end }
         }
       },
 
@@ -1068,42 +1188,10 @@ export const GetselectedDateCalls = async (req, res) => {
               input: "$callregistration",
               as: "call",
               cond: {
-                $gt: [
-                  {
-                    $size: {
-                      $filter: {
-                        input: {
-                          $ifNull: ["$$call.formdata.attendedBy", []]
-                        },
-                        as: "attendee",
-                        cond: {
-                          $and: [
-                            { $ne: ["$$attendee.calldate", null] },
-                            { $ne: ["$$attendee.calldate", ""] },
-                            {
-                              $in: [
-                                { $type: "$$attendee.calldate" },
-                                ["string", "date"]
-                              ]
-                            },
-                            {
-                              $gte: [
-                                { $toDate: "$$attendee.calldate" },
-                                start
-                              ]
-                            },
-                            {
-                              $lte: [
-                                { $toDate: "$$attendee.calldate" },
-                                end
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    }
-                  },
-                  0
+                $and: [
+                  { $ne: ["$$call.timedata.startTime", null] },
+                  { $gte: ["$$call.timedata.startTime", start] },
+                  { $lte: ["$$call.timedata.startTime", end] }
                 ]
               }
             }

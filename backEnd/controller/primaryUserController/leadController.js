@@ -13991,6 +13991,19 @@ export const GetfollowupsummaryReport = async (req, res) => {
                 ]
               }
             }
+          },
+          taskAllocationEntriesAfterAssign: {
+            $filter: {
+              input: "$entriesAfterAssign",
+              as: "item",
+              cond: {
+                $and: [
+                  { $ne: ["$$item.log.taskallocatedTo", null] },
+                  { $ne: ["$$item.log.taskallocatedToModel", null] },
+                  { $in: ["$$item.log.taskallocatedToModel", ["Staff", "Admin"]] }
+                ]
+              }
+            }
           }
         }
       },
@@ -13999,7 +14012,8 @@ export const GetfollowupsummaryReport = async (req, res) => {
         $addFields: {
           lastNextFollowupEntry: { $arrayElemAt: ["$nextFollowupEntries", -1] },
           hasNextFollowup: { $gt: [{ $size: "$nextFollowupEntries" }, 0] },
-          hasClosedEntryAfterAssign: { $gt: [{ $size: "$closedEntriesAfterAssign" }, 0] }
+          hasClosedEntryAfterAssign: { $gt: [{ $size: "$closedEntriesAfterAssign" }, 0] },
+          hasTaskAllocationAfterAssign: { $gt: [{ $size: "$taskAllocationEntriesAfterAssign" }, 0] }
         }
       },
 
@@ -14089,6 +14103,9 @@ export const GetfollowupsummaryReport = async (req, res) => {
                 { case: "$isLeadLost", then: "excluded" },
                 { case: "$isAssignFollowupClosed", then: "excluded" },
                 { case: "$hasClosedEntryAfterAssign", then: "excluded" },
+                // A task allocated after the initial follow-up assignment is
+                // already being worked on, so it cannot remain a New Lead.
+                { case: "$hasTaskAllocationAfterAssign", then: "excluded" },
                 { case: "$isClosedLeadOutsideWindow", then: "excluded" },
                 {
                   case: {
@@ -16415,6 +16432,16 @@ export const UpdateResearchAndDevelopmentTask = async (req, res) => {
         return res.status(400).json({ success: false, message: "Coding & QC is not the latest activity" });
       }
 
+      const activeAllocation = [...lead.activityLog]
+        .reverse()
+        .find((log) => String(log.taskId) === codingAndQcTaskId && log.taskallocatedTo);
+      if (
+        activeAllocation?.taskallocatedTo &&
+        String(activeAllocation.taskallocatedTo) !== String(req.owner?.userId)
+      ) {
+        return res.status(403).json({ success: false, message: "Only the assigned developer can reject this task" });
+      }
+
       const followupReturnAllocationType = "689c22e93e94902039b9772b";
       // Remove only the contiguous Coding & QC entries at the end of the log.
       // Older Coding & QC history must remain intact.
@@ -16472,8 +16499,8 @@ export const UpdateResearchAndDevelopmentTask = async (req, res) => {
       return res.status(404).json({ success: false, message: "Coding & QC allocation was not found" });
     }
 
-    if (["start", "end"].includes(action) && String(allocationLog.taskallocatedTo) !== String(req.owner?.userId)) {
-      return res.status(403).json({ success: false, message: "Only the assigned developer can start or end this task" });
+    if (["start", "end", "status"].includes(action) && String(allocationLog.taskallocatedTo) !== String(req.owner?.userId)) {
+      return res.status(403).json({ success: false, message: "Only the assigned developer can work on or update this task" });
     }
 
     if (["Hold", "Completed"].includes(allocationLog.taskStatus) && ["start", "end"].includes(action)) {
@@ -16627,6 +16654,10 @@ export const TransferResearchAndDevelopmentTask = async (req, res) => {
 
     if (!currentAllocation) {
       return res.status(400).json({ success: false, message: "An in-progress Coding & QC task was not found" });
+    }
+
+    if (String(currentAllocation.taskallocatedTo) !== String(transferredBy)) {
+      return res.status(403).json({ success: false, message: "Only the assigned developer can transfer this task" });
     }
 
     if (String(currentAllocation.taskallocatedTo) === String(transferredTo)) {

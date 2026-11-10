@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import MyDatePicker from "../../../components/common/MyDatePicker"
 import { PropagateLoader } from "react-spinners"
 import { BarLoader } from "react-spinners"
@@ -7,12 +7,18 @@ import api from "../../../api/api"
 import UseFetch from "../../../hooks/useFetch"
 import { PerformanceModal } from "../../../components/primaryUser/PerformanceModal"
 import { StaticSidebar } from "../../../components/primaryUser/StaticSidebar"
+import SkeletonTable from "../../../components/loader/SkeletonTable"
 import AdminHeader from "../../../header/AdminHeader"
 import StaffHeader from "../../../header/StaffHeader"
 import BranchDropdown from "../../../components/primaryUser/BranchDropdown"
+import Tiles from "../../../components/common/Tiles"
 import {
   Eye,
+  BadgeCheck,
   Phone,
+  PhoneCall,
+  PhoneIncoming,
+  PhoneMissed,
   Mail,
   Settings,
   MessageSquareText,
@@ -31,26 +37,57 @@ import {
   CircleCheck
 } from "lucide-react"
 
-// eslint-disable-next-line react/prop-types
-const ModalStat = ({ label, value, tone }) => (
-  <div className={`rounded-lg border px-3 py-2 ${tone}`}>
-    <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">{label}</p>
-    <p className="mt-0.5 text-xl font-bold leading-none">{value ?? 0}</p>
-  </div>
-)
-
 const getCallTone = (call) => {
   const status = String(call?.formdata?.status || "").toLowerCase()
-  if (status === "online") return "bg-blue-50 hover:bg-blue-100"
-  if (status === "solved") return "bg-emerald-50 hover:bg-emerald-100"
+  if (status === "online") return "bg-gradient-to-r from-blue-300 via-sky-100 to-blue-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),inset_0_-1px_0_rgba(30,64,175,0.20)] hover:from-blue-400 hover:via-sky-200 hover:to-blue-300"
+  if (status === "solved") return "bg-gradient-to-r from-emerald-300 via-emerald-100 to-teal-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(6,95,70,0.20)] hover:from-emerald-400 hover:via-emerald-200 hover:to-teal-300"
 
   const startDate = call?.timedata?.startTime
     ? new Date(call.timedata.startTime).toISOString().slice(0, 10)
     : ""
   const today = new Date().toISOString().slice(0, 10)
   return startDate === today
-    ? "bg-amber-50 hover:bg-amber-100"
-    : "bg-rose-50 hover:bg-rose-100"
+    ? "bg-gradient-to-r from-amber-300 via-yellow-100 to-amber-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(146,64,14,0.20)] hover:from-amber-400 hover:via-yellow-200 hover:to-amber-300"
+    : "bg-gradient-to-r from-rose-300 via-rose-100 to-red-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(159,18,57,0.20)] hover:from-rose-400 hover:via-rose-200 hover:to-red-300"
+}
+
+const formatCallDateTime = (value) => {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "—"
+  return `${date.toLocaleDateString("en-GB")} ${date.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  })}`
+}
+
+const formatCallDuration = (startTime, endTime) => {
+  const start = new Date(startTime).getTime()
+  const end = new Date(endTime).getTime()
+  if (!startTime || !endTime || Number.isNaN(start) || Number.isNaN(end) || end < start) return "—"
+
+  const totalSeconds = Math.floor((end - start) / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  return `${hours} hr ${minutes} min ${seconds} sec`
+}
+
+const formatTotalDuration = (value) => {
+  const totalSeconds = Math.max(0, Number(value) || 0)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  return `${hours} hr ${minutes} min ${seconds} sec`
+}
+
+const toApiDate = (value) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${date.getFullYear()}-${month}-${day}`
 }
 
 const Summary = () => {
@@ -78,6 +115,10 @@ const [selectedCompanyBranch,setselectedCompanyBranch]=useState(null)
   const [isToggled, setIsToggled] = useState(false)
   const [dates, setDates] = useState({ startDate: "", endDate: "" })
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [summaryPage, setSummaryPage] = useState(1)
+  const [hasMoreSummaryPages, setHasMoreSummaryPages] = useState(true)
+  const summaryLoadMoreRef = useRef(null)
   const [selectedUserName, setselecteduserName] = useState(null)
   const [selectedCategory, setselectedCategory] = useState(null)
   const [selectedDatapopup, setselectedDataPopup] = useState({})
@@ -109,7 +150,7 @@ const now=new Date()
       const userData = localStorage.getItem("user")
       const user = JSON.parse(userData)
       setloggedUsers(user)
-console.log(user.selected[0].branch_id)
+
 setselectedCompanyBranch(user.selected[0].branch_id)
       user.selected.forEach((branches) =>
         setBranch((prev) => [
@@ -233,6 +274,7 @@ console.log(filteredselectedCategory)
                     existingEntry.colleagueSolved += call.colleagueSolved || 0
                     existingEntry.todaysCalls += call.todaysCalls || 0
                     existingEntry.datecalls += call.datecalls || 0
+                  existingEntry.totalDurationSeconds += call.totalDurationSeconds || 0
                   } else {
                     updatedList.push({
                       _id: call.callerId,
@@ -241,6 +283,7 @@ console.log(filteredselectedCategory)
                       pendingCalls: call.pendingCalls || 0,
                       colleagueSolved: call.colleagueSolved || 0,
                       datecalls: call.datecalls || 0,
+                      totalDurationSeconds: call.totalDurationSeconds || 0,
                       todaysCalls: call.todaysCalls || 0,
                       selected: call.selected || []
                     })
@@ -278,6 +321,7 @@ console.log(filteredselectedCategory)
                     existingEntry.colleagueSolved += call.colleagueSolved || 0
                     existingEntry.todaysCalls += call.todaysCalls || 0
                     existingEntry.datecalls += call.datecalls || 0
+                  existingEntry.totalDurationSeconds += call.totalDurationSeconds || 0
                   } else {
                     updatedList.push({
                       _id: call.callerId,
@@ -286,6 +330,7 @@ console.log(filteredselectedCategory)
                       pendingCalls: call.pendingCalls || 0,
                       colleagueSolved: call.colleagueSolved || 0,
                       datecalls: call.datecalls || 0,
+                      totalDurationSeconds: call.totalDurationSeconds || 0,
                       todaysCalls: call.todaysCalls || 0,
                       selected: call.selected || []
                     })
@@ -309,34 +354,35 @@ console.log(filteredselectedCategory)
       } else {
         if (callList && callList.length > 0 && selectedBranch) {
           const customerSummaries = callList
-            .filter(
-              (customer) =>
-                selectedBranch === "All" ||
-                customer?.callregistration?.some((call) =>
-                  call?.branchName?.includes(selectedbranchName)
-                )
-            )
             .map((customer) => {
-              const totalCalls = customer.callregistration.length
-              const startDate = new Date(dates.startDate)
-                .toISOString()
-                .split("T")[0] // Convert start date to a Date object
-              const endDate = new Date(dates.endDate)
-                .toISOString()
-                .split("T")[0] // Convert end date to a Date object
+              const startDate = toApiDate(dates.startDate)
+              const endDate = toApiDate(dates.endDate)
 
-              const dateCalls = customer.callregistration.filter((call) => {
+              const filteredCalls = (customer.callregistration || []).filter((call) => {
+                const callDate = call?.timedata?.startTime
+                  ? new Date(call.timedata.startTime).toISOString().split("T")[0]
+                  : null
+                const isInRange = callDate && callDate >= startDate && callDate <= endDate
+                const isInSelectedBranch =
+                  selectedBranch === "All" || call?.branchName?.includes(selectedbranchName)
+                return isInRange && isInSelectedBranch
+              })
+
+              if (!filteredCalls.length) return null
+
+              const totalCalls = filteredCalls.length
+              const totalDurationSeconds = filteredCalls.reduce((total, call) => {
+                const start = new Date(call?.timedata?.startTime).getTime()
+                const end = new Date(call?.timedata?.endTime).getTime()
+                return total + (!Number.isNaN(start) && !Number.isNaN(end) && end >= start
+                  ? Math.floor((end - start) / 1000)
+                  : 0)
+              }, 0)
+
+              const solvedCalls = filteredCalls.filter((call) => {
                 const callDate = new Date(call.timedata.startTime)
                   .toISOString()
-                  .split("T")[0] // Convert call's startTime to a Date object
-
-                return callDate >= startDate && callDate <= endDate // Check if call is within the range
-              }).length
-
-              const solvedCalls = customer.callregistration.filter((call) => {
-                const callDate = new Date(call.timedata.startTime)
-                  .toISOString()
-                  .split("T")[0] // Convert call's startTime to a Date object
+                  .split("T")[0]
                 return (
                   call.formdata.status === "solved" && // Check if status is solved
                   callDate >= startDate &&
@@ -344,10 +390,10 @@ console.log(filteredselectedCategory)
                 )
               }).length
 
-              const pendingCalls = dateCalls - solvedCalls
+              const pendingCalls = totalCalls - solvedCalls
               const today = new Date().toISOString().split("T")[0]
 
-              const todaysCalls = customer.callregistration.filter((call) => {
+              const todaysCalls = filteredCalls.filter((call) => {
                 const callDate = new Date(call?.timedata?.startTime)
                   .toISOString()
                   .split("T")[0] // Convert call's startTime to a Date object
@@ -358,7 +404,7 @@ console.log(filteredselectedCategory)
               }).length
               // Extract unique last 3 mobile numbers (incomingNumber)
               const uniqueIncomingNumbers = []
-              for (const call of customer.callregistration) {
+              for (const call of filteredCalls) {
                 const num = call?.formdata?.incomingNumber
                 if (num && !uniqueIncomingNumbers.includes(num)) {
                   uniqueIncomingNumbers.push(num)
@@ -367,7 +413,7 @@ console.log(filteredselectedCategory)
               }
               // Extract unique last 3 mobile numbers (incomingNumber)
               const uniqueSerialNumbers = []
-              for (const call of customer.callregistration) {
+              for (const call of filteredCalls) {
                 const license = call?.license
                 if (license && !uniqueSerialNumbers.includes(license)) {
                   uniqueSerialNumbers.push(license)
@@ -377,14 +423,15 @@ console.log(filteredselectedCategory)
                 customerId: customer._id,
                 customerName: customer.customerName,
                 totalCalls,
+                totalDurationSeconds,
                 solvedCalls,
                 pendingCalls,
                 todaysCalls,
-                dateCalls,
                 mobileNumbers: uniqueIncomingNumbers,
                 serialNumbers: uniqueSerialNumbers
               }
             })
+            .filter(Boolean)
           if (customerSummaries) {
             setCustomerSummary(customerSummaries)
             setCachedsummary(customerSummaries)
@@ -395,7 +442,7 @@ console.log(filteredselectedCategory)
         }
       }
     }
-  }, [callList, selectedBranch, isToggled, dates])
+  }, [callList, selectedBranch, selectedbranchName, isToggled, dates])
 
   useEffect(() => {
     const list = isToggled ? userList : customerSummary
@@ -407,42 +454,47 @@ console.log(filteredselectedCategory)
     )
   }, [customerSummary, isToggled, userList])
   useEffect(() => {
-    if (cachedsummary && cachedsummary.length > 0) {
-      if (isToggled) {
-        if (searchTerm === null) {
-          return
-        } else if (searchTerm === "") {
-          setUserList(cachedUserlistsummary)
-        } else if (searchTerm) {
-          const filteredCalls = cachedUserlistsummary.filter((call) =>
-            call.name.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-          setUserList(filteredCalls)
-        }
-      } else {
-        if (searchTerm === null) {
-          return
-        } else if (searchTerm === "") {
-          setCustomerSummary(cachedsummary)
-        } else if (searchTerm) {
-          const filteredCalls = cachedsummary.filter((call) =>
-            call.customerName.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-          setCustomerSummary(filteredCalls)
-        }
-      }
+    if (searchTerm === null) return
+
+    const searchValue = searchTerm.trim().toLowerCase()
+    if (isToggled) {
+      const source = cachedUserlistsummary || []
+      setUserList(
+        searchValue
+          ? source.filter((call) => call.name?.toLowerCase().includes(searchValue))
+          : source
+      )
+      return
     }
-  }, [searchTerm])
+
+    const source = cachedsummary || []
+    setCustomerSummary(
+      searchValue
+        ? source.filter((call) => call.customerName?.toLowerCase().includes(searchValue))
+        : source
+    )
+  }, [searchTerm, cachedsummary, cachedUserlistsummary, isToggled])
 
   useEffect(() => {
     if (isModalOpen && selectedCustomer) {
       const customerData = callList
-        .filter((customer) => customer._id === selectedCustomer) // Filter for the selected customer
+        .filter((customer) => String(customer._id) === String(selectedCustomer)) // Filter for the selected customer
         .map((customer) => {
           const today = new Date().toISOString().slice(0, 10) // Get today's date in YYYY-MM-DD format
 
-          // Get all calls for the selected customer
-          const allCalls = customer.callregistration.map((call) => call)
+          const startDate = toApiDate(dates.startDate)
+          const endDate = toApiDate(dates.endDate)
+
+          // Keep the popup consistent with the selected customer, branch, and date range.
+          const allCalls = (customer.callregistration || []).filter((call) => {
+            const callDate = call?.timedata?.startTime
+              ? new Date(call.timedata.startTime).toISOString().split("T")[0]
+              : null
+            const isInRange = callDate && callDate >= startDate && callDate <= endDate
+            const isInSelectedBranch =
+              selectedBranch === "All" || call?.branchName?.includes(selectedbranchName)
+            return isInRange && isInSelectedBranch
+          })
 
           // Calculate summary counts
           const totalCalls = allCalls.length
@@ -467,10 +519,16 @@ console.log(filteredselectedCategory)
           }
         })[0] // Assuming there's only one customer with this name
 
+      if (!customerData) {
+        setCustomerCalls(null)
+        setCalls([])
+        return
+      }
+
       // Get today's date in YYYY-MM-DD format
       const today = new Date().toISOString().slice(0, 10)
       // Sort calls: pending calls first, today's calls second, and solved calls last
-      const sortedCalls = customerData.allCalls.sort((a, b) => {
+      const sortedCalls = (customerData?.allCalls || []).sort((a, b) => {
         const isAPending = a.formdata?.status === "pending"
         const isBPending = b.formdata?.status === "pending"
         const isAToday = a.timedata?.startTime?.slice(0, 10) === today
@@ -608,25 +666,44 @@ console.log(filteredselectedCategory)
         setLoading(false)
       }
     }
-  }, [isModalOpen, selectedUser, selectedCustomer])
+  }, [isModalOpen, selectedUser, selectedCustomer, callList, dates, selectedBranch, selectedbranchName])
+  useEffect(() => {
+    if (!isToggled) {
+      setSummaryPage(1)
+      setHasMoreSummaryPages(true)
+      setCallList([])
+    }
+  }, [dates.startDate, dates.endDate, isToggled])
+
   useEffect(() => {
     const fetchCalls = async () => {
-      try {
-        const today = new Date().toISOString().split("T")[0]
-        if (today < dates.endDate) {
+        const startDate = toApiDate(dates.startDate)
+        const endDate = toApiDate(dates.endDate)
+        if (!startDate || !endDate) {
+          setLoading(false)
           return
         }
-        setLoading(true)
-        setTotalCalls(0)
-        const query = `startDate=${dates.startDate}&endDate=${dates.endDate}`
-        const response = await api.get(
-          `/customer/getselectedDateCalls?${query}`
-        ) // Replace with your API endpoint
-        const data = response.data.data
 
-        setLoading(false)
+      try {
+        const isFirstPage = summaryPage === 1
+        if (isFirstPage) {
+          setLoading(true)
+          setTotalCalls(0)
+        } else {
+          setLoadingMore(true)
+        }
+        const response = await api.get("/customer/getselectedDateCalls", {
+          params: { startDate, endDate, page: summaryPage, limit: 50 }
+        })
+        const data = Array.isArray(response.data?.data) ? response.data.data : []
+        setHasMoreSummaryPages(Boolean(response.data?.pagination?.hasMore))
+
         if (loggedusers?.role === "Admin") {
-          setCallList(data)
+          setCallList((currentCalls) => {
+            if (isFirstPage) return data
+            const existingIds = new Set(currentCalls.map((customer) => String(customer._id)))
+            return [...currentCalls, ...data.filter((customer) => !existingIds.has(String(customer._id)))]
+          })
         } else {
           const userBranchName = new Set(
             loggedusers?.selected.map((branch) => branch.branchName)
@@ -657,11 +734,20 @@ console.log(filteredselectedCategory)
               })
           )
 
-          setCallList(filtered)
+          setCallList((currentCalls) => {
+            if (isFirstPage) return filtered
+            const existingIds = new Set(currentCalls.map((customer) => String(customer._id)))
+            return [...currentCalls, ...filtered.filter((customer) => !existingIds.has(String(customer._id)))]
+          })
         }
-      } catch (error) {
-        console.error("Error fetching calls:", error)
-      }
+        } catch (error) {
+          console.error("Error fetching calls:", error)
+          if (summaryPage === 1) setCallList([])
+          setHasMoreSummaryPages(false)
+        } finally {
+          if (summaryPage === 1) setLoading(false)
+          else setLoadingMore(false)
+        }
     }
     if (
       branch &&
@@ -671,12 +757,27 @@ console.log(filteredselectedCategory)
       loggedusers &&
       !isToggled
     ) {
-      setCallList([])
       fetchCalls()
     } else {
       return
     }
-  }, [branch, loggedusers, dates])
+  }, [branch, loggedusers, dates, isToggled, summaryPage])
+
+  useEffect(() => {
+    if (isToggled || searchTerm?.trim() || loading || loadingMore || !hasMoreSummaryPages) return
+    const sentinel = summaryLoadMoreRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setSummaryPage((page) => page + 1)
+      },
+      { rootMargin: "240px 0px" }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [isToggled, searchTerm, loading, loadingMore, hasMoreSummaryPages, summaryPage])
   const handleMoreClick = (id, name) => {
     const Datas = targetData?.userWiseResults
     console.log(id)
@@ -783,6 +884,11 @@ setActiveUserId(userId)
     setTotalCalls(0)
   }
   const openModal = (id) => {
+    setExpandedCallRows({})
+    setCalls([])
+    setUserCalls([])
+    setCustomerCalls(null)
+    setResult({})
     if (isToggled) {
       setSelectedUser(id)
     } else {
@@ -901,10 +1007,10 @@ console.log(selectedBranch)
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
-                <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[200px_minmax(240px,1fr)]">
-                    <label className="block">
+              <div className="rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:p-2">
+                <div className="grid gap-1.5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+                  <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-[190px_minmax(220px,1fr)]">
+                    <label className="block [&_button]:h-8 [&_button]:rounded-lg [&_button]:px-2.5 [&_button]:text-xs [&_svg]:h-4 [&_svg]:w-4">
                       <span className="sr-only">Branch</span>
                       <BranchDropdown
                         branches={branch}
@@ -915,23 +1021,26 @@ console.log(selectedBranch)
                     <label className="block">
                       <span className="sr-only">Search directory</span>
                       <span className="relative block">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                         <input
                           value={searchTerm || ""}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-9 pr-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+                          className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50 py-1 pl-8 pr-2.5 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50"
                           placeholder={`Search ${isToggled ? "users" : "customers"}`}
                         />
                       </span>
                     </label>
                   </div>
                   <div className="min-w-0">
-                    {dates.startDate && <MyDatePicker setDates={setDates} dates={dates} />}
+                    {dates.startDate && <MyDatePicker setDates={setDates} dates={dates} compact inlineOnMobile />}
                   </div>
                 </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+              {loading || branchLoader || (isToggled && staffLoader) ? (
+                <SkeletonTable rows={12} columns={isToggled ? 6 : 9} />
+              ) : (
               <table className="min-w-[960px] w-full text-left">
                 <thead className="sticky top-0 z-30 bg-slate-900">
                   <tr>
@@ -955,9 +1064,6 @@ console.log(selectedBranch)
                     )}
 
                     <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-300">
-                      date Calls
-                    </th>
-                    <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-300">
                       Solved Calls
                     </th>
                     <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-300">
@@ -973,6 +1079,9 @@ console.log(selectedBranch)
                         Today's Calls
                       </th>
                     )}
+                    <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-300">
+                      Duration
+                    </th>
                     <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-300">
                       View
                     </th>
@@ -1002,9 +1111,6 @@ console.log(selectedBranch)
                             </td>
                           )}
 
-                          <td className="px-3 py-2.5 text-center text-xs font-medium text-slate-700">
-                            {isToggled ? item.datecalls : item.dateCalls}
-                          </td>
                           <td className="px-3 py-2.5 text-center text-xs font-medium text-emerald-700">
                             {isToggled ? item.solvedCalls : item.solvedCalls}
                           </td>
@@ -1021,6 +1127,9 @@ console.log(selectedBranch)
                               {item.todaysCalls}
                             </td>
                           )}
+                          <td className="whitespace-nowrap px-3 py-2.5 text-center text-xs font-medium text-slate-700">
+                            {formatTotalDuration(item.totalDurationSeconds)}
+                          </td>
                           <td className="px-3 py-2.5 text-center text-xs">
                             <button
                               onClick={() =>
@@ -1037,7 +1146,7 @@ console.log(selectedBranch)
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="9" className="p-10 text-center">
+                        <td colSpan={isToggled ? 6 : 9} className="p-10 text-center">
                           {loading || branchLoader || staffLoader ? (
                             <div className="justify center">
                               <PropagateLoader color="#3b82f6" size={10} />
@@ -1053,6 +1162,20 @@ console.log(selectedBranch)
                     ))}
                 </tbody>
               </table>
+              )}
+              {!isToggled && !loading && (
+                <div ref={summaryLoadMoreRef} className="flex min-h-10 items-center justify-center border-t border-slate-100 bg-white px-3 py-2 text-xs">
+                  {loadingMore ? (
+                    <span className="inline-flex items-center gap-2 text-slate-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />Loading more customers…</span>
+                  ) : searchTerm?.trim() ? (
+                    <span className="text-slate-400">Showing matching customers</span>
+                  ) : hasMoreSummaryPages ? (
+                    <span className="text-slate-400">Scroll to load more customers</span>
+                  ) : callList.length > 0 ? (
+                    <span className="text-slate-400">All customers loaded</span>
+                  ) : null}
+                </div>
+              )}
               </div>
             </section>
           </div>
@@ -1065,29 +1188,30 @@ console.log(selectedBranch)
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-gradient-to-r from-slate-900 to-indigo-950 px-4 py-3 text-white sm:px-5">
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300">Call activity</p>
-                <h2 className="truncate text-lg font-bold sm:text-xl">{isToggled ? selectedUser : customerCalls.customerName} <span className="font-medium text-slate-300">Call Summary</span></h2>
+                <h2 className="truncate text-lg font-bold sm:text-xl">{isToggled ? selectedUser : customerCalls?.customerName || "Customer"} <span className="font-medium text-slate-300">Call Summary</span></h2>
               </div>
               <button type="button" onClick={closeModal} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-slate-100 transition hover:bg-white/20" aria-label="Close call summary"><X className="h-4 w-4" /></button>
             </div>
-            <div className="grid shrink-0 grid-cols-2 gap-2 border-b border-slate-200 bg-slate-50 p-3 sm:grid-cols-4">
-              <ModalStat label="Pending" value={isToggled ? result?.pendingCalls : customerCalls?.pendingCalls} tone="border-rose-100 bg-rose-50 text-rose-700" />
-              <ModalStat label="Solved" value={isToggled ? result?.solvedCalls : customerCalls?.solvedCalls} tone="border-emerald-100 bg-emerald-50 text-emerald-700" />
-
-
-              <ModalStat label="Today" value={isToggled ? result?.todaysCall : customerCalls?.todaysCalls} tone="border-amber-100 bg-amber-50 text-amber-700" />
-              <ModalStat label={isToggled ? "Colleague solved" : "Online calls"} value={isToggled ? result?.colleagueSolvedCalls : 0} tone="border-indigo-100 bg-indigo-50 text-indigo-700" />
+            <div className="grid shrink-0 grid-cols-2 gap-2 border-b border-slate-300 bg-slate-100 p-3 sm:grid-cols-4">
+              <Tiles title="Pending Calls" compact count={isToggled ? result?.pendingCalls : customerCalls?.pendingCalls} subtitle="Awaiting follow-up" icon={<PhoneMissed size={12} strokeWidth={2.2} />} style={{ background: "linear-gradient(135deg, #be123c 0%, #f43f5e 52%, #fda4af 100%)" }} />
+              <Tiles title="Solved Calls" compact count={isToggled ? result?.solvedCalls : customerCalls?.solvedCalls} subtitle="Resolved" icon={<BadgeCheck size={12} strokeWidth={2.2} />} style={{ background: "linear-gradient(135deg, #047857 0%, #34d399 52%, #99f6e4 100%)" }} />
+              <Tiles title="Today Pending Calls" compact count={isToggled ? result?.todaysCall : customerCalls?.todaysCalls} subtitle="Scheduled today" icon={<PhoneIncoming size={12} strokeWidth={2.2} />} style={{ background: "linear-gradient(135deg, #c2410c 0%, #f59e0b 52%, #fde68a 100%)" }} />
+              <Tiles title={isToggled ? "Colleague Solved" : "Online Calls"} compact count={isToggled ? result?.colleagueSolvedCalls : 0} subtitle={isToggled ? "Colleague resolved" : "Online"} icon={<PhoneCall size={12} strokeWidth={2.2} />} style={{ background: "linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #93c5fd 100%)" }} />
             </div>
-            <div className="min-h-0 flex-1 overflow-auto bg-slate-50 p-3 sm:p-4">
-              <div className="h-full overflow-auto rounded-xl border border-slate-300 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.10)]">
-              <table className="min-w-[900px] w-full table-fixed border-separate border-spacing-0 text-[11px] text-slate-700 md:text-xs">
-                <thead className="sticky top-0 z-40 bg-slate-200">
-                  <tr className="bg-gradient-to-r from-slate-300 via-slate-200 to-slate-100 shadow-[inset_0_-1px_0_rgba(100,116,139,0.35)]">
-                    <th className="w-[5%] border-b border-slate-300 px-2 py-2 text-center text-[11px] font-bold text-slate-700"></th>
-                    <th className="w-[23%] border-b border-slate-300 px-2 py-2 text-left text-[11px] font-bold text-slate-700">Customer Name</th>
-                    <th className="w-[23%] border-b border-slate-300 px-2 py-2 text-left text-[11px] font-bold text-slate-700">Product Name</th>
-                    <th className="w-[16%] border-b border-slate-300 px-2 py-2 text-left text-[11px] font-bold text-slate-700">License No</th>
-                    <th className="w-[20%] border-b border-slate-300 px-2 py-2 text-left text-[11px] font-bold text-slate-700">Description</th>
-                    <th className="w-[13%] border-b border-slate-300 px-2 py-2 text-left text-[11px] font-bold text-slate-700">Incoming No</th>
+            <div className="min-h-0 flex-1 overflow-auto bg-slate-100 p-3 sm:p-4">
+              <div className="h-full overflow-auto rounded-xl border border-slate-400 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.16)]">
+              <table className="min-w-[1280px] w-full table-fixed border-separate border-spacing-0 text-[11px] text-slate-700 md:text-xs">
+                <thead className="sticky top-0 z-40 bg-slate-900">
+                  <tr className="bg-gradient-to-r from-slate-950 via-slate-800 to-slate-900 shadow-[inset_0_-1px_0_rgba(255,255,255,0.12)]">
+                    <th className="w-[4%] border-b border-slate-600 px-2 py-2 text-center text-[11px] font-bold text-slate-100"></th>
+                    <th className="w-[14%] border-b border-slate-600 px-2 py-2 text-left text-[11px] font-bold text-slate-100">Customer Name</th>
+                    <th className="w-[14%] border-b border-slate-600 px-2 py-2 text-left text-[11px] font-bold text-slate-100">Product Name</th>
+                    <th className="w-[9%] border-b border-slate-600 px-2 py-2 text-left text-[11px] font-bold text-slate-100">License No</th>
+                    <th className="w-[15%] border-b border-slate-600 px-2 py-2 text-left text-[11px] font-bold text-slate-100">Description</th>
+                    <th className="w-[11%] border-b border-slate-600 px-2 py-2 text-left text-[11px] font-bold text-slate-100">Incoming No</th>
+                    <th className="w-[12%] border-b border-slate-600 px-2 py-2 text-left text-[11px] font-bold text-slate-100">Start Date &amp; Time</th>
+                    <th className="w-[12%] border-b border-slate-600 px-2 py-2 text-left text-[11px] font-bold text-slate-100">End Date &amp; Time</th>
+                    <th className="w-[9%] border-b border-slate-600 px-2 py-2 text-left text-[11px] font-bold text-slate-100">Duration</th>
                   </tr>
                 </thead>
                 <tbody className="divide-gray-200">
@@ -1108,9 +1232,12 @@ console.log(selectedBranch)
                                 <td className="truncate border-b border-slate-300 px-2 py-1 align-top text-slate-800">{reg?.license || "N/A"}</td>
                                 <td className="border-b border-slate-300 px-2 py-1 align-top text-slate-800"><div className="truncate" title={reg?.formdata?.description || "N/A"}>{reg?.formdata?.description || "N/A"}</div></td>
                                 <td className="truncate border-b border-slate-300 px-2 py-1 align-top text-slate-800">{reg?.formdata?.incomingNumber || "N/A"}</td>
+                                <td className="whitespace-nowrap border-b border-slate-300 px-2 py-1 align-top text-slate-800">{formatCallDateTime(reg?.timedata?.startTime)}</td>
+                                <td className="whitespace-nowrap border-b border-slate-300 px-2 py-1 align-top text-slate-800">{formatCallDateTime(reg?.timedata?.endTime)}</td>
+                                <td className="whitespace-nowrap border-b border-slate-300 px-2 py-1 align-top font-medium text-slate-800">{formatCallDuration(reg?.timedata?.startTime, reg?.timedata?.endTime)}</td>
                               </tr>
-                              {expandedCallRows[`user-${reg._id}`] && <tr className="bg-slate-100 text-left">
-                                <td colSpan={6} className="border-b border-slate-300 px-3 py-2">
+                              {expandedCallRows[`user-${reg._id}`] && <tr className="bg-slate-200 text-left">
+                                <td colSpan={9} className="border-b border-slate-300 px-3 py-2">
                                   <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-3">
                                     <div className="min-w-0"><span className="block text-[9px] font-bold uppercase tracking-wide text-slate-500">Description</span><span className="block truncate text-slate-800" title={reg?.formdata?.description || "N/A"}>{reg?.formdata?.description || "N/A"}</span></div>
                                     <div><span className="block text-[9px] font-bold uppercase tracking-wide text-slate-500">Status</span><span className="font-medium capitalize text-slate-800">{reg?.formdata?.status || "Pending"}</span></div>
@@ -1124,7 +1251,7 @@ console.log(selectedBranch)
                       )
                     ) : (
                       <tr>
-                        <td colSpan={5}>
+                        <td colSpan={9}>
                           {loading ? "Loading..." : "No calls"}
                         </td>
                       </tr>
@@ -1144,9 +1271,12 @@ console.log(selectedBranch)
                             <td className="truncate border-b border-slate-300 px-2 py-1 align-top text-slate-800">{call?.license || "N/A"}</td>
                             <td className="border-b border-slate-300 px-2 py-1 align-top text-slate-800"><div className="truncate" title={call?.formdata?.description || "N/A"}>{call?.formdata?.description || "N/A"}</div></td>
                             <td className="truncate border-b border-slate-300 px-2 py-1 align-top text-slate-800">{call?.formdata?.incomingNumber || "N/A"}</td>
+                            <td className="whitespace-nowrap border-b border-slate-300 px-2 py-1 align-top text-slate-800">{formatCallDateTime(call?.timedata?.startTime)}</td>
+                            <td className="whitespace-nowrap border-b border-slate-300 px-2 py-1 align-top text-slate-800">{formatCallDateTime(call?.timedata?.endTime)}</td>
+                            <td className="whitespace-nowrap border-b border-slate-300 px-2 py-1 align-top font-medium text-slate-800">{formatCallDuration(call?.timedata?.startTime, call?.timedata?.endTime)}</td>
                           </tr>
-                          {expandedCallRows[`customer-${call._id}`] && <tr className="bg-slate-100 text-left">
-                            <td colSpan={6} className="border-b border-slate-300 px-3 py-2">
+                          {expandedCallRows[`customer-${call._id}`] && <tr className="bg-slate-200 text-left">
+                            <td colSpan={9} className="border-b border-slate-300 px-3 py-2">
                               <div className="grid gap-2 text-xs text-slate-600 sm:grid-cols-3">
                                 <div className="min-w-0"><span className="block text-[9px] font-bold uppercase tracking-wide text-slate-500">Description</span><span className="block truncate text-slate-800" title={call?.formdata?.description || "N/A"}>{call?.formdata?.description || "N/A"}</span></div>
                                 <div><span className="block text-[9px] font-bold uppercase tracking-wide text-slate-500">Status</span><span className="font-medium capitalize text-slate-800">{call?.formdata?.status || "Pending"}</span></div>
