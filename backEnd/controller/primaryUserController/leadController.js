@@ -13856,13 +13856,7 @@ export const GetfollowupsummaryReport = async (req, res) => {
       {
         $addFields: {
           leadAmount: {
-            $sum: {
-              $map: {
-                input: { $ifNull: ["$leadFor", []] },
-                as: "item",
-                in: { $ifNull: ["$$item.netAmount", 0] }
-              }
-            }
+            $ifNull: ["$netAmount", 0]
           },
           safeConvertedDate: { $ifNull: ["$leadConvertedDate", null] },
           safeLostDate: { $ifNull: ["$leadLostDate", null] }

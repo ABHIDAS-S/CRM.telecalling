@@ -301,6 +301,10 @@ const MarketingDashboard = () => {
   const [selectedPeriod, setselectedPeriod] = useState("")
   const [showNotification, setShowNotification] = useState(false)
   const [cardDisplay, setcardDisplay] = useState([])
+  const [newLeadFunnelMetric, setNewLeadFunnelMetric] = useState({
+    count: 0,
+    amount: 0
+  })
   const [leadCountScope, setLeadCountScope] = useState("owned")
   const [selectedBranch, setselectedBranch] = useState(null)
   console.log(selectedBranch)
@@ -330,6 +334,10 @@ const MarketingDashboard = () => {
   const defaultEndDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(
     now.getDate()
   ).padStart(2, "0")}`
+  const dashboardSummaryRange = {
+    startDate: defaultStartDate,
+    endDate: defaultEndDate
+  }
   const salesFunnelEndDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(
     new Date(year, month + 1, 0).getDate()
   ).padStart(2, "0")}`
@@ -448,6 +456,10 @@ const MarketingDashboard = () => {
           : ownedSummary
 
       if (item) {
+        setNewLeadFunnelMetric({
+          count: Number(item.neverFollowup || 0),
+          amount: Number(item.neverFollowupAmount || 0)
+        })
         setcardDisplay([
           {
             title: "All Leads",
@@ -505,6 +517,7 @@ const MarketingDashboard = () => {
           }
         ])
       } else {
+        setNewLeadFunnelMetric({ count: 0, amount: 0 })
         setcardDisplay([
           {
             title: "All Leads",
@@ -766,7 +779,7 @@ const MarketingDashboard = () => {
             dueToday: true,
             viewMode: "dueToday",
             istotal: true,
-            filterRange: date,
+            filterRange: dashboardSummaryRange,
             breadcrumb,
             isReadOnly: false
           }
@@ -781,7 +794,7 @@ const MarketingDashboard = () => {
             overdue: true,
             viewMode: "overDue",
             istotal: true,
-            filterRange: date,
+            filterRange: dashboardSummaryRange,
             breadcrumb,
             isReadOnly: false
           }
@@ -796,7 +809,7 @@ const MarketingDashboard = () => {
             future: true,
             viewMode: "future",
             istotal: true,
-            filterRange: date,
+            filterRange: dashboardSummaryRange,
             breadcrumb,
             isReadOnly: false
           }
@@ -813,7 +826,7 @@ const MarketingDashboard = () => {
             header: "Converted",
             pending: false,
             istotal: true,
-            filterRange: date,
+            filterRange: dashboardSummaryRange,
             breadcrumb,
             isReadOnly: false
           }
@@ -828,7 +841,7 @@ const MarketingDashboard = () => {
             neverfollowup: true,
             viewMode: "neverfollowup",
             istotal: true,
-            filterRange: date,
+            filterRange: dashboardSummaryRange,
             breadcrumb,
             isReadOnly: false
           }
@@ -838,7 +851,7 @@ const MarketingDashboard = () => {
       navigate(`/${user.role === "Admin" ? "admin" : "staff"}/transaction/lead/leadFollowUp`, {
         state: {
           ...followupScope,
-          filterRange: date,
+          filterRange: dashboardSummaryRange,
           viewMode: "followup",
           istotal: true,
           header: "Total Leads",
@@ -908,8 +921,12 @@ const MarketingDashboard = () => {
     ["Converted", 42, "linear-gradient(180deg, #3dcc87 0%, #249f65 100%)", "#34c77d"]
   ].map(([label, width, color, dotColor]) => ({
     label,
-    value: funnelNumber(salesFunnelStageMap[label]?.count),
-    amount: funnelNumber(salesFunnelStageMap[label]?.value),
+    value: label === "New Leads"
+      ? newLeadFunnelMetric.count
+      : funnelNumber(salesFunnelStageMap[label]?.count),
+    amount: label === "New Leads"
+      ? newLeadFunnelMetric.amount
+      : funnelNumber(salesFunnelStageMap[label]?.value),
     conversion: salesFunnelStageMap[label]?.conversion || "0%",
     width,
     color,
@@ -917,6 +934,38 @@ const MarketingDashboard = () => {
   }))
   const handleSalesFunnelStageClick = (stage) => {
     if (stage?.value <= 0) return
+
+    if (stage.label === "New Leads") {
+      const isAllBranchScope = leadCountScope === "all"
+      const breadcrumb = [
+        { label: "Report", path: "" },
+        {
+          label: "Marketing Dashboard",
+          path: "/staff/reports/markettingdashboard"
+        },
+        { label: "Lead Follow-Up", path: "" }
+      ]
+
+      navigate(
+        `/${user?.role === "Admin" ? "admin" : "staff"}/transaction/lead/leadFollowUp`,
+        {
+          state: {
+            staffId: user?._id,
+            staffRole: isAllBranchScope ? "Admin" : undefined,
+            ownlead: !isAllBranchScope,
+            branchId: reduxselectedBranch,
+            from: isAllBranchScope ? "dashboardAll" : "followupReport",
+            neverfollowup: true,
+            viewMode: "neverfollowup",
+            istotal: true,
+            filterRange: dashboardSummaryRange,
+            breadcrumb,
+            isReadOnly: false
+          }
+        }
+      )
+      return
+    }
 
     navigate(
       `/${user?.role === "Admin" ? "admin" : "staff"}/transaction/lead/ownedLeadlist`,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
 
 import { flushSync } from "react-dom"
 import ClipLoader from "react-spinners/ClipLoader"
@@ -15,7 +15,6 @@ import {
 import api from "../../../api/api"
 import { formatTime } from "../../../utils/timeUtils"
 // import debounce from "lodash.debounce"
-import { debounce } from "lodash"
 import UseFetch from "../../../hooks/useFetch"
 import Timer from "../../../components/primaryUser/Timer"
 import { toast } from "react-toastify"
@@ -24,7 +23,6 @@ import AdminHeader from "../../../header/AdminHeader"
 import StaffHeader from "../../../header/StaffHeader"
 import { PerformanceModal } from "../../../components/primaryUser/PerformanceModal"
 import {
-  Eye,
   Phone,
   Mail,
   Settings,
@@ -40,7 +38,6 @@ import {
   ChevronDown,
   ChevronRight,
   X,
-  Check
 } from "lucide-react"
 import {
   FaEdit,
@@ -122,7 +119,6 @@ export default function AccountSearch() {
   const [branchOptions, setBranchOptions] = useState([])
   const [productOptions, setProductOptions] = useState([])
   const [customerData, setCustomerData] = useState([])
-  const [selectedLicenseNumber, setselectedlicense] = useState(null)
   const [tableData, setTableData] = useState([])
   console.log(customerData)
   const [editIndex, setEditIndex] = useState(null)
@@ -152,8 +148,6 @@ export default function AccountSearch() {
   const [productlist, setproductList] = useState([])
   const [achievedproducts, setacheivedProducts] = useState([])
   const [selectedPeriod, setselectedPeriod] = useState("")
-  // useRef to keep track of the latest timeout for debouncing
-  const debounceTimeoutRef = useRef(null)
   const { data: branchProduct } = UseFetch(
     `/product/getallbranchProduct?branch=${selectedcompanyBranch}`
   )
@@ -329,58 +323,65 @@ console.log(selectedbranch)
     return `${hrs} hr ${mins} min ${secs} sec`
   }
 
-  const handleInputChange = debounce(async (value) => {
-console.log(value)
-    try {
-      if (value === "") {
-        setCustomerData([])
-        setMessage("")
-        setSearch("")
-        return
-      }
-      setLoading(true)
-      setSearch(value)
-      setMessage("")
-      setSearching(true)
+  const fetchCustomerData = useCallback(async (query) => {
+    const isAdmin = user?.role === "Admin"
+    const selectedBranches = Array.isArray(selectedbranch)
+      ? selectedbranch
+      : selectedbranch
+        ? [selectedbranch]
+        : branches
+    const branchIds = selectedBranches
+      .map((branch) => branch?._id || branch?.branch_id || branch)
+      .filter(Boolean)
 
-      if (value) {
-        // const customerdata = await api.get(
-        //   `/customer/getCustomer?search=${value}&userBranch=${branches}`
-        // )
-
-        const branch = JSON.stringify([selectedbranch])
-
-// console.log(branch)
-        // const url = `http://localhost:9000/api/customer/getCustomer?search=${value}&role=${
-        //   user.role
-        // }&userBranch=${encodeURIComponent(branch)}`
-
-        const url = `https://crm.camet.in/api/customer/getCustomer?search=${value}&role=${
-          user.role
-        }&userBranch=${encodeURIComponent(branch)}`
-
-        const customerdata = await api.get(url)
-
-        const { data } = customerdata.data
-
-        if (Array.isArray(data) && data.length === 0) {
-          setLoading(false)
-          console.log(data)
-          setCustomerData(data)
-          setMessage("No customers found")
-        } else {
-          console.log(data)
-          setLoading(false)
-          setCustomerData(data)
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching customer data:", error)
-      setLoading(false)
+    if (!isAdmin && branchIds.length === 0) {
+      setCustomerData([])
+      setMessage("Your branch access is still loading. Please try again.")
+      return
     }
 
-    // Add your logic here
-  }, 1000)
+    try {
+      setLoading(true)
+      const params = { search: query, role: user?.role }
+      if (!isAdmin) params.userBranch = JSON.stringify(branchIds)
+
+      const { data: result } = await api.get("/customer/getCustomer", { params })
+      const customers = Array.isArray(result?.data) ? result.data : []
+      setCustomerData(customers)
+      setMessage(customers.length ? "" : result?.message || "No customers found")
+      setSearching(true)
+    } catch (error) {
+      setCustomerData([])
+      setMessage(
+        error.response?.data?.message ||
+          "Unable to search customers. Please try again."
+      )
+      console.error("Error fetching customer data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [branches, selectedbranch, user?.role])
+
+  const handleChange = (e) => {
+    const value = e.target.value
+    setSearch(value)
+    setSelectedCustomer(null)
+    setSelectedProducts([])
+    setMessage("")
+    setSearching(Boolean(value.trim()))
+  }
+
+  useEffect(() => {
+    const query = search.trim()
+    if (!query) {
+      setCustomerData([])
+      setLoading(false)
+      return
+    }
+
+    const timeout = setTimeout(() => fetchCustomerData(query), 350)
+    return () => clearTimeout(timeout)
+  }, [search, fetchCustomerData])
   const closePopup = () => {
     setShowProductPopup(false)
     setPopupType("")
@@ -443,7 +444,6 @@ console.log(value)
     setShowProductPopup(true)
   }
   console.log(showProductPopup)
-  const handleChange = (e) => handleInputChange(e.target.value)
   //   const handleRowClick = (customer) => {
   // console.log(customer)
   //     setSelectedCustomer(customer)
@@ -580,7 +580,6 @@ console.log(value)
         )
         console.log(filteredlicenseproduct)
         setSelectedProducts(filteredlicenseproduct)
-        setselectedlicense(lic)
         // For example, set it to state to display in a modal or another component
         // setSelectedCustomer(data);
       } catch (error) {
@@ -748,18 +747,41 @@ console.log(value)
       </div>
     )
   }
+  const InfoInputCard = ({
+    icon,
+    iconBg,
+    iconColor,
+    label,
+    children,
+    error
+  }) => (
+    <div className="rounded-[14px] border border-[#edf1f7] bg-white px-3 py-3 transition hover:border-[#dbe6ff]">
+      <div className="flex items-start gap-3">
+        <div
+          className={`mt-[2px] flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${iconBg} ${iconColor}`}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="mb-1 text-[11px] font-medium text-[#8c96ad]">
+            {label}
+          </p>
+          {children}
+          {error ? (
+            <p className="mt-1 text-[11px] text-red-500">{error}</p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
   const ProductCircleCard = ({
-    item,
-    actualIndex,
+    productType,
     variant,
-    topBadgeIcon,
-    isSelected,
     line1,
     line2,
     line3,
     line4,
-    onEdit,
-    onDelete
+    line5
   }) => {
     const variantClass =
       variant === "danger"
@@ -767,100 +789,35 @@ console.log(value)
         : variant === "service"
           ? "bg-[#fff3c9] border-[#f0e1a2]"
           : "bg-[#dff3d2] border-[#cce6bc]"
-    console.log(line3)
     return (
-      // <div className="group relative">
-      //   <button
-      //     type="button"
-      //     onClick={() => onEdit(item, actualIndex)}
-      //     className={`relative flex h-[108px] w-[108px] flex-col items-center justify-center rounded-full border text-center shadow-sm transition hover:scale-[1.02] ${variantClass}`}
-      //   >
-      //     {/* <div className="mb-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/80 text-[#4e5a72] shadow-sm">
-      //     {topBadgeIcon}
-      //   </div> */}
-
-      //     <p className="px-2 text-[9.5px] font-semibold leading-3 text-[#1e293b]">
-      //       {line1}
-      //     </p>
-
-      //     {line2 ? (
-      //       <p className="mt-1 px-2 text-[8.5px] leading-3 text-[#4b5563]">
-      //         {line2}
-      //       </p>
-      //     ) : null}
-      //     {line3 ? (
-      //       <p className="mt-1 px-2 text-[8.5px] font-semibold leading-3 text-[#d35c5c]">
-      //         {line3}
-      //       </p>
-      //     ) : null}
-      //     {line4 ? (
-      //       <p className="mt-1 px-2 text-[10px] leading-3 text-[#4b5563] font-bold">
-      //         Due: {line4}
-      //       </p>
-      //     ) : null}
-
-      //     {/* {line3 ? (
-      //     <p className="mt-1 px-2 text-[8.5px] leading-3 text-[#4b5563]">
-      //       {`"NextDue":${line3}`}
-      //     </p>
-      //   ) : null} */}
-      //   </button>
-
-      //   <div className="absolute -right-2 -top-2 hidden gap-1 group-hover:flex">
-      //     {/* <button
-      //     type="button"
-      //     onClick={() => onEdit(item, actualIndex)}
-      //     className="rounded-full bg-white p-2 text-green-600 shadow"
-      //   >
-      //     <FaEdit size={10} />
-      //   </button>
-      //   <button
-      //     type="button"
-      //     onClick={() => onDelete(actualIndex)}
-      //     className="rounded-full bg-white p-2 text-red-600 shadow"
-      //   >
-      //     <FaTrash size={10} />
-      //   </button> */}
-      //   </div>
-      // </div>
-      <div className="group relative">
-        <button
-          type="button"
-          onClick={() => onEdit(item, actualIndex)}
-          className={`relative flex h-[108px] w-[108px] flex-col items-center justify-center rounded-full border text-center shadow-sm transition hover:scale-[1.02] ${variantClass}`}
-        >
-          {/* {isSelected && (
-            <div className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border border-emerald-200 bg-emerald-500 text-white shadow-md">
-              <Check size={14} strokeWidth={3} />
-            </div>
-          )} */}
-
-          <div className="mb-2 flex h-6 w-6 items-center justify-center rounded-full bg-white/80 text-[#4e5a72] shadow-sm">
-            {topBadgeIcon}
+      <div
+        className={`flex h-[120px] w-[124px] flex-col items-center justify-center rounded-full border text-center shadow-sm ${variantClass}`}
+      >
+          <div className="flex w-[90px] flex-col items-center justify-center">
+            <p className="w-full break-words text-center text-[10px] font-medium leading-[12px] text-[#1e293b] line-clamp-2">
+              {line1}
+            </p>
+            {line2 && (
+              <p className="mt-1 w-full truncate text-center text-[10px] font-medium leading-[12px] text-[#4b5563]">
+                {line2}
+              </p>
+            )}
+            {line3 && (
+              <p className="mt-1 w-full whitespace-nowrap text-center text-[10px] font-semibold leading-[10px] text-[#d35c5c]">
+                {productType === "Primaryproduct" ? "Date" : "Due"}: {line3}
+              </p>
+            )}
+            {line4 && (
+              <p className={`mt-1 w-full truncate text-center text-[9px] font-bold leading-[11px] ${line4 === "Active" ? "text-green-600" : "text-orange-500"}`}>
+                {line4}
+              </p>
+            )}
+            {line5 && (
+              <p className="mt-1 w-full truncate text-center text-[9px] font-bold leading-[11px] text-[#0b66e6]">
+                Amount: {line5}
+              </p>
+            )}
           </div>
-
-          <p className="px-2 text-[9.5px] font-semibold leading-3 text-[#1e293b]">
-            {line1}
-          </p>
-
-          {line2 ? (
-            <p className="mt-1 px-2 text-[8.5px] leading-3 text-[#4b5563]">
-              {line2}
-            </p>
-          ) : null}
-
-          {line3 ? (
-            <p className="mt-1 px-2 text-[8.5px] leading-3 text-[#4b5563]">
-              {line3}
-            </p>
-          ) : null}
-
-          {line4 ? (
-            <p className="mt-1 px-2 text-[8.5px] font-semibold leading-3 text-[#d35c5c]">
-              {line4}
-            </p>
-          ) : null}
-        </button>
       </div>
     )
   }
@@ -1606,7 +1563,7 @@ console.log(value)
   //     </div>
   //   )
   return (
-    <div className="h-screen bg-[#ADD8E6] overflow-hidden">
+    <div className="h-full min-h-0 bg-[#ADD8E6] overflow-hidden">
       <div className="flex h-full flex-row">
         {/* <StaticSidebar
           handleMoreClick={handleMoreClick}
@@ -1657,6 +1614,14 @@ console.log(value)
           </header> */}
 
           <div className="sticky top-0 z-40 shrink-0 bg-[#ADD8E6] px-5 pb-4 pt-2">
+            <nav
+              aria-label="Breadcrumb"
+              className="mb-2 flex items-center gap-1.5 text-xs text-slate-600"
+            >
+              <span>Reports</span>
+              <ChevronRight size={14} aria-hidden="true" className="text-slate-400" />
+              <span className="font-semibold text-slate-800">Account Search</span>
+            </nav>
             <div className="w-full max-w-md">
               <div className="relative">
                 <label
@@ -1670,7 +1635,11 @@ console.log(value)
                   <input
                     type="text"
                     id="customerName"
+                    name="customer-search"
+                    value={search}
                     onChange={handleChange}
+                    autoComplete="off"
+                    spellCheck={false}
                     className="mt-1 block w-full rounded-md border border-gray-300 p-2 pr-10 shadow-sm outline-none focus:border-gray-500 sm:text-sm"
                     placeholder="Enter name or license..."
                   />
@@ -1683,10 +1652,11 @@ console.log(value)
                 </div>
               </div>
 
-              {searching && customerData && customerData.length > 0 ? (
-                <div className="mt-4 max-h-40 overflow-y-auto overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-md">
+              {searching && customerData?.length > 0 ? (
+                <div className="mt-3 w-full max-w-xl overflow-hidden rounded-lg border border-gray-200 shadow-md">
+                  <div className="max-h-52 overflow-auto">
                   <table className="min-w-full bg-white">
-                    <thead className="sticky top-0 z-30 border-b border-green-300 bg-green-300 shadow">
+                    <thead className="sticky top-0 z-20 border-b border-green-300 bg-green-300 shadow">
                       <tr>
                         <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-600">
                           Customer Name
@@ -1701,7 +1671,13 @@ console.log(value)
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {customerData?.map((customer, index) =>
-                        customer.selected.map((item, subIndex) => (
+                        customer?.selected
+                          ?.filter(
+                            (item) =>
+                              item?.product_id?.productorservicetype ===
+                              "Primaryproduct"
+                          )
+                          .map((item, subIndex) => (
                           <tr
                             key={`${index}-${subIndex}`}
                             onClick={() =>
@@ -1719,10 +1695,11 @@ console.log(value)
                               {customer?.mobile}
                             </td>
                           </tr>
-                        ))
+                          ))
                       )}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               ) : (
                 <div className="mt-2 text-red-500">{message}</div>
@@ -1733,124 +1710,111 @@ console.log(value)
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 pb-6">
             {selectedCustomer && (
               <>
-                <div className="mt-2 grid grid-cols-1 gap-3 rounded p-5 shadow-md sm:grid-cols-4 bg-[#4888b9]">
-                  <div>
-                    <h4 className="text-md font-bold text-white">
-                      Customer Name
-                    </h4>
-                    <p className="text-white">
-                      {selectedCustomer.customerName}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="text-md font-bold text-white">Email</h4>
-                    <p className="text-white">{selectedCustomer.email}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-md font-bold text-white">Mobile</h4>
-                    <p className="text-white">{selectedCustomer.mobile}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-md font-bold text-white">Address 1</h4>
-                    <p className="text-white">{selectedCustomer.address1}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-md font-bold text-white">Address 2</h4>
-                    <p className="text-white">{selectedCustomer.address2}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-md font-bold text-white">City</h4>
-                    <p className="text-white">{selectedCustomer.city}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-md font-bold text-white">State</h4>
-                    <p className="text-white">{selectedCustomer.state}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-md font-bold text-white">Country</h4>
-                    <p className="text-white">{selectedCustomer.country}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-md font-bold text-white">Pincode</h4>
-                    <p className="text-white">{selectedCustomer.pincode}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-md font-bold text-white">Landline</h4>
-                    <p className="text-white">
-                      {selectedCustomer.landline || "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <h4 className="text-md font-bold text-white">Status</h4>
-                    <p
-                      className={`bg-clip-text text-lg font-bold text-transparent ${
-                        selectedCustomer.selected.some(
-                          (item) => item.isActive === "Running"
-                        )
-                          ? "bg-gradient-to-r from-lime-400 via-green-500 to-emerald-600"
-                          : "bg-gradient-to-r from-red-400 via-red-500 to-orange-600"
-                      }`}
+                <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50/60 shadow-sm">
+                  <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-100/70 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-800">
+                        Customer Summary
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Basic customer information
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomerDetails((prev) => !prev)}
+                      className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-blue-700"
                     >
-                      {selectedCustomer.selected.some(
-                        (item) => item.isActive === "Running"
-                      )
-                        ? "Active"
-                        : "Inactive"}
-                    </p>
+                      {showCustomerDetails ? "Hide Details" : "Expand Details"}
+                    </button>
                   </div>
-                  <div>
-                    <h4 className="text-md font-bold text-white">
-                      Reason of Status
-                    </h4>
-                    <p className="text-white">
-                      {selectedCustomer.reasonofStatus || "N/A"}
-                    </p>
+
+                  <div className="bg-white p-3 md:p-4">
+                    <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4">
+                      <InfoInputCard icon={<FaUser size={12} />} iconBg="bg-[#edf6ff]" iconColor="text-[#5aa2ff]" label="Customer Name">
+                        <input readOnly value={typeof selectedCustomer?.customerName === "string" ? selectedCustomer.customerName.toUpperCase() : selectedCustomer?.customerName || ""} className={tileInputClass} />
+                      </InfoInputCard>
+                      <InfoInputCard icon={<FaPhone size={12} />} iconBg="bg-[#edf9f0]" iconColor="text-[#45bf6b]" label="Mobile No">
+                        <input readOnly type="tel" value={selectedCustomer?.mobile || ""} className={tileInputClass} />
+                      </InfoInputCard>
+                      <InfoInputCard icon={<FaLandmark size={12} />} iconBg="bg-[#fff8df]" iconColor="text-[#d1a91b]" label="Partnership">
+                        <input readOnly value={selectedCustomer?.partner?.[0]?.partner || selectedCustomer?.partner?.partner || "N/A"} className={tileInputClass} />
+                      </InfoInputCard>
+
+                      {showCustomerDetails && <>
+                        <InfoInputCard icon={<FaHashtag size={12} />} iconBg="bg-[#f4efff]" iconColor="text-[#8a5eff]" label="Pincode">
+                          <input readOnly value={selectedCustomer?.pincode || ""} className={tileInputClass} />
+                        </InfoInputCard>
+                        <InfoInputCard icon={<FaBuilding size={12} />} iconBg="bg-[#fff4ea]" iconColor="text-[#f0a24d]" label="City">
+                          <input readOnly value={selectedCustomer?.city || ""} className={tileInputClass} />
+                        </InfoInputCard>
+                        <InfoInputCard icon={<FaEnvelope size={12} />} iconBg="bg-[#eefbf2]" iconColor="text-[#4cbf73]" label="Email">
+                          <input readOnly type="email" value={selectedCustomer?.email || ""} className={tileInputClass} />
+                        </InfoInputCard>
+                        <InfoInputCard icon={<FaMapMarkerAlt size={12} />} iconBg="bg-[#fff0f8]" iconColor="text-[#ef7db2]" label="Address 1">
+                          <input readOnly value={selectedCustomer?.address1 || ""} className={tileInputClass} />
+                        </InfoInputCard>
+                        <InfoInputCard icon={<FaUser size={12} />} iconBg="bg-[#ebfbfb]" iconColor="text-[#43c7cb]" label="Contact Person">
+                          <input readOnly value={selectedCustomer?.contactPerson || ""} className={tileInputClass} />
+                        </InfoInputCard>
+                        <InfoInputCard icon={<FaMapMarkerAlt size={12} />} iconBg="bg-[#eef5ff]" iconColor="text-[#3879f2]" label="Address 2">
+                          <input readOnly value={selectedCustomer?.address2 || ""} className={tileInputClass} />
+                        </InfoInputCard>
+                        <InfoInputCard icon={<FaBuilding size={12} />} iconBg="bg-[#edf7ff]" iconColor="text-[#4f98ff]" label="State">
+                          <input readOnly value={selectedCustomer?.state || ""} className={tileInputClass} />
+                        </InfoInputCard>
+                        <InfoInputCard icon={<FaGlobeAsia size={12} />} iconBg="bg-[#fff2e8]" iconColor="text-[#ef9a47]" label="Country">
+                          <input readOnly value={selectedCustomer?.country || ""} className={tileInputClass} />
+                        </InfoInputCard>
+                        <InfoInputCard icon={<FaPhone size={12} />} iconBg="bg-[#fff1f6]" iconColor="text-[#f07ab1]" label="Landline No">
+                          <input readOnly type="tel" value={selectedCustomer?.landline || ""} className={tileInputClass} />
+                        </InfoInputCard>
+                        <InfoInputCard icon={<FaHashtag size={12} />} iconBg="bg-[#f5f0ff]" iconColor="text-[#9967ff]" label="Registration Type">
+                          <input readOnly value={selectedCustomer?.registrationType || ""} className={tileInputClass} />
+                        </InfoInputCard>
+                      </>}
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-6 w-full">
-                  <div className="mb-2">
-                    <h3 className="text-lg font-medium text-gray-900">
-                      Product Details List
+                <div className="mt-3 rounded-lg border border-slate-200 bg-gray-50 p-3 shadow-sm">
+                  <div className="mb-2.5 border-b border-slate-200 pb-2">
+                    <h3 className="text-sm font-semibold text-slate-800">
+                      Product Details
                     </h3>
+                    <p className="text-xs text-slate-500">
+                      Primary products and additional services for this customer
+                    </p>
                   </div>
 
-                  <div className="min-h-[180px] px-4 py-5">
-                    <h2 className="mb-2 font-medium">Prmimary Products</h2>
+                  <div className="flex flex-col gap-3 xl:flex-row">
+                    <div className="min-h-[140px] w-full rounded-lg border border-slate-100 bg-white px-3 py-4 xl:w-1/2">
+                      <h2 className="mb-3 text-sm font-medium">Primary Products</h2>
                     {primaryProducts.length > 0 ? (
-                      <div className="flex flex-wrap gap-4">
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,120px))] justify-center gap-x-6 gap-y-6 sm:justify-start">
                         {primaryProducts.map((item) => {
                           const actualIndex = primaryProducts.findIndex(
                             (x) => x === item
                           )
                           const isDeactive =
                             String(item?.isActive).toLowerCase() === "deactive"
-                          const isSelected =
-                            String(item?.licensenumber ?? "") ===
-                            String(selectedLicenseNumber ?? "")
-
                           return (
-                            <ProductCircleCard
-                              key={`primary-${actualIndex}`}
-                              item={item}
-                              actualIndex={actualIndex}
-                              isSelected={isSelected}
-                              variant={isDeactive ? "danger" : "success"}
-                              topBadgeIcon={<FaBuilding size={10} />}
-                              line1={
-                                item?.shortName
-                                  ? item?.shortName
-                                  : item?.product_id?.productName
-                              }
-                              line2={item?.licensenumber}
-                              line3={
-                                item?.nextDue
-                                  ? formatDateToDDMMYYYY(item?.nextDue)
-                                  : ""
-                              }
-                              line4={isDeactive ? "De Active" : ""}
-                              onEdit={handleEdit}
-                            />
+                            <div key={`primary-${actualIndex}`} className="flex flex-col items-center">
+                              <ProductCircleCard
+                                productType="Primaryproduct"
+                                variant={isDeactive ? "danger" : "success"}
+                                line1={item?.shortName || item?.productName || item?.product_id?.productName}
+                                line2={item?.licensenumber}
+                                line3={item?.applicationDate ? formatDateToDDMMYYYY(item.applicationDate) : ""}
+                                line4={isDeactive ? "De Active" : "Active"}
+                              />
+                              <div className="mt-3 w-full rounded-lg bg-gray-100 px-2 py-1 text-center shadow-sm">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">AMC End</p>
+                                <p className={`text-xs font-bold ${item?.amcendDate ? "text-red-600" : "text-gray-400"}`}>
+                                  {item?.amcendDate ? formatDateToDDMMYYYY(item.amcendDate) : "--"}
+                                </p>
+                              </div>
+                            </div>
                           )
                         })}
                       </div>
@@ -1861,64 +1825,58 @@ console.log(value)
                     )}
                   </div>
 
-                  <div className="min-h-[180px] px-4 py-5">
-                    <h2 className="mb-2 font-medium">Additional Services</h2>
+                    <div className="min-h-[140px] w-full rounded-lg border border-slate-100 bg-white px-3 py-4 xl:w-1/2">
+                      <h2 className="mb-3 text-sm font-medium">Additional Services</h2>
                     {additionalServices.length > 0 ? (
-                      <div className="flex flex-wrap gap-4">
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,120px))] justify-center gap-x-6 gap-y-6 sm:justify-start">
                         {additionalServices.map((item) => {
                           const actualIndex = additionalServices.findIndex(
                             (x) => x === item
                           )
+                          const isDeactive =
+                            String(item?.isActive).toLowerCase() === "deactive"
+                          const today = new Date()
+                          today.setHours(0, 0, 0, 0)
+                          const selectedTagged = Array.isArray(item?.taggeddata)
+                            ? [...item.taggeddata]
+                                .sort((a, b) => new Date(a.nextDue) - new Date(b.nextDue))
+                                .find((tagged) => {
+                                  const dueDate = new Date(tagged.nextDue)
+                                  dueDate.setHours(0, 0, 0, 0)
+                                  return dueDate <= today
+                                }) ||
+                              [...item.taggeddata]
+                                .sort((a, b) => new Date(a.nextDue) - new Date(b.nextDue))[0]
+                            : null
 
                           return (
                             <ProductCircleCard
                               key={`additional-${actualIndex}`}
-                              item={item}
-                              actualIndex={actualIndex}
-                              variant="service"
-                              topBadgeIcon={<FaBuilding size={10} />}
-                              line1={
-                                item?.shortName
-                                  ? item?.shortName
-                                  : item?.productName
-                              }
-                              line2={item?.amount ? `Rs. ${item.amount}` : ""}
-                              line3={
-                                Array.isArray(item?.taggeddata) &&
-                                item.taggeddata.length > 0
-                                  ? item.taggeddata
-                                      .map((x) => x.licensenumber)
-                                      .join(", ")
-                                      .slice(0, 18)
-                                  : ""
-                              }
-                              line4={
-                                item?.taggeddata?.length > 0
-                                  ? formatDateToDDMMYYYY(
-                                      item?.taggeddata?.[0]?.nextDue
-                                    )
-                                  : item?.nextDue
-                                    ? formatDateToDDMMYYYY(item?.nextDue)
-                                    : ""
-                              }
-                              onEdit={handleEdit}
+                              productType="Additionalservice"
+                              variant={isDeactive ? "danger" : "service"}
+                              line1={item?.shortName || item?.productName || item?.product_id?.productName}
+                              line2={Array.isArray(item?.taggeddata) && item.taggeddata.length > 0 ? item.taggeddata.map((tagged) => tagged.licensenumber).join(", ").slice(0, 18) : item?.licensenumber}
+                              line3={selectedTagged ? formatDateToDDMMYYYY(selectedTagged.nextDue) : item?.nextDue ? formatDateToDDMMYYYY(item.nextDue) : ""}
+                              line4={isDeactive ? "De Active" : "Active"}
+                              line5={selectedTagged?.productAmount || item?.productAmount || item?.amount}
                             />
                           )
                         })}
                       </div>
                     ) : (
-                      <div className="flex h-[140px] flex-col items-center justify-center rounded-[12px] border border-dashed border-[#e7ebf4] bg-[#fbfcff] text-center">
-                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#f2f4f8] text-[#9ca8be]">
+                      <div className="flex h-[110px] flex-col items-center justify-center rounded-[12px] border border-dashed border-[#e7ebf4] bg-[#fbfcff] text-center">
+                        <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#f2f4f8] text-[#9ca8be]">
                           <FaBuilding size={12} />
                         </div>
                         <p className="text-[12px] text-[#76839d]">
                           No additional services added.
                         </p>
-                        <p className="mt-1 text-[11px] text-[#a0abc0]">
+                        <p className="mt-0.5 text-[11px] text-[#a0abc0]">
                           Click Add Service to get started.
                         </p>
                       </div>
                     )}
+                  </div>
                   </div>
                 </div>
               </>
@@ -2269,7 +2227,6 @@ console.log("hhh")
                                       <input
                                         readOnly
                                         value={licenseNo}
-                                        readOnly
                                         className="w-full cursor-not-allowed rounded-[7px] border border-[#dfe5ee] bg-[#f3f6fb] px-2 py-1.5 text-[11px] text-[#1f2a3d] outline-none"
                                       />
                                     </td>
