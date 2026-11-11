@@ -93,6 +93,7 @@ console.log(openannoucementpopup)
     callListEndpoint
   )
 console.log(users)
+console.log("users")
   const { data: branchProduct } = UseFetch(
     selectedcompanybranchId &&
       `/product/getallbranchProduct?branch=${selectedcompanybranchId}`
