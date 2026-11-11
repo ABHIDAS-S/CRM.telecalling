@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
-import { X, Edit2, Save, DollarSign, Trash2 } from "lucide-react"
+import { X, Edit2, Save, DollarSign, Trash2, CalendarDays } from "lucide-react"
 import { PropagateLoader } from "react-spinners"
+import DatePicker from "react-datepicker"
+import "react-datepicker/dist/react-datepicker.css"
 import { toast } from "react-toastify"
 import api from "../../api/api"
 import { AlertTriangle, CheckCircle2, ShieldAlert, Receipt } from "lucide-react"
@@ -48,7 +50,9 @@ export const PaymentHistoryModal = ({
   const [submitLoading, setsubmitLoading] = useState(false)
   const [verifyDate, setVerifyDate] = useState("")
   const [rowVerifyDates, setRowVerifyDates] = useState({})
+  const [updatingVerifiedDateIndex, setUpdatingVerifiedDateIndex] = useState(null)
   const [closeLeadChoice, setCloseLeadChoice] = useState("no")
+  const [showReverseTargetPrompt, setShowReverseTargetPrompt] = useState(false)
 
   const toDateInputValue = (date) => {
     if (!date) return ""
@@ -91,6 +95,10 @@ export const PaymentHistoryModal = ({
     selectedLead?.forcefullyClosedTargetDate
   ])
 
+  useEffect(() => {
+    setShowReverseTargetPrompt(false)
+  }, [leadDocId])
+
   const formatDate = (dateString) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("en-IN", {
@@ -99,6 +107,19 @@ export const PaymentHistoryModal = ({
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit"
+    })
+  }
+
+  const formatClosedTargetDate = (dateString) => {
+    if (!dateString) return "Not recorded"
+
+    const date = new Date(dateString)
+    if (Number.isNaN(date.getTime())) return "Not recorded"
+
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
     })
   }
 
@@ -236,6 +257,28 @@ export const PaymentHistoryModal = ({
     }
   }
 
+  const handleReverseTargetUiConfirm = async () => {
+    try {
+      setsubmitLoading(true)
+      const response = await api.post(
+        `/lead/reverseforcefullyclosetarget?leadDocId=${leadDocId}`
+      )
+
+      toast.success(response.data?.message || "Forcefully closed target reversed")
+      setShowReverseTargetPrompt(false)
+      onClose(false)
+      setselectedLeadId(null)
+      refresh?.()
+    } catch (error) {
+      console.error("Unable to reverse forcefully closed target", error)
+      toast.error(
+        error.response?.data?.message || "Unable to reverse forcefully closed target"
+      )
+    } finally {
+      setsubmitLoading(false)
+    }
+  }
+
   const handleVerify = async (
     index,
     isCurrentlyVerified,
@@ -302,6 +345,36 @@ export const PaymentHistoryModal = ({
       console.log(error)
       toast.error("Something went wrong")
       setsubmitLoading(false)
+    }
+  }
+
+  const handleUpdateVerifiedDate = async (index, selectedVerifyDate) => {
+    if (!selectedVerifyDate) {
+      toast.error("Select a verified date")
+      return
+    }
+
+    try {
+      setUpdatingVerifiedDateIndex(index)
+      const response = await api.put("/lead/paymentverification", {
+        leadId: leadDocId,
+        index,
+        verifyDate: selectedVerifyDate,
+        updateVerifyDate: true
+      })
+
+      setRowVerifyDates((previousDates) => {
+        const nextDates = { ...previousDates }
+        delete nextDates[index]
+        return nextDates
+      })
+      toast.success(response.data?.message || "Verified date updated successfully")
+      refresh?.()
+    } catch (error) {
+      console.error("Unable to update verified date", error)
+      toast.error(error.response?.data?.message || "Unable to update verified date")
+    } finally {
+      setUpdatingVerifiedDateIndex(null)
     }
   }
 
@@ -642,6 +715,11 @@ export const PaymentHistoryModal = ({
       aria-modal="true"
       aria-labelledby="payment-history-title"
     >
+      <style>{`
+        #payment-history-date-picker-portal .react-datepicker-popper {
+          z-index: 80 !important;
+        }
+      `}</style>
       <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:max-w-6xl sm:rounded-2xl">
         {/* Header */}
         <div className="relative shrink-0 overflow-hidden bg-gradient-to-r from-blue-600 via-blue-600 to-indigo-700 px-4 py-3 sm:px-6 sm:py-4">
@@ -900,6 +978,12 @@ export const PaymentHistoryModal = ({
                       (isPaymentVerified
                         ? toDateInputValue(row?.verifiedAt)
                         : toDateInputValue(new Date()))
+                    const storedVerifyDate = toDateInputValue(row?.verifiedAt)
+                    const hasChangedVerifiedDate =
+                      verifiedLead &&
+                      isPaymentVerified &&
+                      Boolean(rowVerifyDate) &&
+                      rowVerifyDate !== storedVerifyDate
 
                     return (
                       <tr
@@ -1148,23 +1232,67 @@ export const PaymentHistoryModal = ({
                           </td>
                         )}
                         <td className="px-3 py-3 text-sm">
-                          <label className="flex flex-col gap-1 text-xs font-semibold text-emerald-800">
-                            <span className="sr-only">Date verify</span>
-                            <input
-                              type="date"
-                              value={rowVerifyDate}
-                              onChange={(event) => {
-                                const value = event.target.value
-                                setRowVerifyDates((previousDates) => ({
-                                  ...previousDates,
-                                  [rowOriginalIndex]: value
-                                }))
-                              }}
-                              disabled={submitLoading || !isdepartmentisAccountant}
-                              className="h-8 w-full min-w-0 rounded-md border border-emerald-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-                              aria-label={`Date verify for payment ${index + 1}`}
-                            />
-                          </label>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="flex flex-col gap-1 text-xs font-semibold text-emerald-800">
+                              <span className="sr-only">Date verify</span>
+                              <div className="relative">
+                                <CalendarDays className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                                <DatePicker
+                                  selected={
+                                    rowVerifyDate
+                                      ? new Date(`${rowVerifyDate}T00:00:00`)
+                                      : null
+                                  }
+                                  onChange={(date) => {
+                                    if (!date || isForcefullyClosed) return
+
+                                    setRowVerifyDates((previousDates) => ({
+                                      ...previousDates,
+                                      [rowOriginalIndex]: toDateInputValue(date)
+                                    }))
+                                  }}
+                                  dateFormat="dd MMM yyyy"
+                                  popperPlacement="bottom-end"
+                                  portalId="payment-history-date-picker-portal"
+                                  popperClassName="payment-history-date-picker-popper"
+                                  showPopperArrow={false}
+                                  calendarClassName="!rounded-xl !border-slate-200 !shadow-xl"
+                                  wrapperClassName="block w-full"
+                                  disabled={
+                                    submitLoading ||
+                                    updatingVerifiedDateIndex === rowOriginalIndex ||
+                                    !isdepartmentisAccountant ||
+                                    isForcefullyClosed
+                                  }
+                                  readOnly={isForcefullyClosed}
+                                  className="h-8 w-full min-w-0 cursor-pointer rounded-md border border-slate-300 bg-white py-0 pl-8 pr-2 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                                  aria-label={`Date verify for payment ${index + 1}`}
+                                />
+                              </div>
+                            </label>
+
+                            {isdepartmentisAccountant && hasChangedVerifiedDate && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateVerifiedDate(
+                                    rowOriginalIndex,
+                                    rowVerifyDate
+                                  )
+                                }
+                                disabled={
+                                  submitLoading ||
+                                  updatingVerifiedDateIndex === rowOriginalIndex
+                                }
+                                className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md bg-blue-600 px-2 text-[11px] font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                <Save className="h-3.5 w-3.5" />
+                                {updatingVerifiedDateIndex === rowOriginalIndex
+                                  ? "Updating…"
+                                  : "Update date"}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -1177,10 +1305,62 @@ export const PaymentHistoryModal = ({
 
         {/* Footer */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
-          <p className="text-sm text-slate-600">
-            Total records:{" "}
-            <span className="font-bold text-slate-800">{data.length}</span>
-          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-slate-600">
+              Total records:{" "}
+              <span className="font-bold text-slate-800">{data.length}</span>
+            </p>
+
+            {isForcefullyClosed && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                <div className="leading-tight">
+                  <p className="text-xs font-bold text-amber-900">Forcefully closed target</p>
+                  <p className="text-[10px] text-amber-700">Verified dates are read-only</p>
+                </div>
+
+                <div className="rounded-md border border-amber-200 bg-white/70 px-2 py-1 leading-tight">
+                  <p className="text-[9px] font-bold uppercase tracking-wide text-amber-700">
+                    Closed target date
+                  </p>
+                  <p className="text-[11px] font-bold text-amber-950">
+                    {formatClosedTargetDate(selectedLead?.forcefullyClosedTargetDate)}
+                  </p>
+                </div>
+
+                {isdepartmentisAccountant && !showReverseTargetPrompt && (
+                  <button
+                    type="button"
+                    onClick={() => setShowReverseTargetPrompt(true)}
+                    className="ml-1 inline-flex h-7 items-center rounded-md border border-amber-300 bg-white px-2.5 text-[11px] font-bold text-amber-800 shadow-sm transition hover:bg-amber-100"
+                  >
+                    Reverse target
+                  </button>
+                )}
+
+                {isdepartmentisAccountant && showReverseTargetPrompt && (
+                  <div className="flex flex-wrap items-center gap-1.5 border-l border-amber-200 pl-2 text-[11px]">
+                    <span className="font-semibold text-amber-900">Reverse this closed target?</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowReverseTargetPrompt(false)}
+                      className="rounded px-2 py-1 font-semibold text-slate-600 transition hover:bg-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReverseTargetUiConfirm}
+                      disabled={submitLoading}
+                      className="rounded bg-amber-600 px-2 py-1 font-bold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Confirm reversal
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-3">
             {isdepartmentisAccountant && verifiedLead && (

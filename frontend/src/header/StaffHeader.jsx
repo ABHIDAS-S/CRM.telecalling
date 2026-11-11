@@ -592,7 +592,7 @@ console.log(user?.department?.code)
 
   return (
     <>
-      <header className="sticky top-0 z-50 h-16 border-b border-white/10 bg-black px-4 shadow-[0_2px_12px_rgba(15,23,42,0.28)] sm:px-6">
+      <header className="sticky top-0 z-50 h-16 border-b border-slate-300/70 bg-[#ADD8E6] px-4 shadow-[0_2px_12px_rgba(15,23,42,0.10)] sm:px-6">
         <div className="grid h-full w-full grid-cols-[auto_1fr_auto] items-center gap-2 sm:gap-4">
           {/* Left */}
           <div className="flex min-w-0 items-center gap-3">

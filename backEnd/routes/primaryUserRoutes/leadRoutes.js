@@ -48,6 +48,7 @@ import {
   getAlltasktoTarget,
 GetleadById,
 ApprovedforcefullyClosedTarget,
+ReverseforcefullyClosedTarget,
 Leadclosing,
 Checkduplicatecustomer,
 // exportBranchWiseProductUsage,
@@ -135,6 +136,7 @@ router.post(
   UpdateOrSubmittaskByfollower
 );
 router.post("/approveforcefullyclosetarget",authMiddleware,ApprovedforcefullyClosedTarget)
+router.post("/reverseforcefullyclosetarget",authMiddleware,ReverseforcefullyClosedTarget)
 router.post("/rnd-allocation", authMiddleware, AllocateResearchAndDevelopmentTask)
 router.post("/rnd-task-update", authMiddleware, UpdateResearchAndDevelopmentTask)
 router.post("/rnd-task-transfer", authMiddleware, TransferResearchAndDevelopmentTask)

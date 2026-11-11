@@ -2859,6 +2859,7 @@ export const UpdatepaymentVerification = async (req, res) => {
       verifiedBy,
       verifyDate,
       unVerify = false,
+      updateVerifyDate = false,
     } = req.body;
 
     // Find lead
@@ -2882,6 +2883,28 @@ export const UpdatepaymentVerification = async (req, res) => {
     }
 
     const payment = lead.paymentHistory[index];
+
+    if (updateVerifyDate === true) {
+      if (payment.paymentVerified !== true) {
+        return res.status(400).json({
+          message: "Only verified payments can have their verified date updated",
+        });
+      }
+
+      const selectedVerifyDate = new Date(verifyDate);
+      if (!verifyDate || Number.isNaN(selectedVerifyDate.getTime())) {
+        return res.status(400).json({
+          message: "A valid verify date is required",
+        });
+      }
+
+      payment.verifiedAt = selectedVerifyDate;
+      await lead.save();
+
+      return res.status(200).json({
+        message: "Verified date updated successfully",
+      });
+    }
 
     // =========================
     // UNVERIFY PAYMENT
@@ -8759,6 +8782,43 @@ export const ApprovedforcefullyClosedTarget = async (req, res) => {
     })
   } catch (error) {
     console.error("ApprovedforcefullyClosedTarget error:", error)
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" })
+  }
+}
+
+export const ReverseforcefullyClosedTarget = async (req, res) => {
+  try {
+    const { leadDocId } = req.query
+
+    if (!leadDocId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "leadDocId is required" })
+    }
+
+    const lead = await LeadMaster.findById(leadDocId)
+    if (!lead) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Lead not found" })
+    }
+
+    await LeadMaster.findByIdAndUpdate(leadDocId, {
+      $unset: {
+        forcefullyClosedTarget: 1,
+        forcefullyClosedTargetDate: 1
+      }
+    })
+
+    return res.status(200).json({
+      success: true,
+      message: "Forcefully closed target reversed successfully",
+      data: { leadDocId }
+    })
+  } catch (error) {
+    console.error("ReverseforcefullyClosedTarget error:", error)
     return res
       .status(500)
       .json({ success: false, message: "Internal server error" })
