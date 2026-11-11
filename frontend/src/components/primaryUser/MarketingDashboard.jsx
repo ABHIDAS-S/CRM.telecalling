@@ -913,6 +913,7 @@ const MarketingDashboard = () => {
     stages[stage?.stage] = stage
     return stages
   }, {})
+  const displayedNewLeadCount = newLeadFunnelMetric.count
   const funnelStages = [
     ["New Leads", 100, "linear-gradient(180deg, #326fe4 0%, #2459bd 100%)", "#2563d9"],
     ["Contacted", 84, "linear-gradient(180deg, #4b91ec 0%, #2e72d0 100%)", "#3b82f6"],
@@ -927,7 +928,12 @@ const MarketingDashboard = () => {
     amount: label === "New Leads"
       ? newLeadFunnelMetric.amount
       : funnelNumber(salesFunnelStageMap[label]?.value),
-    conversion: salesFunnelStageMap[label]?.conversion || "0%",
+    conversion:
+      label === "Contacted"
+        ? displayedNewLeadCount > 0
+          ? `${((funnelNumber(salesFunnelStageMap[label]?.count) / displayedNewLeadCount) * 100).toFixed(1)}%`
+          : "0%"
+        : salesFunnelStageMap[label]?.conversion || "0%",
     width,
     color,
     dotColor
