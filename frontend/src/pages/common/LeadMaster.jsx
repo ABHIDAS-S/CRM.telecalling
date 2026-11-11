@@ -5,7 +5,12 @@ import { useSelector } from "react-redux"
 import { parsePhoneNumberFromString } from "libphonenumber-js/mobile"
 import { Country, State } from "country-state-city"
 import BarLoader from "react-spinners/BarLoader"
-import { FaSpinner } from "react-icons/fa"
+import {
+  FaSpinner,
+  FaUser,
+  FaBuilding,
+  FaMapMarkerAlt,
+} from "react-icons/fa"
 import Select from "react-select"
 import { useForm, Controller } from "react-hook-form"
 import PopUp from "../../components/common/PopUp"
@@ -54,6 +59,43 @@ const modernMenuSelectStyles = {
         : "#ffffff",
     cursor: "pointer"
   })
+}
+
+const customerModalSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: 32,
+    borderRadius: 8,
+    borderColor: state.isFocused ? "#7ba7ff" : "#dfe5ee",
+    boxShadow: "none",
+    fontSize: 12,
+    backgroundColor: "#f8fafc",
+    "&:hover": { borderColor: "#7ba7ff" }
+  }),
+  valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+  indicatorsContainer: (base) => ({ ...base, height: 32 }),
+  menu: (base) => ({ ...base, zIndex: 9999 })
+}
+
+function CustomerInfoCard({ icon, iconBg, iconColor, label, children, error }) {
+  return (
+    <div className="rounded-[14px] border border-[#edf1f7] bg-white px-3 py-2.5 transition hover:border-[#dbe6ff]">
+      <div className="flex items-start gap-3">
+        <div
+          className={`mt-[2px] flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${iconBg} ${iconColor}`}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="mb-1 text-[11px] font-medium text-[#8c96ad]">
+            {label}
+          </p>
+          {children}
+          {error ? <p className="mt-1 text-[11px] text-red-500">{error}</p> : null}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function ModernMenuSelect({
@@ -7062,20 +7104,23 @@ convertexcel
 
           {modalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4">
-              <div className="flex w-full max-w-4xl max-h-[88vh] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+              <div className="flex w-[calc(100vw-2rem)] max-w-[1440px] max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-[20px] border border-[#edf1f7] bg-white shadow-2xl">
                 {/* Header */}
-                <div className="flex shrink-0 items-start justify-between border-b border-slate-200 bg-[#1B2A4A] px-5 py-3.5 sm:px-6">
-                  <div>
-                    <h2 className="text-sm font-semibold tracking-wide text-white sm:text-base">
+                <div className="flex shrink-0 items-center justify-between border-b border-[#edf1f7] bg-white px-5 py-4 sm:px-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#eef5ff] text-[#4b87ff]">
+                      <FaUser size={14} />
+                    </div>
+                    <div>
+                    <h2 className="text-[16px] font-semibold text-[#162033]">
                       {checknewcustomer
                         ? "Add New Customer"
                         : "Update Customer Details"}
                     </h2>
-                    {!Data && (
-                      <p className="mt-0.5 text-[11px] text-blue-200">
-                        Fill in the details to register a new customer
-                      </p>
-                    )}
+                    <p className="text-[12px] text-[#7f8aa3]">
+                      Fill customer master information
+                    </p>
+                    </div>
                   </div>
 
                   <button
@@ -7085,7 +7130,7 @@ convertexcel
                       clearmodalErros()
                       resetModal()
                     }}
-                    className="rounded-full p-1.5 text-blue-200 transition hover:bg-white/10 hover:text-white"
+                    className="rounded-full p-1.5 text-[#7f8aa3] transition hover:bg-[#f4f7fb] hover:text-[#162033]"
                   >
                     <svg
                       className="h-5 w-5"
@@ -7109,7 +7154,7 @@ convertexcel
                   className="flex min-h-0 flex-1 flex-col"
                 >
                   {/* Scrollable body only */}
-                  <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
+                  <div className="min-h-0 flex-1 overflow-y-auto bg-[#fbfcff] px-5 py-3 sm:px-6">
                     <input
                       type="hidden"
                       {...registerModal("customerid")}
@@ -7126,13 +7171,15 @@ convertexcel
                       }
                     />
 
+                    <div className="space-y-2.5">
                     {/* Basic Information */}
-                    <div className="mb-4">
-                      <p className="mb-2 border-b border-slate-200 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#1B2A4A]">
-                        Basic Information
-                      </p>
-
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <CustomerInfoCard
+                      icon={<FaUser size={12} />}
+                      iconBg="bg-[#edf6ff]"
+                      iconColor="text-[#5aa2ff]"
+                      label="Customer Information"
+                    >
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
                         <div>
                           <label className="mb-1 block text-[11px] font-semibold text-slate-600">
                             Customer Name
@@ -7150,7 +7197,7 @@ convertexcel
                               )
                             }
                             placeholder="Customer Name"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                           {errorsModal.customerName && (
                             <p className="mt-1 text-[11px] text-red-500">
@@ -7167,7 +7214,7 @@ convertexcel
                             type="email"
                             {...registerModal("email")}
                             placeholder="Email"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                         </div>
 
@@ -7193,7 +7240,7 @@ convertexcel
                               setValueModal("mobile", e.target.value.trim())
                             }
                             placeholder="Mobile"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           /> */}
                           <input
                             type="tel"
@@ -7264,7 +7311,7 @@ convertexcel
                               setValueModal("mobile", e.target.value.trim())
                             }
                             placeholder="Mobile"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                           {duplicateWarning && (
                             <p className="mt-1 text-xs font-medium text-red-500">
@@ -7289,7 +7336,7 @@ convertexcel
                               setValueModal("landline", e.target.value.trim())
                             }
                             placeholder="Landline"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                         </div>
 
@@ -7310,7 +7357,7 @@ convertexcel
                               )
                             }
                             placeholder="Contact Person"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                           {errorsModal.contactPerson && (
                             <p className="mt-1 text-[11px] text-red-500">
@@ -7319,7 +7366,7 @@ convertexcel
                           )}
                         </div>
 
-                        <div className="md:col-span-2">
+                        <div className="sm:col-span-2">
                           <label className="mb-1 block text-[11px] font-semibold text-slate-600">
                             Address
                           </label>
@@ -7330,19 +7377,20 @@ convertexcel
                             }
                             placeholder="Address"
                             rows={2}
-                            className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10 resize-none"
+                            className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10 resize-none"
                           />
                         </div>
                       </div>
-                    </div>
+                    </CustomerInfoCard>
 
                     {/* Location */}
-                    <div className="mb-4">
-                      <p className="mb-2 border-b border-slate-200 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#1B2A4A]">
-                        Location
-                      </p>
-
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <CustomerInfoCard
+                      icon={<FaMapMarkerAlt size={12} />}
+                      iconBg="bg-[#fff0f8]"
+                      iconColor="text-[#ef7db2]"
+                      label="Location"
+                    >
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
                         <div>
                           <label className="mb-1 block text-[11px] font-semibold text-slate-600">
                             Country
@@ -7353,6 +7401,7 @@ convertexcel
                             render={({ field }) => (
                               <Select
                                 options={countryOptions}
+                                styles={customerModalSelectStyles}
                                 value={
                                   countryOptions.find(
                                     (opt) => opt.value === field.value
@@ -7378,6 +7427,7 @@ convertexcel
                             render={({ field }) => (
                               <Select
                                 options={stateOptions}
+                                styles={customerModalSelectStyles}
                                 value={
                                   stateOptions.find(
                                     (opt) => opt.value === field.value
@@ -7404,7 +7454,7 @@ convertexcel
                               setValueModal("city", e.target.value.trim())
                             }
                             placeholder="City"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                         </div>
 
@@ -7419,26 +7469,27 @@ convertexcel
                               setValueModal("pincode", e.target.value.trim())
                             }
                             placeholder="Pincode"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                         </div>
                       </div>
-                    </div>
+                    </CustomerInfoCard>
 
                     {/* Business Information */}
-                    <div>
-                      <p className="mb-2 border-b border-slate-200 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#1B2A4A]">
-                        Business Information
-                      </p>
-
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <CustomerInfoCard
+                      icon={<FaBuilding size={12} />}
+                      iconBg="bg-[#fff4ea]"
+                      iconColor="text-[#f0a24d]"
+                      label="Registration Information"
+                    >
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
                       <div className="hidden">
                           <label className="mb-1 block text-[11px] font-semibold text-slate-600">
                             Partnership Type
                           </label>
                           <select
                             {...registerModal("partner")}
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           >
                             <option value="">Select Partner</option>
                             {partner?.map((p, i) => (
@@ -7455,7 +7506,7 @@ convertexcel
                           </label>
                           <select
                             {...registerModal("registrationType")}
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           >
                             <option value="">Select Type</option>
                             <option value="unregistered">
@@ -7476,7 +7527,7 @@ convertexcel
                                 required: "GST is required"
                               })}
                               placeholder="e.g. 22AAAAA0000A1Z5"
-                              className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                              className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                             />
                             {errorsModal.gstNo && (
                               <p className="mt-1 text-[11px] text-red-500">
@@ -7486,11 +7537,12 @@ convertexcel
                           </div>
                         )}
                       </div>
+                    </CustomerInfoCard>
                     </div>
                   </div>
 
                   {/* Fixed footer */}
-                  <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200 bg-white px-5 py-3 sm:px-6">
+                  <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200 bg-white px-5 py-2.5 sm:px-6">
                     <button
                       type="button"
                       onClick={() => {

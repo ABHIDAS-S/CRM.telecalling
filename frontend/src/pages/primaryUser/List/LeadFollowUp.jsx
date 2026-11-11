@@ -21,6 +21,7 @@ import {
   Settings,
   MessageSquareText,
   User,
+  Users,
   Calendar,
   Clock,
   UserPlus,
@@ -1643,6 +1644,76 @@ const LeadFollowUp = () => {
     return Number(total.toFixed(2))
   }
 
+  // This mirrors the Marketing Dashboard's active follow-up rules. A lead
+  // stops being a follow-up item once it is closed, converted/lost, or moved
+  // to another staff task after the latest active follow-up allocation.
+  const getDashboardFollowupStatus = (lead, asOfDate) => {
+    const logs = Array.isArray(lead?.activityLog) ? lead.activityLog : []
+    const asOf = new Date(asOfDate)
+    asOf.setHours(23, 59, 59, 999)
+
+    const activeAllocation = logs
+      .map((log, index) => ({ log, index }))
+      .filter(({ log }) => {
+        const submittedAt = new Date(log?.submissionDate)
+        return (
+          log?.taskTo === "followup" &&
+          log?.taskallocatedTo &&
+          log?.allocationChanged !== true &&
+          !Number.isNaN(submittedAt.getTime()) &&
+          submittedAt <= asOf
+        )
+      })
+      .at(-1)
+
+    if (!activeAllocation) return null
+
+    const entriesAfterAllocation = logs
+      .slice(activeAllocation.index + 1)
+      .filter((log) => {
+        const submittedAt = new Date(log?.submissionDate)
+        return !Number.isNaN(submittedAt.getTime()) && submittedAt <= asOf
+      })
+    const nextFollowupEntries = entriesAfterAllocation.filter((log) => {
+      const nextDue = new Date(log?.nextFollowUpDate)
+      return (
+        log?.nextFollowUpDate &&
+        !Number.isNaN(nextDue.getTime()) &&
+        nextDue > new Date("2000-01-01T00:00:00.000Z")
+      )
+    })
+    const latestNextFollowup = nextFollowupEntries.at(-1)
+    const hasClosedFollowup =
+      Boolean(activeAllocation.log?.followupClosed) ||
+      entriesAfterAllocation.some((log) => Boolean(log?.followupClosed))
+    const hasTaskAfterFollowup = entriesAfterAllocation.some(
+      (log) =>
+        log?.taskallocatedTo &&
+        ["Staff", "Admin"].includes(log?.taskallocatedToModel)
+    )
+
+    if (
+      lead?.leadClosed ||
+      lead?.leadLost ||
+      lead?.leadLostDate ||
+      lead?.leadConvertedDate ||
+      hasClosedFollowup ||
+      hasTaskAfterFollowup ||
+      !latestNextFollowup
+    ) {
+      return null
+    }
+
+    const nextDue = new Date(latestNextFollowup.nextFollowUpDate)
+    nextDue.setHours(0, 0, 0, 0)
+    const asOfDay = new Date(asOf)
+    asOfDay.setHours(0, 0, 0, 0)
+
+    if (nextDue < asOfDay) return "overdue"
+    if (nextDue.getTime() === asOfDay.getTime()) return "dueToday"
+    return "future"
+  }
+
   const normalizeTableData = (data) => {
     if (Array.isArray(data)) {
       return [{ staffName: null, leads: data }]
@@ -1717,29 +1788,13 @@ const LeadFollowUp = () => {
         setTableData(groupedData)
       } else {
         if (safeState?.viewMode === "overDue") {
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-
-          const overdueLeads = leads.filter((lead) => {
-            // 1️⃣ Get logs having nextFollowUpDate
-            const followupLogs = lead.activityLog.filter(
-              (log) =>
-                log.nextFollowUpDate &&
-                new Date(log.nextFollowUpDate) > new Date("2000-01-01")
-            )
-
-            // 2️⃣ If no followups → NOT overdue
-            if (followupLogs.length === 0) return false
-
-            // 3️⃣ Get last followup log
-            const lastFollowup = followupLogs[followupLogs.length - 1]
-
-            const nextDate = new Date(lastFollowup.nextFollowUpDate)
-            nextDate.setHours(0, 0, 0, 0)
-
-            // 4️⃣ Check overdue
-            return nextDate < today && !lead.leadConvertedDate && !lead.leadLost
-          })
+          const overdueLeads = leads.filter(
+            (lead) =>
+              getDashboardFollowupStatus(
+                lead,
+                dates.endDate || new Date()
+              ) === "overdue"
+          )
 
           const groupedLeads = {}
           let grandTotal = 0
@@ -3073,6 +3128,13 @@ console.log("hhh")
         .filter((group) => group.leads.length > 0)
     : currentData
 
+  const visibleLeadCount = Array.isArray(visibleData)
+    ? visibleData.reduce(
+        (count, group) => count + (Array.isArray(group?.leads) ? group.leads.length : 0),
+        0
+      )
+    : 0
+
   const hasLeads = () => {
     if (!Array.isArray(visibleData) || visibleData.length === 0) return false
     return visibleData.some(
@@ -3093,9 +3155,22 @@ console.log("hhh")
           <div className="flex flex-col flex-1 bg-[#ADD8E6] min-h-0">
             <Breadcrumb items={Breadcrumblist} />
             <div className="flex flex-col gap-3 px-4 py-1 md:flex-row md:items-end">
-              <h2 className="shrink-0 whitespace-nowrap text-lg font-bold text-slate-900">
-                Lead Follow Up
-              </h2>
+              <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
+                <h2 className="text-lg font-bold text-slate-900">
+                  Lead Follow Up
+                </h2>
+                <span className="inline-flex items-center gap-1 rounded-md border border-blue-200/80 bg-white/80 px-2 py-1 text-xs font-semibold text-blue-800 shadow-sm">
+                  <Users className="h-3.5 w-3.5 text-blue-600" />
+                  {visibleLeadCount} listed
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200/80 bg-white/80 px-2 py-1 text-xs font-semibold text-emerald-800 shadow-sm">
+                  <IndianRupee className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Total net amount:</span>
+                  <span className="tabular-nums">
+                    {statusAllocated ? allocatednetAmount : netTotalAmount}
+                  </span>
+                </span>
+              </div>
 
               <div className="flex flex-1 flex-wrap items-end justify-end gap-3">
                 <div className="relative w-full sm:w-52 lg:w-56">
@@ -3270,18 +3345,6 @@ console.log("hhh")
                 </div>
               </div>
             </div>
-            <div className="flex justify-end mr-5">
-              <span className="text-blue-700 font-semibold">
-                Total Amount -
-              </span>
-              <div className="flex items-center ml-1">
-                <IndianRupee className="w-3 h-3 text-green-600 mr-1" />
-                <span>
-                  {statusAllocated ? allocatednetAmount : netTotalAmount}
-                </span>
-              </div>
-            </div>
-
             {/* <div className=" min-h-0 overflow-auto rounded-lg shadow-xl mx-2 md:mx-3 mb-3 bg-white">
               {loading ? (
                 <SkeletonTable rows={7} />
