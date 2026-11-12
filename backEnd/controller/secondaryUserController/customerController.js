@@ -634,7 +634,7 @@ export const GetallPartners = async (req, res) => {
 export const GetPartnerCustomers = async (req, res) => {
   try {
     const customers = await Customer.find({ isPartner: true })
-      .select("customerName mobile isPartner isActive")
+      .select("customerName")
       .sort({ customerName: 1 })
       .lean()
 

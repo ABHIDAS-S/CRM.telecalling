@@ -10,6 +10,11 @@ import {
   FaUser,
   FaBuilding,
   FaMapMarkerAlt,
+  FaEnvelope,
+  FaPhone,
+  FaGlobeAsia,
+  FaHashtag,
+  FaLandmark,
 } from "react-icons/fa"
 import Select from "react-select"
 import { useForm, Controller } from "react-hook-form"
@@ -26,7 +31,7 @@ import FullScreenLoader from "../../components/common/FullScreenLoader"
 const modernMenuSelectStyles = {
   control: (base, state) => ({
     ...base,
-    minHeight: 40,
+    minHeight: 32,
     borderRadius: 8,
     borderColor: state.isFocused ? "#1B2A4A" : "#e2e8f0",
     boxShadow: state.isFocused ? "0 0 0 4px rgba(27, 42, 74, 0.1)" : "0 1px 2px rgba(15, 23, 42, 0.05)",
@@ -38,7 +43,7 @@ const modernMenuSelectStyles = {
   singleValue: (base) => ({ ...base, color: "#334155", fontWeight: 500 }),
   placeholder: (base) => ({ ...base, color: "#94a3b8" }),
   indicatorSeparator: () => ({ display: "none" }),
-  dropdownIndicator: (base) => ({ ...base, color: "#94a3b8", padding: 8 }),
+  dropdownIndicator: (base) => ({ ...base, color: "#94a3b8", padding: 6 }),
   menu: (base) => ({
     ...base,
     zIndex: 30,
@@ -64,25 +69,88 @@ const modernMenuSelectStyles = {
 const customerModalSelectStyles = {
   control: (base, state) => ({
     ...base,
-    minHeight: 32,
-    borderRadius: 8,
-    borderColor: state.isFocused ? "#7ba7ff" : "#dfe5ee",
+    minHeight: 20,
+    borderRadius: 0,
+    border: 0,
     boxShadow: "none",
     fontSize: 12,
-    backgroundColor: "#f8fafc",
-    "&:hover": { borderColor: "#7ba7ff" }
+    backgroundColor: "transparent",
+    "&:hover": { border: 0 }
   }),
-  valueContainer: (base) => ({ ...base, padding: "0 8px" }),
-  indicatorsContainer: (base) => ({ ...base, height: 32 }),
-  menu: (base) => ({ ...base, zIndex: 9999 })
+  valueContainer: (base) => ({ ...base, padding: 0 }),
+  indicatorsContainer: (base) => ({ ...base, height: 20 }),
+  dropdownIndicator: (base) => ({ ...base, padding: 0, color: "#64748b" }),
+  indicatorSeparator: () => ({ display: "none" }),
+  menu: (base) => ({
+    ...base,
+    zIndex: 9999,
+    overflow: "hidden",
+    border: "1px solid #dfe5ee",
+    borderRadius: 10,
+    boxShadow: "0 12px 28px rgba(15, 23, 42, 0.16)"
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  option: (base, state) => ({
+    ...base,
+    padding: "9px 11px",
+    fontSize: 12,
+    color: state.isSelected ? "#ffffff" : "#334155",
+    backgroundColor: state.isSelected
+      ? "#1B2A4A"
+      : state.isFocused
+        ? "#eff6ff"
+        : "#ffffff",
+    cursor: "pointer"
+  })
 }
 
-function CustomerInfoCard({ icon, iconBg, iconColor, label, children, error }) {
+const customerModalFieldGridClass =
+  "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4 [&>div]:relative [&>div]:rounded-xl [&>div]:border [&>div]:border-[#edf1f7] [&>div]:bg-white [&>div]:px-2.5 [&>div]:py-1.5 [&>div]:pl-10 [&>div]:transition [&>div]:hover:border-[#dbe6ff] [&>div>input]:border-0 [&>div>input]:bg-transparent [&>div>input]:p-0 [&>div>textarea]:border-0 [&>div>textarea]:bg-transparent [&>div>textarea]:p-0"
+
+function CustomerFieldLabel({ icon, iconBg = "bg-[#edf6ff]", iconColor = "text-[#5aa2ff]", children }) {
   return (
-    <div className="rounded-[14px] border border-[#edf1f7] bg-white px-3 py-2.5 transition hover:border-[#dbe6ff]">
+    <>
+      <span className={`absolute left-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md ${iconBg} ${iconColor}`}>
+        {icon}
+      </span>
+      <label className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-[#8c96ad]">
+        {children}
+      </label>
+    </>
+  )
+}
+
+function CustomerModalSelect({ options, value, onChange, placeholder }) {
+  return (
+    <Select
+      options={options}
+      value={options.find((option) => option.value === value) || null}
+      onChange={(option) => onChange(option?.value || "")}
+      placeholder={placeholder}
+      isSearchable={false}
+      styles={customerModalSelectStyles}
+      menuPortalTarget={typeof document === "undefined" ? null : document.body}
+      noOptionsMessage={() => "No options available"}
+    />
+  )
+}
+
+function CustomerInfoCard({
+  icon,
+  iconBg,
+  iconColor,
+  label,
+  children,
+  error,
+  plain = false
+}) {
+  if (plain) return children
+
+  return (
+    <div className="rounded-xl border border-[#edf1f7] bg-white px-2.5 py-1.5 transition hover:border-[#dbe6ff]">
       <div className="flex items-start gap-3">
         <div
-          className={`mt-[2px] flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${iconBg} ${iconColor}`}
+          className={`mt-[2px] flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${iconBg} ${iconColor}`}
         >
           {icon}
         </div>
@@ -1730,6 +1798,7 @@ console.log(originalCustomerTableData)
   const dropdownLeadforRef = useRef(null)
   const registrationType = watchModal("registrationType")
   const selectedCountrymodal = watchModal("country")
+  const isPartnerModal = watchModal("isPartner") === true
   const navigate = useNavigate()
   const location = useLocation()
   const mobileValue = watchModal("mobile")
@@ -1919,7 +1988,6 @@ console.log(originalCustomerTableData)
   const partnerCustomerOptions = useMemo(
     () =>
       (Array.isArray(partnerCustomers) ? partnerCustomers : [])
-        .filter((customer) => customer?.isPartner === true)
         .map((customer) => ({
           customerId: String(customer._id),
           value: String(customer._id),
@@ -3120,12 +3188,28 @@ console.log(licenses)
       setValueModal("landline", selectedCustomer?.landline)
       setValueModal("contactPerson", selectedCustomer?.contactPerson)
       setValueModal("address1", selectedCustomer?.address1)
+      setValueModal("address2", selectedCustomer?.address2)
       setValueModal("pincode", selectedCustomer?.pincode)
-      setValueModal("partner", selectedCustomer?.partner?._id)
+      setValueModal(
+        "partner",
+        selectedCustomer?.partner?._id || selectedCustomer?.partner || ""
+      )
+      setValueModal(
+        "partnerSelection",
+        selectedCustomer?.partnerSelection?._id ||
+          selectedCustomer?.partnerSelection ||
+          ""
+      )
+      setValueModal(
+        "isPartner",
+        selectedCustomer?.isPartner ?? Boolean(selectedCustomer?.partner)
+      )
       setValueModal("registrationType", selectedCustomer?.registrationType)
       setValueModal("gstNo", selectedCustomer?.gstNo)
       setValueModal("city", selectedCustomer?.city)
       setValueModal("country", selectedCustomer?.country)
+      setValueModal("state", selectedCustomer?.state)
+      setValueModal("isActive", selectedCustomer?.isActive || "Running")
       console.log("hhh")
     }
   }
@@ -5427,7 +5511,7 @@ convertexcel
                           styles={{
                             control: (base, state) => ({
                               ...base,
-                              minHeight: 38,
+                              minHeight: 32,
                               borderRadius: 8,
                               borderColor: state.isFocused ? "#1B2A4A" : "#CBD5E1",
                               backgroundColor: state.isDisabled ? "#F1F5F9" : "#FFFFFF",
@@ -5444,7 +5528,7 @@ convertexcel
                             }),
                             valueContainer: (base) => ({
                               ...base,
-                              padding: "0 10px"
+                              padding: "0 8px"
                             }),
                             placeholder: (base) => ({
                               ...base,
@@ -5466,7 +5550,7 @@ convertexcel
                             dropdownIndicator: (base, state) => ({
                               ...base,
                               color: state.isFocused ? "#1B2A4A" : "#64748B",
-                              padding: 7,
+                              padding: 5,
                               "&:hover": { color: "#1B2A4A" }
                             }),
                             menu: (base) => ({
@@ -5588,7 +5672,7 @@ convertexcel
                       {...registerMain("email")}
                       disabled={isReadOnly}
                       placeholder="Email..."
-                      className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
+                      className={`h-8 w-full border border-gray-300 rounded px-3 text-sm outline-none bg-[#EEF2F8] ${
                         isReadOnly ? "cursor-not-allowed opacity-70" : ""
                       }`}
                     />
@@ -5601,7 +5685,7 @@ convertexcel
                       {...registerMain("phone")}
                       disabled={isReadOnly}
                       placeholder="Landline..."
-                      className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
+                      className={`h-8 w-full border border-gray-300 rounded px-3 text-sm outline-none bg-[#EEF2F8] ${
                         isReadOnly ? "cursor-not-allowed opacity-70" : ""
                       }`}
                     />
@@ -5618,7 +5702,7 @@ convertexcel
                         isMobileTypedByUser.current = true
                         mobileRegister.onChange(e)
                       }}
-                      className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
+                      className={`h-8 w-full border border-gray-300 rounded px-3 text-sm outline-none bg-[#EEF2F8] ${
                         isReadOnly ? "cursor-not-allowed opacity-70" : ""
                       }`}
                     />
@@ -5693,6 +5777,55 @@ convertexcel
                       </p>
                     )}
                   </div>
+                  {process === "Registration" && showInput && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">
+                        Self Allocation / Other
+                      </label>
+                      <Controller
+                        name="selfAllocation"
+                        control={controlMain}
+                        defaultValue={false}
+                        rules={{
+                          validate: (value) =>
+                            value === true || value === false
+                              ? true
+                              : "This field is required"
+                        }}
+                        render={({ field }) => (
+                          <ModernMenuSelect
+                            value={field.value ? "true" : "false"}
+                            isDisabled={!isSelfAllocationChangable}
+                            onChange={(value) => {
+                              const isSelfAllocated = value === "true"
+                              field.onChange(isSelfAllocated)
+                              setValueMain("allocationType", "followup")
+                              setselfAllocation(isSelfAllocated)
+                            }}
+                            options={[
+                              ...(canSelfAllocate
+                                ? [
+                                    {
+                                      value: "true",
+                                      label: "Self Allocate"
+                                    }
+                                  ]
+                                : []),
+                              {
+                                value: "false",
+                                label: "Allocate To Other"
+                              }
+                            ]}
+                          />
+                        )}
+                      />
+                      {errorsMain.selfAllocation && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errorsMain.selfAllocation.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {process === "Registration" && selfAllocation && showInput && (
@@ -5731,7 +5864,7 @@ convertexcel
                         {...registerMain("dueDate", {
                           required: "Due Date is required"
                         })}
-                        className="w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8]"
+                        className="h-8 w-full border border-gray-300 rounded px-3 text-sm outline-none bg-[#EEF2F8]"
                       />
                       {errorsMain.dueDate && (
                         <p className="text-red-500 text-xs mt-1">
@@ -6217,56 +6350,7 @@ convertexcel
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3 pt-2">
                   {/* left: self allocation or lead id */}
                   <div className="w-full sm:w-1/2">
-                    {process === "Registration" && showInput ? (
-                      <>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">
-                          Self Allocation / Other
-                        </label>
-
-                        <Controller
-                          name="selfAllocation"
-                          control={controlMain}
-                          defaultValue={false}
-                          rules={{
-                            validate: (value) =>
-                              value === true || value === false
-                                ? true
-                                : "This field is required"
-                          }}
-                          render={({ field }) => (
-                            <ModernMenuSelect
-                              value={field.value ? "true" : "false"}
-                              isDisabled={!isSelfAllocationChangable}
-                              onChange={(value) => {
-                                const isSelfAllocated = value === "true"
-                                field.onChange(isSelfAllocated)
-                                setValueMain("allocationType", "followup")
-                                setselfAllocation(isSelfAllocated)
-                              }}
-                              options={[
-                                ...(canSelfAllocate
-                                  ? [
-                                      {
-                                        value: "true",
-                                        label: "Self Allocate"
-                                      }
-                                    ]
-                                  : []),
-                                {
-                                  value: "false",
-                                  label: "Allocate To Other"
-                                }
-                              ]}
-                            />
-                          )}
-                        />
-                        {errorsMain.selfAllocation && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errorsMain.selfAllocation.message}
-                          </p>
-                        )}
-                      </>
-                    ) : (
+                    {process === "Registration" && showInput ? null : (
                       <>
                         <label className="block text-xs font-semibold text-gray-600 mb-1">
                           Lead Id
@@ -6474,7 +6558,7 @@ convertexcel
                                 value={detailsForm.name}
                                 onChange={handleDetailsChange}
                                 placeholder="List of Primary Products"
-                                className="h-10 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 outline-none"
+                                className="h-9 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 outline-none"
                               />
                             </div>
 
@@ -6505,7 +6589,7 @@ convertexcel
                                   aria-label="Search software trades"
                                   aria-expanded={isTradeOpen}
                                   aria-haspopup="listbox"
-                                  className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 pr-10 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                                  className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 pr-10 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                                 />
                                 <svg
                                   className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-transform ${
@@ -6603,7 +6687,7 @@ convertexcel
                                 name="applicationDate"
                                 value={detailsForm.applicationDate}
                                 onChange={handleDetailsChange}
-                                className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                                className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                               />
                             </div>
 
@@ -6615,7 +6699,7 @@ convertexcel
                                 name="status"
                                 value={detailsForm.status}
                                 onChange={handleDetailsChange}
-                                className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                                className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                               >
                                 <option value="Running">Active</option>
                                 <option value="Deactive">DE active</option>
@@ -6643,7 +6727,7 @@ convertexcel
                                   value={detailsForm.name}
                                   onChange={handleDetailsChange}
                                   placeholder="List of additional service"
-                                  className="h-10 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 outline-none"
+                                  className="h-9 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 outline-none"
                                 />
                               </div>
 
@@ -6657,7 +6741,7 @@ convertexcel
                                     name="nextDue"
                                     value={detailsForm.nextDue}
                                     onChange={handleDetailsChange}
-                                    className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                                    className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                                   />
                                 </div>
                               )}
@@ -6670,7 +6754,7 @@ convertexcel
                                   name="status"
                                   value={detailsForm.status}
                                   onChange={handleDetailsChange}
-                                  className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                                  className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                                 >
                                   <option value="Running">Active</option>
                                   <option value="Deactive">DE active</option>
@@ -7104,18 +7188,16 @@ convertexcel
 
           {modalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4">
-              <div className="flex w-[calc(100vw-2rem)] max-w-[1440px] max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-[20px] border border-[#edf1f7] bg-white shadow-2xl">
+              <div className="flex w-[calc(100vw-2rem)] max-w-[1180px] max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-[20px] border border-[#edf1f7] bg-white shadow-2xl">
                 {/* Header */}
-                <div className="flex shrink-0 items-center justify-between border-b border-[#edf1f7] bg-white px-5 py-4 sm:px-6">
+                <div className="flex shrink-0 items-center justify-between border-b border-[#edf1f7] bg-white px-4 py-2.5 sm:px-5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#eef5ff] text-[#4b87ff]">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef5ff] text-[#4b87ff]">
                       <FaUser size={14} />
                     </div>
                     <div>
                     <h2 className="text-[16px] font-semibold text-[#162033]">
-                      {checknewcustomer
-                        ? "Add New Customer"
-                        : "Update Customer Details"}
+                      Customer Details
                     </h2>
                     <p className="text-[12px] text-[#7f8aa3]">
                       Fill customer master information
@@ -7129,22 +7211,11 @@ convertexcel
                       setModalOpen(false)
                       clearmodalErros()
                       resetModal()
+                      setchecknewcustomer(false)
                     }}
-                    className="rounded-full p-1.5 text-[#7f8aa3] transition hover:bg-[#f4f7fb] hover:text-[#162033]"
+                    className="rounded-md border border-[#e6ebf3] bg-white px-3 py-2 text-[12px] font-medium text-[#6d7890] transition hover:bg-[#f8fafc]"
                   >
-                    <svg
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
+                    Cancel
                   </button>
                 </div>
 
@@ -7154,7 +7225,7 @@ convertexcel
                   className="flex min-h-0 flex-1 flex-col"
                 >
                   {/* Scrollable body only */}
-                  <div className="min-h-0 flex-1 overflow-y-auto bg-[#fbfcff] px-5 py-3 sm:px-6">
+                  <div className="min-h-0 flex-1 overflow-y-auto bg-white p-2.5 sm:p-3">
                     <input
                       type="hidden"
                       {...registerModal("customerid")}
@@ -7171,20 +7242,21 @@ convertexcel
                       }
                     />
 
-                    <div className="space-y-2.5">
+                    <div className="space-y-2">
                     {/* Basic Information */}
                     <CustomerInfoCard
+                      plain
                       icon={<FaUser size={12} />}
                       iconBg="bg-[#edf6ff]"
                       iconColor="text-[#5aa2ff]"
                       label="Customer Information"
                     >
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                      <div className={customerModalFieldGridClass}>
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaUser size={12} />}>
                             Customer Name
                             <span className="text-red-500">*</span>
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="text"
                             {...registerModal("customerName", {
@@ -7207,9 +7279,9 @@ convertexcel
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaEnvelope size={12} />} iconBg="bg-[#eefbf2]" iconColor="text-[#4cbf73]">
                             Email
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="email"
                             {...registerModal("email")}
@@ -7219,9 +7291,9 @@ convertexcel
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaPhone size={12} />} iconBg="bg-[#eafaf5]" iconColor="text-[#36b882]">
                             Mobile <span className="text-red-500">*</span>
-                          </label>
+                          </CustomerFieldLabel>
                           {/* <input
                             type="tel"
                             {...registerModal("mobile", {
@@ -7326,9 +7398,9 @@ convertexcel
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaPhone size={12} />} iconBg="bg-[#fff1f7]" iconColor="text-[#ee82a9]">
                             Landline
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="tel"
                             {...registerModal("landline")}
@@ -7341,10 +7413,10 @@ convertexcel
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaUser size={12} />} iconBg="bg-[#eaf9f8]" iconColor="text-[#35b8ba]">
                             Contact Person{" "}
                             <span className="text-red-500">*</span>
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="text"
                             {...registerModal("contactPerson", {
@@ -7367,34 +7439,36 @@ convertexcel
                         </div>
 
                         <div className="sm:col-span-2">
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaMapMarkerAlt size={12} />} iconBg="bg-[#fff0f8]" iconColor="text-[#ef7db2]">
                             Address
-                          </label>
+                          </CustomerFieldLabel>
                           <textarea
                             {...registerModal("address1")}
                             onBlur={(e) =>
                               setValueModal("address1", e.target.value.trim())
                             }
                             placeholder="Address"
-                            rows={2}
+                            rows={1}
                             className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10 resize-none"
                           />
                         </div>
+
                       </div>
                     </CustomerInfoCard>
 
                     {/* Location */}
                     <CustomerInfoCard
+                      plain
                       icon={<FaMapMarkerAlt size={12} />}
                       iconBg="bg-[#fff0f8]"
                       iconColor="text-[#ef7db2]"
                       label="Location"
                     >
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                      <div className={customerModalFieldGridClass}>
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaGlobeAsia size={12} />} iconBg="bg-[#fff4ea]" iconColor="text-[#f0a24d]">
                             Country
-                          </label>
+                          </CustomerFieldLabel>
                           <Controller
                             name="country"
                             control={controlModal}
@@ -7410,6 +7484,11 @@ convertexcel
                                 onChange={(option) =>
                                   field.onChange(option?.value || "")
                                 }
+                                menuPortalTarget={
+                                  typeof document === "undefined"
+                                    ? null
+                                    : document.body
+                                }
                                 getOptionLabel={(o) => o.label}
                                 getOptionValue={(o) => o.value}
                               />
@@ -7418,9 +7497,9 @@ convertexcel
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaMapMarkerAlt size={12} />} iconBg="bg-[#f1edff]" iconColor="text-[#8769eb]">
                             State
-                          </label>
+                          </CustomerFieldLabel>
                           <Controller
                             name="state"
                             control={controlModal}
@@ -7437,6 +7516,11 @@ convertexcel
                                   field.onChange(option?.value || "")
                                   setSelectedState(option)
                                 }}
+                                menuPortalTarget={
+                                  typeof document === "undefined"
+                                    ? null
+                                    : document.body
+                                }
                                 isDisabled={!selectedCountry}
                               />
                             )}
@@ -7444,9 +7528,9 @@ convertexcel
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaBuilding size={12} />} iconBg="bg-[#fff4ea]" iconColor="text-[#f0a24d]">
                             City
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="text"
                             {...registerModal("city")}
@@ -7459,9 +7543,9 @@ convertexcel
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaHashtag size={12} />} iconBg="bg-[#f1edff]" iconColor="text-[#8769eb]">
                             Pincode
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="text"
                             {...registerModal("pincode")}
@@ -7477,51 +7561,72 @@ convertexcel
 
                     {/* Business Information */}
                     <CustomerInfoCard
+                      plain
                       icon={<FaBuilding size={12} />}
                       iconBg="bg-[#fff4ea]"
                       iconColor="text-[#f0a24d]"
                       label="Registration Information"
                     >
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                      <div className="hidden">
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
-                            Partnership Type
-                          </label>
-                          <select
-                            {...registerModal("partner")}
-                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
-                          >
-                            <option value="">Select Partner</option>
-                            {partner?.map((p, i) => (
-                              <option key={i} value={p._id}>
-                                {p.partner}
-                              </option>
-                            ))}
-                          </select>
+                      <div className={customerModalFieldGridClass}>
+                        <div>
+                          <CustomerFieldLabel icon={<FaLandmark size={12} />} iconBg="bg-[#fff8df]" iconColor="text-[#d1a91b]">
+                            Partner Selection
+                          </CustomerFieldLabel>
+                          <Controller
+                            name="partnerSelection"
+                            control={controlModal}
+                            render={({ field }) => (
+                              <CustomerModalSelect
+                                value={
+                                  field.value?._id || field.value?.id || field.value || ""
+                                }
+                                onChange={field.onChange}
+                                placeholder="Select partner customer"
+                                options={partnerCustomerOptions.map(
+                                  (partnerCustomer) => ({
+                                    value: partnerCustomer.value,
+                                    label: `${partnerCustomer.label}${
+                                      partnerCustomer.mobile
+                                        ? ` - ${partnerCustomer.mobile}`
+                                        : ""
+                                    }`
+                                  })
+                                )}
+                              />
+                            )}
+                          />
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaHashtag size={12} />} iconBg="bg-[#f1edff]" iconColor="text-[#8769eb]">
                             Registration Type
-                          </label>
-                          <select
-                            {...registerModal("registrationType")}
-                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
-                          >
-                            <option value="">Select Type</option>
-                            <option value="unregistered">
-                              Unregistered / Consumer
-                            </option>
-                            <option value="regular">Regular</option>
-                          </select>
+                          </CustomerFieldLabel>
+                          <Controller
+                            name="registrationType"
+                            control={controlModal}
+                            render={({ field }) => (
+                              <CustomerModalSelect
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                placeholder="Select type"
+                                options={[
+                                  {
+                                    value: "unregistered",
+                                    label: "Unregistered / Consumer"
+                                  },
+                                  { value: "regular", label: "Regular" }
+                                ]}
+                              />
+                            )}
+                          />
                         </div>
 
                         {registrationType === "regular" && (
                           <div>
-                            <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                            <CustomerFieldLabel icon={<FaLandmark size={12} />} iconBg="bg-[#fff1f7]" iconColor="text-[#ee82a9]">
                               GSTIN / UIN{" "}
                               <span className="text-red-500">*</span>
-                            </label>
+                            </CustomerFieldLabel>
                             <input
                               {...registerModal("gstNo", {
                                 required: "GST is required"
@@ -7536,13 +7641,123 @@ convertexcel
                             )}
                           </div>
                         )}
+                        <div>
+                          <CustomerFieldLabel icon={<FaHashtag size={12} />} iconBg="bg-[#eefbf2]" iconColor="text-[#4cbf73]">
+                            Status
+                          </CustomerFieldLabel>
+                          <Controller
+                            name="isActive"
+                            control={controlModal}
+                            render={({ field }) => (
+                              <CustomerModalSelect
+                                value={field.value || "Running"}
+                                onChange={field.onChange}
+                                placeholder="Select status"
+                                options={[
+                                  { value: "Running", label: "Running" },
+                                  { value: "Deactive", label: "Deactive" }
+                                ]}
+                              />
+                            )}
+                          />
+                        </div>
                       </div>
                     </CustomerInfoCard>
+
+                    <div className="border-t border-[#edf1f7] pt-2">
+                      <div
+                        className={`grid grid-cols-1 gap-2 ${
+                          isPartnerModal
+                            ? "max-w-[540px] sm:grid-cols-2"
+                            : "max-w-[264px]"
+                        }`}
+                      >
+                        <CustomerInfoCard
+                          icon={<FaBuilding size={12} />}
+                          iconBg="bg-[#fff8df]"
+                          iconColor="text-[#d1a91b]"
+                          label="Is this customer also a partner?"
+                        >
+                          <Controller
+                            name="isPartner"
+                            control={controlModal}
+                            defaultValue={false}
+                            render={({ field }) => (
+                              <div className="inline-flex w-full rounded-lg border border-[#dce3ee] bg-[#f7f9fc] p-1">
+                                <button
+                                  type="button"
+                                  aria-pressed={!field.value}
+                                  onClick={() => {
+                                    field.onChange(false)
+                                    setValueModal("partner", "")
+                                  }}
+                                  className={`flex-1 rounded-md px-3 py-1.5 text-[11px] font-semibold transition ${
+                                    !field.value
+                                      ? "bg-white text-[#5d6983] shadow-sm"
+                                      : "text-[#8c96ad]"
+                                  }`}
+                                >
+                                  No
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-pressed={Boolean(field.value)}
+                                  onClick={() => field.onChange(true)}
+                                  className={`flex-1 rounded-md px-3 py-1.5 text-[11px] font-semibold transition ${
+                                    field.value
+                                      ? "bg-[#1B2A4A] text-white shadow-sm"
+                                      : "text-[#8c96ad]"
+                                  }`}
+                                >
+                                  Yes
+                                </button>
+                              </div>
+                            )}
+                          />
+                        </CustomerInfoCard>
+
+                        {isPartnerModal && (
+                          <CustomerInfoCard
+                            icon={<FaBuilding size={12} />}
+                            iconBg="bg-[#fff8df]"
+                            iconColor="text-[#d1a91b]"
+                            label="Partner Type"
+                          >
+                            <Controller
+                              name="partner"
+                              control={controlModal}
+                              rules={{ required: "Select a partner type" }}
+                              render={({ field }) => (
+                                <CustomerModalSelect
+                                  value={
+                                    field.value?._id ||
+                                    field.value?.id ||
+                                    field.value ||
+                                    ""
+                                  }
+                                  onChange={field.onChange}
+                                  placeholder="Select partner"
+                                  options={partner.map((item) => ({
+                                    value: item._id,
+                                    label: item.partner
+                                  }))}
+                                />
+                              )}
+                            />
+                            {errorsModal.partner && (
+                              <p className="mt-1 text-[11px] text-red-500">
+                                {errorsModal.partner.message}
+                              </p>
+                            )}
+                          </CustomerInfoCard>
+                        )}
+                      </div>
+                    </div>
                     </div>
                   </div>
 
                   {/* Fixed footer */}
-                  <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200 bg-white px-5 py-2.5 sm:px-6">
+                  <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 py-2 sm:px-5">
                     <button
                       type="button"
                       onClick={() => {

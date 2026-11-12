@@ -4555,7 +4555,6 @@ export const UpdateCollection = async (req, res) => {
             email: formData.email,
             mobile: formData?.mobile,
             registrationType: formData?.registrationType,
-            partnerSelection: formData?.partnerSelection || null,
             country: formData?.country,
             state: formData?.state,
             city: formData?.city,
@@ -4608,6 +4607,8 @@ export const UpdateCollection = async (req, res) => {
           : new Date(),
         receivedAmount,
         paymentVerified: false,
+        partnerSelection:
+          paymentData?.partnerSelection ?? formData?.partnerSelection ?? null,
         paymentEntries: normalizedPaymentEntries,
         receivedBy: paymentData?.receivedBy || formData?.receivedBy,
         receivedModel:
@@ -4656,7 +4657,6 @@ export const UpdateCollection = async (req, res) => {
       }
 
       lead.totalPaidAmount = newTotalPaid
-      lead.partnerSelection = formData?.partnerSelection || null
       lead.balanceAmount = newBalance
 
       if (isFrom === "reallocation") {
@@ -4675,8 +4675,7 @@ export const UpdateCollection = async (req, res) => {
           $set: {
             email: formData?.email,
             mobile: formData?.mobile,
-            pincode: formData?.pincode,
-            partnerSelection: formData?.partnerSelection || null
+            pincode: formData?.pincode
           }
         },
         { session }
@@ -15942,6 +15941,10 @@ export const GetownLeadList = async (req, res) => {
       startDate,
       endDate,
       salesFunnelStage,
+      productId,
+      productModel,
+      categoryId,
+      status = "all",
     } = req.query;
     if (
       !mongoose.Types.ObjectId.isValid(userId) ||
@@ -15953,6 +15956,71 @@ export const GetownLeadList = async (req, res) => {
     const objectId = new mongoose.Types.ObjectId(userId);
     const branchId = new mongoose.Types.ObjectId(selectedBranch);
     const query = { leadBranch: branchId };
+    const leadForMatch = {};
+
+    if (productId) {
+      if (!mongoose.Types.ObjectId.isValid(productId)) {
+        return res.status(400).json({ message: "Invalid product id" });
+      }
+      if (productModel && !["Product", "Service"].includes(productModel)) {
+        return res.status(400).json({ message: "Invalid product model" });
+      }
+
+      leadForMatch.productorServiceId = new mongoose.Types.ObjectId(productId);
+      if (productModel) leadForMatch.productorServicemodel = productModel;
+    }
+
+    if (categoryId) {
+      if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+        return res.status(400).json({ message: "Invalid category id" });
+      }
+
+      const categoryProducts = await Product.find({
+        selected: {
+          $elemMatch: {
+            branch_id: branchId,
+            category_id: new mongoose.Types.ObjectId(categoryId)
+          }
+        }
+      })
+        .select("_id")
+        .lean();
+      const categoryProductIds = categoryProducts.map((product) => product._id);
+
+      if (
+        categoryProductIds.length === 0 ||
+        (productId &&
+          !categoryProductIds.some(
+            (id) => String(id) === String(productId)
+          ))
+      ) {
+        return res.status(200).json({ message: "lead not found", data: [] });
+      }
+
+      if (!productId) {
+        leadForMatch.productorServiceId = { $in: categoryProductIds };
+      }
+      // Categories belong to products; services are intentionally excluded.
+      leadForMatch.productorServicemodel = "Product";
+    }
+
+    const normalizedStatus = String(status).toLowerCase();
+    if (!['all', 'other', 'lost', 'completed'].includes(normalizedStatus)) {
+      return res.status(400).json({ message: "Invalid lead status" });
+    }
+
+    if (normalizedStatus === "completed") {
+      query.leadConfirmed = true;
+    } else if (normalizedStatus === "lost") {
+      query.leadLost = true;
+    } else if (normalizedStatus === "other") {
+      query.leadConfirmed = { $ne: true };
+      query.leadLost = { $ne: true };
+    }
+
+    if (Object.keys(leadForMatch).length > 0) {
+      query.leadFor = { $elemMatch: leadForMatch };
+    }
 
     if (ownlead === "true") {
       query.leadBy = objectId;
@@ -16600,6 +16668,20 @@ export const UpdateResearchAndDevelopmentTask = async (req, res) => {
       allocationLog.taskStatus = status;
       allocationLog.taskRemark = remark?.trim() || "";
       if (status === "Completed") {
+        // Completing a task is a terminal action. Close any active timer
+        // automatically so completed work can never remain displayed as running.
+        allocationLog.taskSessions = allocationLog.taskSessions || [];
+        const activeSession = [...allocationLog.taskSessions]
+          .reverse()
+          .find((session) => !session.endedAt);
+        if (activeSession) {
+          activeSession.endedAt = now;
+          activeSession.description =
+            activeSession.description ||
+            allocationLog.taskRemark ||
+            "Task completed";
+          allocationLog.taskEndedAt = now;
+        }
         allocationLog.taskCompletedAt = now;
         allocationLog.taskSubmissionDate = now;
         allocationLog.taskDescription = allocationLog.taskRemark || allocationLog.taskDescription;
