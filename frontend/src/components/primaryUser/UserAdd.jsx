@@ -306,6 +306,7 @@ console.log(stateOptions)
       setValue("joiningdate", User.joiningdate)
       setValue("pincode", User.pincode)
       setValue("attendanceId", User.attendanceId)
+      setValue("canSelfAllocateLeads", Boolean(User.canSelfAllocateLeads))
 
       Object.entries(User).forEach(([key, value]) => {
         if (key === "country") {
@@ -427,7 +428,10 @@ console.log(url)
 
       const formattedData = {
         ...data,
-        department: data.department || null
+        department: data.department || null,
+        canSelfAllocateLeads:
+          data.canSelfAllocateLeads === true ||
+          data.canSelfAllocateLeads === "true"
       }
       handleUserData(formattedData, imageData, tableData)
     } else if (process === "Edit") {
@@ -459,7 +463,7 @@ console.log(url)
           </div>
         )}
         <form onSubmit={handleSubmit(onSubmit)} autoComplete="off" className="space-y-5 [&_label]:mb-1 [&_label]:block [&_label]:text-[11px] [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-slate-600 [&>div>div>input]:!mt-0 [&>div>div>input]:!w-full [&>div>div>input]:!rounded-xl [&>div>div>input]:!border-slate-200 [&>div>div>input]:!bg-slate-50 [&>div>div>input]:!px-3 [&>div>div>input]:!py-2 [&>div>div>input]:!text-sm [&>div>div>input]:!text-slate-800 [&>div>div>input]:!shadow-sm [&>div>div>input]:!outline-none [&>div>div>input]:!transition [&>div>div>input]:focus:!border-blue-500 [&>div>div>input]:focus:!bg-white [&>div>div>input]:focus:!ring-4 [&>div>div>input]:focus:!ring-blue-100 [&>div>div>div>input]:!rounded-xl [&>div>div>div>input]:!border-slate-200 [&>div>div>div>input]:!bg-slate-50 [&>div>div>div>input]:!px-3 [&>div>div>div>input]:!py-2 [&>div>div>div>input]:focus:!border-blue-500 [&>div>div>div>input]:focus:!bg-white [&>div>div>div>input]:focus:!ring-4 [&>div>div>div>input]:focus:!ring-blue-100 [&_select]:!mt-0 [&_select]:!w-full [&_select]:!rounded-xl [&_select]:!border-slate-200 [&_select]:!bg-slate-50 [&_select]:!px-3 [&_select]:!py-2 [&_select]:!text-sm [&_select]:!text-slate-800 [&_select]:!shadow-sm [&_select]:!outline-none [&_select]:!transition [&_select]:focus:!border-blue-500 [&_select]:focus:!bg-white [&_select]:focus:!ring-4 [&_select]:focus:!ring-blue-100">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div>
               <label className="block mb-1 font-semibold">Name</label>
               <input
@@ -646,6 +650,21 @@ console.log(url)
               </label>
 
               <ModernSelect name="department" control={control} placeholder="Select department" styles={selectStyles} onValueChange={setSelectedDepartment} options={(departments || []).map((department) => ({ value: department._id, label: department.department || "Unnamed department" }))} />
+            </div>
+            <div>
+              <label className="block mb-1 font-semibold">
+                Can self-allocate leads?
+              </label>
+              <select
+                {...register("canSelfAllocateLeads")}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm outline-none"
+              >
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Allows this user to create and work on their own self-allocated leads.
+              </p>
             </div>
             <div className="relative">
               <label htmlFor="password" className="block mb-1 font-semibold">

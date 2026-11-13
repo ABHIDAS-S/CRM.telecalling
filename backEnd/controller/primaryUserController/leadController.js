@@ -1754,6 +1754,8 @@ export const LeadRegister = async (req, res) => {
       partnerSelection,
       allocationType = null,
       selfAllocation,
+      isZeroAmountLead = false,
+      zeroAmountTask = null,
       leadBy,
       leadBranch,
     } = leadData
@@ -1764,6 +1766,12 @@ export const LeadRegister = async (req, res) => {
       value && mongoose.Types.ObjectId.isValid(value) ? value : null
     const normalizedPartner = optionalObjectId(partner)
     const normalizedPartnerSelection = optionalObjectId(partnerSelection)
+    const normalizedZeroAmountTask = optionalObjectId(zeroAmountTask)
+    const isTargetOnlyLead = Boolean(isZeroAmountLead)
+    if (isTargetOnlyLead && !normalizedZeroAmountTask) {
+      await session.endSession()
+      return res.status(400).json({ message: "Select a task for the zero amount lead" })
+    }
     const leadDate = new Date()
     const lastLead = await LeadId.findOne().sort({ leadId: -1 }).session(session)
 
@@ -1792,13 +1800,46 @@ export const LeadRegister = async (req, res) => {
       return res.status(400).json({ message: "Invalid leadBy reference" })
     }
 
+    const leadCreator = isStaff || (await Admin.findById(leadBy).lean().session(session))
+    if (selfAllocation && !leadCreator?.canSelfAllocateLeads) {
+      await session.endSession()
+      return res.status(403).json({
+        message: "This user is not permitted to self-allocate leads"
+      })
+    }
+
     await session.startTransaction()
 
     const leadtask = await Task.findOne({ taskName: "Lead" }).session(session)
+    const zeroAmountTaskRecord = isTargetOnlyLead
+      ? await Task.findById(normalizedZeroAmountTask).session(session)
+      : null
+    if (isTargetOnlyLead && !zeroAmountTaskRecord) {
+      throw new Error("Selected zero amount task was not found")
+    }
 
     let allocationtask = null
     if (allocationType) {
       allocationtask = await Task.findOne({ taskName: "Allocation" }).session(session)
+    }
+
+    if (isTargetOnlyLead) {
+      activityLog.push({
+        submissionDate: leadDate,
+        submittedUser: leadBy,
+        submissiondoneByModel: leadByModel,
+        taskallocatedBy: leadBy,
+        taskallocatedByModel: leadByModel,
+        taskallocatedTo: leadBy,
+        taskallocatedToModel: leadByModel,
+        remarks: "Zero amount target-only lead",
+        taskBy: leadtask?._id,
+        taskTo: zeroAmountTaskRecord.taskName.toLowerCase(),
+        taskId: zeroAmountTaskRecord._id,
+        allocationChanged: false,
+        followupClosed: false,
+        taskfromFollowup: false,
+      })
     }
 
     const activityLog = [
@@ -1852,11 +1893,13 @@ export const LeadRegister = async (req, res) => {
       remark,
       leadBy,
       leadByModel,
-      taxAmount: Number(taxAmount),
-      taxableAmount: Number(taxableAmount),
-      netAmount: Number(netAmount),
-      balanceAmount: Number(netAmount),
-      selfAllocation: selfAllocation,
+      taxAmount: isTargetOnlyLead ? 0 : Number(taxAmount),
+      taxableAmount: isTargetOnlyLead ? 0 : Number(taxableAmount),
+      netAmount: isTargetOnlyLead ? 0 : Number(netAmount),
+      balanceAmount: isTargetOnlyLead ? 0 : Number(netAmount),
+      selfAllocation: isTargetOnlyLead ? false : selfAllocation,
+      isZeroAmountLead: isTargetOnlyLead,
+      zeroAmountTask: normalizedZeroAmountTask,
       ...(allocationType && { allocationType: allocationName?._id }),
       ...(selfAllocation && {
         selfAllocationType: allocationName?._id,
@@ -1876,13 +1919,13 @@ export const LeadRegister = async (req, res) => {
         productorServiceId: item.productorServiceId,
         productorServicemodel: item.itemType,
         licenseNumber: item.licenseNumber,
-        productPrice: item.productPrice,
-        hsn: item.hsn,
+        productPrice: isTargetOnlyLead ? 0 : item.productPrice,
+        hsn: isTargetOnlyLead ? 0 : item.hsn,
         actualproductPrice: item?.actualproductPrice ?? item.productPrice,
         actualHsn: item?.actualHsn,
         actualNetAmount: item?.actualNetAmount ?? item.netAmount,
         productorservicetype: item.productorservicetype,
-        netAmount: item.netAmount,
+        netAmount: isTargetOnlyLead ? 0 : item.netAmount,
         price: item.price,
         company_id: item.company_id,
         branch_id: item.branch_id,
@@ -6900,6 +6943,21 @@ export const UpdateLeadRegister = async (req, res) => {
         throw Object.assign(new Error("Lead not found"), { statusCode: 404 });
       }
 
+      let leadItemsForUpdate = leadData;
+
+      // A target-only lead must remain zero-value throughout later edits,
+      // even when a product is replaced with one that has Product Master pricing.
+      const isTargetOnlyLead = Boolean(
+        matchedDoc.isZeroAmountLead || data?.isZeroAmountLead
+      );
+      if (isTargetOnlyLead) {
+        matchedDoc.isZeroAmountLead = true;
+        data.taxableAmount = 0;
+        data.taxAmount = 0;
+        data.netAmount = 0;
+        data.discamnt = 0;
+      }
+
       const activePendingTask = (matchedDoc.activityLog || []).find((log) => {
         const taskName = String(log?.taskTo || "").trim().toLowerCase();
         const isFollowupAssignedToCurrentUser =
@@ -6940,8 +6998,6 @@ export const UpdateLeadRegister = async (req, res) => {
 
       const isCustomerChangedFlag =
         isCustomerChanged === true || isCustomerChanged === "true";
-      let leadItemsForUpdate = leadData;
-
       if (from === "closedlead") {
         if (isCustomerChangedFlag) {
           if (String(previousleadCustomer || "") === String(data?.customerName || "")) {
@@ -6979,6 +7035,16 @@ export const UpdateLeadRegister = async (req, res) => {
 
       } else {
         console.log("[reverse-gate] SKIPPED - from !== 'closedlead'");
+      }
+
+      if (isTargetOnlyLead) {
+        leadItemsForUpdate = leadItemsForUpdate.map((item) => ({
+          ...item,
+          productPrice: 0,
+          hsn: 0,
+          netAmount: 0,
+          taxAmount: 0,
+        }));
       }
 
       const hasPrimaryProduct = leadItemsForUpdate.some(
@@ -12120,6 +12186,17 @@ export const UpdateLeadTask = async (req, res) => {
 
     const leadObjectId = new mongoose.Types.ObjectId(taskDetails.leadDocId);
     const lead = await LeadMaster.findById(leadObjectId);
+    if (!lead) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+    if (
+      lead.selfAllocation === true &&
+      String(lead.leadBy) !== String(req.owner?.userId || "")
+    ) {
+      return res.status(403).json({
+        message: "Only the lead creator can work on this self-allocated lead"
+      });
+    }
     const activityLog = [...lead.activityLog];
     const Index = activityLog.length - 1;
     const updateFields = {

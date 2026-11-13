@@ -7252,7 +7252,8 @@ export const StaffRegister = async (req, res) => {
       role,
       department,
       assignedto,
-      attendanceId
+      attendanceId,
+      canSelfAllocateLeads = false
     } = userData
     const { profileUrl, documentUrl } = image
 
@@ -7269,6 +7270,7 @@ export const StaffRegister = async (req, res) => {
         isVerified,
         role,
         activeRole: role,
+        canSelfAllocateLeads: Boolean(canSelfAllocateLeads),
         dateofbirth,
         bloodgroup,
         gender,

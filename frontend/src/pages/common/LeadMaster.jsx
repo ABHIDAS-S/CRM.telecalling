@@ -1799,6 +1799,7 @@ console.log(originalCustomerTableData)
   const registrationType = watchModal("registrationType")
   const selectedCountrymodal = watchModal("country")
   const isPartnerModal = watchModal("isPartner") === true
+  const isZeroAmountLead = watchMain("isZeroAmountLead") === true
   const navigate = useNavigate()
   const location = useLocation()
   const mobileValue = watchModal("mobile")
@@ -1864,6 +1865,14 @@ console.log(originalCustomerTableData)
   )
   console.log(filter)
   const { data: tasks } = UseFetch("lead/getallTask")
+  const zeroAmountTaskOptions = useMemo(
+    () =>
+      (tasks || []).map((task) => ({
+        value: task?._id,
+        label: task?.taskName || task?.name || "Task"
+      })).filter((task) => task.value),
+    [tasks]
+  )
   const { data: companybranches } = UseFetch("/branch/getBranch")
   const { data: partners } = UseFetch("/customer/getallpartners")
   const { data: serviceData } = UseFetch(
@@ -1872,6 +1881,24 @@ console.log(originalCustomerTableData)
       `/product/getallServices?branchselected=${selectedBranch}`
   )
   console.log(haveprimaryProduct)
+  useEffect(() => {
+    if (!isZeroAmountLead) return
+
+    setselfAllocation(false)
+    setValueMain("selfAllocation", false)
+    setValueMain("allocationType", null)
+    setValueMain("taxableAmount", 0)
+    setValueMain("taxAmount", 0)
+    setValueMain("netAmount", 0)
+    setValueMain("discamnt", 0)
+    setSelectedLeadList((rows) => {
+      const needsReset = rows.some(
+        (row) => Number(row?.productPrice) !== 0 || Number(row?.hsn) !== 0 || Number(row?.netAmount) !== 0
+      )
+      if (!needsReset) return rows
+      return rows.map((row) => ({ ...row, productPrice: 0, hsn: 0, netAmount: 0 }))
+    })
+  }, [isZeroAmountLead, setValueMain])
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -2008,8 +2035,10 @@ console.log(originalCustomerTableData)
     netAmount: ""
   }
 
-  const canSelfAllocate =
-    loggeduser?.department?.code === "DEPARTMENT3" || console.log(loggeduser)
+  const canSelfAllocate = Boolean(
+    loggeduser?.canSelfAllocateLeads ||
+      loggeduser?.department?.code === "DEPARTMENT3"
+  )
   const isMarketingStaff =
     String(loggeduser?.role || "").toLowerCase() === "staff" &&
     (loggeduser?.department?.code === "DEPARTMENT3" ||
@@ -2282,6 +2311,8 @@ console.log(originalCustomerTableData)
           : ""
         setValueMain("dueDate", formattedDate)
       }
+      setValueMain("isZeroAmountLead", Boolean(Data[0]?.isZeroAmountLead))
+      setValueMain("zeroAmountTask", Data[0]?.zeroAmountTask?._id || Data[0]?.zeroAmountTask || "")
       console.log(Data[0])
       setValueMain("source", Data[0]?.source || "")
       setValueMain("customerName", Data[0]?.customerName?._id)
@@ -3982,6 +4013,8 @@ console.log(licenses)
       taxAmount: "",
       netAmount: "",
       selfAllocation: false,
+      isZeroAmountLead: false,
+      zeroAmountTask: "",
       leadId: "",
       leadBy: loggeduser?._id || loggeduser?.id || ""
     })
@@ -5777,7 +5810,49 @@ convertexcel
                       </p>
                     )}
                   </div>
-                  {process === "Registration" && showInput && (
+                {isZeroAmountLead && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                    Target-only lead: product prices, tax, and net amount are locked to ₹0. This lead counts toward targets but not incentives.
+                  </div>
+                )}
+
+                {process === "Registration" && showInput && (
+                    <div>
+                      <label className="mb-1 flex items-center gap-2 text-xs font-semibold text-gray-700">
+                        <input
+                          type="checkbox"
+                          disabled={isReadOnly}
+                          {...registerMain("isZeroAmountLead")}
+                          className="h-4 w-4 rounded border-slate-300 text-[#1B2A4A] focus:ring-[#1B2A4A]"
+                        />
+                        Zero amount / target-only lead
+                      </label>
+                      <p className="text-[10px] text-slate-500">Included in targets, excluded from incentives.</p>
+                    </div>
+                  )}
+                  {process === "Registration" && showInput && isZeroAmountLead && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">
+                        Direct task allocation <span className="text-red-500">*</span>
+                      </label>
+                      <Controller
+                        name="zeroAmountTask"
+                        control={controlMain}
+                        rules={{ required: "Select a task for this zero amount lead" }}
+                        render={({ field }) => (
+                          <ModernMenuSelect
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            isDisabled={isReadOnly}
+                            placeholder="Select task"
+                            options={zeroAmountTaskOptions}
+                          />
+                        )}
+                      />
+                      {errorsMain.zeroAmountTask && <p className="mt-1 text-xs text-red-500">{errorsMain.zeroAmountTask.message}</p>}
+                    </div>
+                  )}
+                  {process === "Registration" && showInput && !isZeroAmountLead && (
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">
                         Self Allocation / Other
