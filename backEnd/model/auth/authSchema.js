@@ -236,6 +236,9 @@ const adminSchema = new Schema(
   { timestamps: true }
 )
 
+// Supports Leave Summary's active staff lookup, including branch selection.
+staffSchema.index({ isVerified: 1, role: 1, "selected.branch_id": 1 })
+
 // Pre-save hook for password hashing
 staffSchema.pre("save", async function (next) {
   if (!this.isModified("password")) {

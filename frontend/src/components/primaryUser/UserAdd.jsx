@@ -4,7 +4,7 @@ import { useForm, Controller } from "react-hook-form"
 import { Country, State } from "country-state-city"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons"
-import { FaEdit, FaTrash } from "react-icons/fa"
+import { FaEdit, FaTrash, FaUserPlus, FaUserCircle, FaSitemap, FaCamera } from "react-icons/fa"
 import Select from "react-select"
 import ImageInput from "../common/ImageInput"
 import UseFetch from "../../hooks/useFetch"
@@ -17,6 +17,7 @@ const ModernSelect = ({ name, control, options, placeholder, styles, onValueChan
     rules={rules}
     render={({ field }) => (
       <Select
+        className="user-add-select-root"
         classNamePrefix="user-add-select"
         options={options}
         value={options.find((option) => String(option.value) === String(field.value)) || null}
@@ -95,27 +96,44 @@ const UserAdd = ({
     documentUrl: []
   })
 
+  const profileImageUrl = useMemo(() => {
+    const firstUrl = (value) => (Array.isArray(value) ? value[0] : value)
+
+    return firstUrl(imageData.profileUrl) || firstUrl(User?.profileUrl) || ""
+  }, [imageData.profileUrl, User?.profileUrl])
+
   const selectStyles = useMemo(
     () => ({
       control: (base, state) => ({
         ...base,
-        minHeight: "38px",
-        borderRadius: "12px",
+        minHeight: "32px",
+        height: "32px",
+        borderRadius: "6px",
         borderColor: state.isFocused ? "#3b82f6" : "#e2e8f0",
         backgroundColor: state.isDisabled ? "#f8fafc" : "#f8fafc",
         boxShadow: state.isFocused ? "0 0 0 3px rgba(59, 130, 246, 0.14)" : "0 1px 2px rgba(15, 23, 42, 0.03)",
         cursor: state.isDisabled ? "not-allowed" : "pointer",
         "&:hover": { borderColor: state.isFocused ? "#3b82f6" : "#cbd5e1" }
       }),
-      valueContainer: (base) => ({ ...base, padding: "0 12px" }),
-      placeholder: (base) => ({ ...base, color: "#94a3b8" }),
+      valueContainer: (base) => ({ ...base, height: "30px", minWidth: 0, padding: "0 10px" }),
+      placeholder: (base) => ({
+        ...base,
+        margin: 0,
+        color: "#94a3b8",
+        fontSize: "12px",
+        fontWeight: 400,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+      }),
       indicatorSeparator: () => ({ display: "none" }),
-      dropdownIndicator: (base) => ({ ...base, color: "#64748b", padding: "8px" }),
+      dropdownIndicator: (base) => ({ ...base, color: "#64748b", padding: "5px" }),
+      indicatorsContainer: (base) => ({ ...base, height: "30px" }),
       menuPortal: (base) => ({ ...base, zIndex: 80 }),
       menu: (base) => ({ ...base, marginTop: "6px", borderRadius: "12px", overflow: "hidden", border: "1px solid #dbe5f1", backgroundColor: "#ffffff", boxShadow: "0 14px 32px rgba(15, 23, 42, 0.16)" }),
       menuList: (base) => ({ ...base, maxHeight: "200px", padding: "5px", overflowY: "auto", backgroundColor: "#ffffff" }),
       option: (base, state) => ({ ...base, borderRadius: "8px", margin: "2px 0", padding: "9px 10px", fontSize: "13px", fontWeight: state.isSelected ? 600 : 500, backgroundColor: state.isSelected ? "#2563eb" : state.isFocused ? "#eff6ff" : "transparent", color: state.isSelected ? "#ffffff" : "#334155", cursor: "pointer", transition: "background-color 120ms ease, color 120ms ease" }),
-      singleValue: (base) => ({ ...base, color: "#1e293b", fontSize: "14px", fontWeight: 500 }),
+      singleValue: (base) => ({ ...base, margin: 0, color: "#1e293b", fontSize: "12px", fontWeight: 500 }),
       noOptionsMessage: (base) => ({ ...base, padding: "12px", color: "#94a3b8", fontSize: "13px" }),
       loadingMessage: (base) => ({ ...base, padding: "12px", color: "#64748b", fontSize: "13px" })
     }),
@@ -306,6 +324,7 @@ console.log(stateOptions)
       setValue("joiningdate", User.joiningdate)
       setValue("pincode", User.pincode)
       setValue("attendanceId", User.attendanceId)
+      setValue("canSelfAllocateLeads", Boolean(User.canSelfAllocateLeads))
 
       Object.entries(User).forEach(([key, value]) => {
         if (key === "country") {
@@ -427,7 +446,10 @@ console.log(url)
 
       const formattedData = {
         ...data,
-        department: data.department || null
+        department: data.department || null,
+        canSelfAllocateLeads:
+          data.canSelfAllocateLeads === true ||
+          data.canSelfAllocateLeads === "true"
       }
       handleUserData(formattedData, imageData, tableData)
     } else if (process === "Edit") {
@@ -436,15 +458,19 @@ console.log(url)
   }
   return (
     <div
-      className="flex min-h-screen items-center justify-center bg-[#ADD8E6] p-3 sm:p-5"
+      className="min-h-screen bg-[#ADD8E6] p-2 sm:p-4 lg:p-5"
       // style={{ backgroundImage: "url('/userbackground.jpg')" }}
     >
-      <div className="w-full max-w-[1500px] rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xl shadow-slate-300/30 sm:p-6">
-        <div className="mb-4 border-b border-slate-100 pb-3 text-center">
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-          User Registration
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">Create a professional user profile and assign branch access.</p>
+      <div className="mx-auto w-full max-w-[1680px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-400/20">
+        <div className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-indigo-50 px-4 py-3 sm:px-5">
+          <div className="absolute -right-14 -top-16 h-44 w-80 rounded-full bg-indigo-200/30 blur-2xl" />
+          <div className="relative flex items-center gap-3">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-sm shadow-indigo-200"><FaUserPlus size={16} /></span>
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-slate-900">{isEditMode ? "Edit user" : "Add a new user"}</h2>
+              <p className="text-xs text-slate-500">Create a professional profile and define branch access.</p>
+            </div>
+          </div>
         </div>
         {/* Display Form Message */}
         {formMessage && (
@@ -458,8 +484,28 @@ console.log(url)
             {formMessage}
           </div>
         )}
-        <form onSubmit={handleSubmit(onSubmit)} autoComplete="off" className="space-y-5 [&_label]:mb-1 [&_label]:block [&_label]:text-[11px] [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-slate-600 [&>div>div>input]:!mt-0 [&>div>div>input]:!w-full [&>div>div>input]:!rounded-xl [&>div>div>input]:!border-slate-200 [&>div>div>input]:!bg-slate-50 [&>div>div>input]:!px-3 [&>div>div>input]:!py-2 [&>div>div>input]:!text-sm [&>div>div>input]:!text-slate-800 [&>div>div>input]:!shadow-sm [&>div>div>input]:!outline-none [&>div>div>input]:!transition [&>div>div>input]:focus:!border-blue-500 [&>div>div>input]:focus:!bg-white [&>div>div>input]:focus:!ring-4 [&>div>div>input]:focus:!ring-blue-100 [&>div>div>div>input]:!rounded-xl [&>div>div>div>input]:!border-slate-200 [&>div>div>div>input]:!bg-slate-50 [&>div>div>div>input]:!px-3 [&>div>div>div>input]:!py-2 [&>div>div>div>input]:focus:!border-blue-500 [&>div>div>div>input]:focus:!bg-white [&>div>div>div>input]:focus:!ring-4 [&>div>div>div>input]:focus:!ring-blue-100 [&_select]:!mt-0 [&_select]:!w-full [&_select]:!rounded-xl [&_select]:!border-slate-200 [&_select]:!bg-slate-50 [&_select]:!px-3 [&_select]:!py-2 [&_select]:!text-sm [&_select]:!text-slate-800 [&_select]:!shadow-sm [&_select]:!outline-none [&_select]:!transition [&_select]:focus:!border-blue-500 [&_select]:focus:!bg-white [&_select]:focus:!ring-4 [&_select]:focus:!ring-blue-100">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <form onSubmit={handleSubmit(onSubmit)} autoComplete="off" className="space-y-3 p-3 sm:p-4 [&_label]:mb-1 [&_label]:block [&_label]:text-[10px] [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-[0.05em] [&_label]:text-slate-600 [&_input]:!mt-0 [&_input]:!min-h-8 [&_input]:!w-full [&_input]:!rounded-md [&_input]:!border-slate-200 [&_input]:!bg-slate-50 [&_input]:!px-2.5 [&_input]:!py-1 [&_input]:!text-xs [&_input]:!text-slate-800 [&_input]:!shadow-none [&_input]:!outline-none [&_input]:!transition [&_input]:hover:!border-slate-300 [&_input]:focus:!border-indigo-500 [&_input]:focus:!bg-white [&_input]:focus:!ring-2 [&_input]:focus:!ring-indigo-100 [&_select]:!mt-0 [&_select]:!min-h-8 [&_select]:!w-full [&_select]:!rounded-md [&_select]:!border-slate-200 [&_select]:!bg-slate-50 [&_select]:!px-2.5 [&_select]:!py-1 [&_select]:!text-xs [&_select]:!text-slate-800 [&_select]:!shadow-none [&_select]:!outline-none [&_select]:!transition [&_select]:hover:!border-slate-300 [&_select]:focus:!border-indigo-500 [&_select]:focus:!bg-white [&_select]:focus:!ring-2 [&_select]:focus:!ring-indigo-100">
+          <div className="grid gap-3 xl:grid-cols-[104px_minmax(0,1fr)] xl:items-start">
+            <aside className="flex flex-row items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 xl:flex-col xl:bg-transparent xl:p-0">
+              <div className="relative rounded-full border-4 border-white bg-gradient-to-br from-indigo-100 to-blue-100 p-1 shadow-md shadow-indigo-100">
+                {profileImageUrl ? (
+                  <img
+                    src={profileImageUrl}
+                    alt="User profile"
+                    className="h-16 w-16 rounded-full object-cover sm:h-20 sm:w-20"
+                  />
+                ) : (
+                  <span className="grid h-16 w-16 place-items-center rounded-full bg-slate-100 text-2xl font-bold text-indigo-500 sm:h-20 sm:w-20">
+                    {(watch("name") || "U").trim().charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <span className="absolute bottom-0 right-0 grid h-6 w-6 place-items-center rounded-full border-2 border-white bg-blue-600 text-white shadow-sm"><FaCamera size={10} /></span>
+              </div>
+              <p className="text-[11px] font-semibold text-slate-500 xl:mt-2 xl:text-center">Profile photo</p>
+            </aside>
+            <div className="min-w-0 space-y-3">
+          <div className="grid grid-cols-1 gap-x-3 gap-y-2.5 rounded-lg border border-violet-100 bg-violet-50/60 p-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="col-span-full flex items-center gap-1.5 border-b border-slate-200 pb-2 text-xs font-bold text-slate-800"><FaUserCircle className="text-indigo-600" /> Personal information</div>
             <div>
               <label className="block mb-1 font-semibold">Name</label>
               <input
@@ -560,6 +606,7 @@ console.log(url)
             <div>
               <label className="block mb-1 font-semibold">Country</label>
               <Select
+                className="user-add-select-root"
                 classNamePrefix="user-add-select"
                 options={countryOptions}
                 value={selectedCountry}
@@ -580,6 +627,7 @@ console.log(url)
             <div>
               <label className="block mb-1 font-semibold">State</label>
               <Select
+                className="user-add-select-root"
                 classNamePrefix="user-add-select"
                 options={stateOptions}
                 value={selectedState}
@@ -640,6 +688,11 @@ console.log(url)
                 </span>
               )}
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <section className="order-1 grid grid-cols-1 gap-x-3 gap-y-2 rounded-lg border border-blue-100 bg-blue-50/60 p-3 sm:grid-cols-2">
+            <div className="col-span-full flex items-center gap-1.5 border-b border-blue-100 pb-1.5 text-xs font-bold text-blue-900"><FaUserCircle className="text-blue-600" /> Employment details</div>
             <div>
               <label htmlFor="department" className="block mb-1 font-semibold">
                 Department
@@ -647,6 +700,36 @@ console.log(url)
 
               <ModernSelect name="department" control={control} placeholder="Select department" styles={selectStyles} onValueChange={setSelectedDepartment} options={(departments || []).map((department) => ({ value: department._id, label: department.department || "Unnamed department" }))} />
             </div>
+            <div>
+              <label htmlFor="role" className="block mb-1 font-semibold">Role</label>
+              <ModernSelect name="role" control={control} placeholder="Select role" styles={selectStyles} rules={{ required: "Role is required" }} options={["Staff", "Admin", "Manager", "Team Leader"].map((value) => ({ value, label: value }))} />
+            </div>
+            <div>
+              <label className="block mb-1 font-semibold">
+                Can self-allocate leads?
+              </label>
+              <select {...register("canSelfAllocateLeads")}>
+                <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+              <p className="mt-1 text-[10px] normal-case tracking-normal text-slate-500">
+                Allow this user to create and work on self-allocated leads.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="assignedto" className="block mb-1 font-semibold">Assigned to</label>
+              <ModernSelect name="assignedto" control={control} placeholder="Select reporting manager" styles={selectStyles} rules={{ required: "Assigned to is required" }} options={(users || []).map((staff) => ({ value: staff._id, label: staff.name || "Unnamed user" }))} />
+              {errors.assignedto && <p className="text-red-500 text-sm">{errors.assignedto.message}</p>}
+            </div>
+            <div>
+              <label className="block mb-1 font-semibold">Account status</label>
+              <ModernSelect name="isVerified" control={control} placeholder="Select account status" styles={selectStyles} rules={{ validate: (value) => typeof value === "boolean" || "Account status is required" }} options={[{ value: true, label: "Active" }, { value: false, label: "Inactive" }]} />
+              {errors.isVerified && <p className="mt-1 text-sm text-red-500">{errors.isVerified.message}</p>}
+            </div>
+            </section>
+
+            <section className="order-3 grid grid-cols-1 gap-x-3 gap-y-2 rounded-lg border border-teal-100 bg-teal-50/60 p-3 sm:grid-cols-2">
+            <div className="col-span-full flex items-center gap-1.5 border-b border-teal-100 pb-1.5 text-xs font-bold text-teal-900"><FaUserCircle className="text-teal-600" /> Access &amp; security</div>
             <div className="relative">
               <label htmlFor="password" className="block mb-1 font-semibold">
                 Password
@@ -668,14 +751,16 @@ console.log(url)
                 />
                 {/* Only show the eye icon if it's not in edit mode */}
 
-                <span
-                  className="absolute inset-y-0 right-0 flex items-center px-2 cursor-pointer"
+                <button
+                  type="button"
+                  aria-label={passwordVisible ? "Hide password" : "Show password"}
+                  className="absolute inset-y-0 right-1 flex items-center rounded-md px-2 text-slate-500 transition hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                   onClick={() => setPasswordVisible(!passwordVisible)}
                 >
                   <FontAwesomeIcon
                     icon={passwordVisible ? faEyeSlash : faEye}
                   />
-                </span>
+                </button>
               </div>
               {errors.password && (
                 <p className="mt-2 text-sm text-red-600">
@@ -685,10 +770,20 @@ console.log(url)
             </div>
 
             <div>
-              <label htmlFor="role" className="block mb-1 font-semibold">
-                Role
-              </label>
-              <ModernSelect name="role" control={control} placeholder="Select role" styles={selectStyles} rules={{ required: "Role is required" }} options={["Staff", "Admin", "Manager", "Team Leader"].map((value) => ({ value, label: value }))} />
+              <label className="block mb-1 font-semibold">Staff ID</label>
+              <input
+                type="number"
+                {...register("attendanceId", {
+                  required: "Staff ID is required",
+                  valueAsNumber: true,
+                  min: { value: 1, message: "Staff ID must be greater than 0" },
+                  validate: (value) => Number.isInteger(value) || "Staff ID must be a whole number"
+                })}
+                placeholder="Enter Staff ID"
+                onWheel={(e) => e.currentTarget.blur()}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-outer-spin-button]:m-0"
+              />
+              {errors.attendanceId && <p className="text-red-500 text-sm">{errors.attendanceId.message}</p>}
             </div>
 
             {/* <div>
@@ -746,6 +841,10 @@ console.log(url)
               )}
             </div> */}
 
+            </section>
+
+            <section className="order-2 grid grid-cols-1 gap-x-3 gap-y-2 rounded-lg border border-violet-100 bg-violet-50/60 p-3 sm:grid-cols-2">
+            <div className="col-span-full flex items-center gap-1.5 border-b border-violet-100 pb-1.5 text-xs font-bold text-violet-900"><FaUserCircle className="text-violet-600" /> Leave configuration</div>
             <div>
               <label className="block mb-1 font-semibold">
                 Privilege Leave Starts From
@@ -794,91 +893,21 @@ console.log(url)
               )}
             </div>
 
-            <div>
-              <label htmlFor="assignedto" className="block mb-1 font-semibold">
-                Assigned to
-              </label>
+            </section>
 
-              <ModernSelect name="assignedto" control={control} placeholder="Select reporting manager" styles={selectStyles} rules={{ required: "Assigned to is required" }} options={(users || []).map((staff) => ({ value: staff._id, label: staff.name || "Unnamed user" }))} />
-              {errors.assignedto && (
-                <p className="text-red-500 text-sm">
-                  {errors.assignedto.message}
-                </p>
-              )}
-            </div>
-            {/* Verified Field */}
-            <div>
-              <label className="block mb-1 font-semibold">Account status</label>
-              <ModernSelect
-                name="isVerified"
-                control={control}
-                placeholder="Select account status"
-                styles={selectStyles}
-                rules={{
-                  validate: (value) =>
-                    typeof value === "boolean" || "Account status is required"
-                }}
-                options={[
-                  { value: true, label: "Active" },
-                  { value: false, label: "Inactive" }
-                ]}
-              />
-              {errors.isVerified && (
-                <p className="mt-1 text-sm text-red-500">{errors.isVerified.message}</p>
-              )}
-            </div>
-
-            <ImageInput onSelect={profileImage} tag={"UploadProfile"} />
-            <ImageInput onSelect={documentImage} tag={"UploadDocument"} />
-            {/* <div>
-              <label className="block mb-1 font-semibold">Staff Id</label>
-              <input
-                type="Number"
-                {...register("attendanceId", { required: "Id is required" })}
-                placeholder="Enter an address"
- onWheel={(e) => e.currentTarget.blur()}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-outer-spin-button]:m-0"
-              />
-              {errors.attendanceId && (
-                <p className="text-red-500 text-sm">
-                  {errors.attendanceId.message}
-                </p>
-              )}
-            </div> */}
-<div>
-  <label className="block mb-1 font-semibold">Staff ID</label>
-
-  <input
-    type="number"
-    {...register("attendanceId", {
-      required: "Staff ID is required",
-      valueAsNumber: true,
-      min: {
-        value: 1,
-        message: "Staff ID must be greater than 0",
-      },
-      validate: (value) =>
-        Number.isInteger(value) || "Staff ID must be a whole number",
-    })}
-    placeholder="Enter Staff ID"
-    onWheel={(e) => e.currentTarget.blur()}
-    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 sm:text-sm outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-outer-spin-button]:m-0"
-  />
-
-  {errors.attendanceId && (
-    <p className="text-red-500 text-sm">
-      {errors.attendanceId.message}
-    </p>
-  )}
-</div>
+            <section className="order-4 grid grid-cols-1 gap-x-3 gap-y-2 rounded-lg border border-orange-100 bg-orange-50/60 p-3 sm:grid-cols-2">
+            <div className="col-span-full flex items-center gap-1.5 border-b border-orange-100 pb-1.5 text-xs font-bold text-orange-900"><FaUserCircle className="text-orange-600" /> Uploads</div>
+            <ImageInput onSelect={profileImage} tag={"UploadProfile"} compact />
+            <ImageInput onSelect={documentImage} tag={"UploadDocument"} compact />
+          </section>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 sm:p-4">
-            <div className="mb-3">
-              <h3 className="text-sm font-bold text-slate-800">Branch access</h3>
-              <p className="mt-0.5 text-xs text-slate-500">Select the company and branch this user can access.</p>
+          <div className="rounded-lg border border-violet-100 bg-white p-3 shadow-sm shadow-violet-100/50">
+            <div className="mb-2 flex flex-wrap items-baseline gap-x-2">
+              <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800"><FaSitemap className="text-indigo-600" /> Branch access</h3>
+              <p className="text-xs text-slate-500">Select each company and branch this user can access.</p>
             </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
               <div>
                 <label
                   htmlFor="companyName"
@@ -909,30 +938,20 @@ console.log(url)
                   </p>
                 )}
               </div>
+              {showTable && (
+                <button
+                  type="button"
+                  onClick={handleTableData}
+                  className="inline-flex h-8 items-center justify-center rounded-md bg-violet-600 px-4 text-xs font-semibold text-white shadow-sm shadow-violet-200 transition hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                >
+                  <span className="mr-1 text-base font-bold">+</span>
+                  {isEditMode ? "Update To Table" : "Add To Table"}
+                </button>
+              )}
             </div>
             {showTable && (
               <div>
-                <div className="mt-4">
-                  <button
-                    type="button"
-                    onClick={handleTableData}
-                    className="inline-flex items-center rounded-xl bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-blue-100"
-                  >
-                    {isEditMode ? (
-                      <>
-                        <span className="text-xl font-bold mr-1">+</span>Update
-                        To Table
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-xl font-bold">+</span> Add to
-                        Table
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
                   <table className="w-full min-w-[620px] divide-y divide-slate-200">
                     <thead className="bg-slate-50">
                       <tr>
@@ -1003,13 +1022,22 @@ console.log(url)
             )}
           </div>
 
-          <div className="flex justify-center border-t border-slate-100 pt-2">
+          <div className="flex justify-center gap-3 border-t border-slate-200 pt-3">
+            <button
+              type="button"
+              onClick={() => reset()}
+              className="inline-flex min-h-10 min-w-28 justify-center rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 focus:outline-none focus:ring-4 focus:ring-violet-100"
+            >
+              Cancel
+            </button>
             <button
               type="submit"
-              className="mt-3 inline-flex min-w-36 justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-blue-200 transition hover:from-blue-700 hover:to-indigo-700 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-100"
+              className="inline-flex min-h-11 min-w-36 justify-center rounded-lg bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-indigo-100"
             >
               {isEditMode ? "Update" : "Register"}
             </button>
+          </div>
+          </div>
           </div>
         </form>
       </div>

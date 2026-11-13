@@ -6575,6 +6575,8 @@ const applyOnsiteToDay = (day, onsiteDoc, user, dateKey) => {
     });
   }
 
+  const period = onsiteDoc.halfDayPeriod === "Morning" ? "Morning" : "Afternoon";
+
   if (onsiteDoc.onsiteType === "Full Day") {
     day.coverage.onsite.morning = true;
     day.coverage.onsite.afternoon = true;
@@ -6906,25 +6908,44 @@ export const GetsomeAll = async (req, res, yearParam = {}, monthParam = {}) => {
       ])
     ];
 
+    // Fetch each collection once for the full staff set. The previous approach
+    // executed three queries per user, which became slow as the staff count grew.
+    const userIds = users.map((user) => user._id);
+    const [allAttendances, allOnsites, allLeaves] = await Promise.all([
+      Attendance.find({
+        userId: { $in: userIds },
+        attendanceDate: { $gte: startDate, $lte: endDate }
+      }).lean(),
+      Onsite.find({
+        userId: { $in: userIds },
+        onsiteDate: { $gte: startDate, $lte: endDate }
+      }).lean(),
+      LeaveRequest.find({
+        userId: { $in: userIds },
+        leaveDate: { $gte: startDate, $lte: endDate }
+      }).lean()
+    ]);
+
+    const groupByUser = (records) =>
+      records.reduce((groups, record) => {
+        const key = String(record.userId);
+        const current = groups.get(key) || [];
+        current.push(record);
+        groups.set(key, current);
+        return groups;
+      }, new Map());
+
+    const attendancesByUser = groupByUser(allAttendances);
+    const onsitesByUser = groupByUser(allOnsites);
+    const leavesByUser = groupByUser(allLeaves);
     const staffAttendanceStats = [];
 
     for (const user of users) {
       const userId = user._id;
-
-      const [attendances, onsites, leaves] = await Promise.all([
-        Attendance.find({
-          userId,
-          attendanceDate: { $gte: startDate, $lte: endDate }
-        }),
-        Onsite.find({
-          userId,
-          onsiteDate: { $gte: startDate, $lte: endDate }
-        }),
-        LeaveRequest.find({
-          userId,
-          leaveDate: { $gte: startDate, $lte: endDate }
-        })
-      ]);
+      const userKey = String(userId);
+      const attendances = attendancesByUser.get(userKey) || [];
+      const onsites = onsitesByUser.get(userKey) || [];
+      const leaves = leavesByUser.get(userKey) || [];
 
       const attendanceMap = new Map(
         attendances.map((a) => [toYMD(a.attendanceDate), a])

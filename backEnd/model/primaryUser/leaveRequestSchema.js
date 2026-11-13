@@ -86,6 +86,9 @@ const leaveRequestSchema = new Schema(
   }
 )
 
+// Supports the monthly Leave Summary lookup for all staff in a branch.
+leaveRequestSchema.index({ userId: 1, leaveDate: 1 })
+
 const LeaveRequest = mongoose.model("LeaveRequest", leaveRequestSchema)
 
 export default LeaveRequest

@@ -72,12 +72,25 @@ const now=new Date()
   const listRef = useRef(null)
   const isFirstRender = useRef(true)
 
-  // API URL with selected year and month
+  const leaveSummaryUrl = useMemo(() => {
+    const params = new URLSearchParams({
+      year: String(selectedYear),
+      month: String(selectedMonth)
+    })
+
+    if (selectedBranch && selectedBranch !== "All") {
+      params.set("selectedBranch", selectedBranch)
+    }
+
+    return `/auth/getsomeall?${params.toString()}`
+  }, [selectedYear, selectedMonth, selectedBranch])
+
+  // Fetch only the active branch when one is selected.
   const {
     data,
 
     loading
-  } = UseFetch(`/auth/getsomeall?year=${selectedYear}&month=${selectedMonth}`)
+  } = UseFetch(leaveSummaryUrl)
   console.log(data)
   const { data: branchProduct } = UseFetch(
     `/product/getallbranchProduct?branch=${selectedCompanyBranch}`
