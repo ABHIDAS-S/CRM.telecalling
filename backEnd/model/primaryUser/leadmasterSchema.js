@@ -1,8 +1,5 @@
 
 
-
-
-
 ////uddated validation schema validation on 7-08-2026
 
 import mongoose from "mongoose";
@@ -268,13 +265,13 @@ const leadSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Partner",
       default: null,
-    },
+    },//this partner type
     partnerSelection: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Customer",
       default: null,
       set: (value) => (value === "" ? null : value),
-    },
+    },//this is partner
     leadConfirmed: { type: Boolean, default: false },
     leadClosed: { type: Boolean, default: false },
     leadClosedDate: { type: Date, default: null },
@@ -334,6 +331,12 @@ const leadSchema = new mongoose.Schema(
         },
         verifiedAt: { type: Date, default: null },
         receivedAmount: { type: Number, default: 0, set: toZeroNumber },
+        partnerSelection: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Customer",
+          default: null,
+          set: (value) => (value === "" ? null : value),
+        },
         paymentEntries: { type: [paymentEntrySchema], default: [] },
         receivedBy: {
           type: mongoose.Schema.Types.ObjectId,

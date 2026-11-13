@@ -3,6 +3,7 @@ import { X, IndianRupee, ClipboardCheck, Lock, Check, ChevronDown } from "lucide
 import { BarLoader } from "../../components/loader/BarLoader"
 import PopUp from "../common/PopUp"
 import { toast } from "react-toastify"
+import UseFetch from "../../hooks/useFetch"
 /* ─── helpers ─── */
 const safeNumber = (v) => {
   const n = parseFloat(v)
@@ -218,11 +219,18 @@ function ModernSelect({
   options,
   placeholder,
   disabled = false,
-  menuPlacement = "bottom"
+  menuPlacement = "bottom",
+  searchable = false
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const selectRef = useRef(null)
   const selectedOption = options.find((option) => String(option.value) === String(value))
+  const visibleOptions = searchable
+    ? options.filter((option) =>
+      option.label.toLowerCase().includes(searchQuery.trim().toLowerCase())
+    )
+    : options
 
   useEffect(() => {
     const closeOnOutsideClick = (event) => {
@@ -234,6 +242,7 @@ function ModernSelect({
 
   const selectOption = (optionValue) => {
     onChange({ target: { name, value: optionValue } })
+    setSearchQuery("")
     setIsOpen(false)
   }
 
@@ -249,7 +258,10 @@ function ModernSelect({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={() => setIsOpen((open) => {
+          if (open) setSearchQuery("")
+          return !open
+        })}
         style={{
           width: "100%",
           minWidth: 0,
@@ -300,7 +312,28 @@ function ModernSelect({
             boxShadow: "0 12px 28px rgba(15,23,42,0.16)"
           }}
         >
-          {options.map((option) => {
+          {searchable && (
+            <input
+              type="search"
+              value={searchQuery}
+              autoFocus
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onClick={(event) => event.stopPropagation()}
+              placeholder="Search customer..."
+              style={{
+                width: "100%",
+                marginBottom: 4,
+                padding: "7px 8px",
+                border: "1px solid #dbe3ef",
+                borderRadius: 6,
+                outline: "none",
+                color: "#334155",
+                fontFamily: "inherit",
+                fontSize: 11
+              }}
+            />
+          )}
+          {visibleOptions.map((option) => {
             const selected = String(option.value) === String(value)
             return (
               <button
@@ -333,6 +366,11 @@ function ModernSelect({
               </button>
             )
           })}
+          {visibleOptions.length === 0 && (
+            <p style={{ margin: 0, padding: "7px 8px", color: "#64748b", fontSize: 11 }}>
+              No customer found
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -456,13 +494,13 @@ export function CollectionupdateModal({
   data,
   closemodal,
   setishavePayment,
-  partnerlist,
   loggedUser,
   handleCollectionUpdate,
   from,
   hasCollectionData,
   editData
 }) {
+  const { data: partnerCustomers } = UseFetch("/customer/getPartnerCustomers")
   const [error, setError] = useState({})
   const [ishaveprimaryProduct, setIsHavePrimaryProduct] = useState(false)
   const [popupOpen, setpopupOpen] = useState(false)
@@ -482,7 +520,7 @@ export function CollectionupdateModal({
     country: "",
     state: "",
     city: "",
-    partner: "",
+    partnerSelection: "",
     customerId: ""
   })
   const [paymentRows, setPaymentRows] = useState([emptyRow()])
@@ -540,7 +578,10 @@ export function CollectionupdateModal({
       country: data.customerName?.country ?? "",
       state: data.customerName?.state ?? "",
       city: data.customerName?.city ?? "",
-      partner: data?.partner?._id ?? "",
+      partnerSelection:
+        editData?.partnerSelection?._id ??
+        editData?.partnerSelection ??
+        "",
       receivedBy: loggedUser?._id,
       receivedModel: loggedUser?.role === "Admin" ? "Admin" : "Staff"
     }))
@@ -1184,23 +1225,22 @@ export function CollectionupdateModal({
               />
             </Field>
 
-            {partnerlist?.length > 0 && (
-              <Field label="Associate With">
-                <ModernSelect
-                  name="partner"
-                  value={formData.partner}
-                  onChange={handleChange}
-                  placeholder="Select partner"
-                  options={[
-                    { value: "", label: "Select partner" },
-                    ...partnerlist.map((partner) => ({
-                      value: partner._id,
-                      label: partner?.partner || partner?.partnerName
-                    }))
-                  ]}
-                />
-              </Field>
-            )}
+            <Field label="Associate With">
+              <ModernSelect
+                name="partnerSelection"
+                value={formData.partnerSelection}
+                onChange={handleChange}
+                placeholder="Select partner customer"
+                searchable
+                options={[
+                  { value: "", label: "Select partner customer" },
+                  ...(Array.isArray(partnerCustomers) ? partnerCustomers : []).map((customer) => ({
+                    value: customer._id,
+                    label: customer.customerName || "Unnamed partner"
+                  }))
+                ]}
+              />
+            </Field>
 
             <Field label="Bank Remark">
               <textarea

@@ -1041,7 +1041,16 @@ console.log(selectedBranch)
                     </label>
                   </div>
                   <div className="min-w-0">
-                    {dates.startDate && <MyDatePicker setDates={setDates} dates={dates} compact inlineOnMobile />}
+                    {dates.startDate && (
+                      <MyDatePicker
+                        setDates={setDates}
+                        dates={dates}
+                        compact
+                        inlineOnMobile
+                        hideLabels
+                        paymentHistoryStyle
+                      />
+                    )}
                   </div>
                 </div>
               </div>

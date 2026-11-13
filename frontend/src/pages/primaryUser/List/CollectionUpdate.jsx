@@ -79,7 +79,6 @@ export default function CollectionUpdate() {
   const [leadId, setleadId] = useState(null)
   const [leadDocId, setleadDocId] = useState(null)
   const [activeUserId, setActiveUserId] = useState(null)
-  const [partner, setPartner] = useState([])
   const [showFullEmail, setShowFullEmail] = useState(false)
   const [paymenthistoryModal, setpaymentHistoryModal] = useState(false)
   const [collectionupdateModal, setcollectionUpdateModal] = useState(false)
@@ -140,13 +139,11 @@ export default function CollectionUpdate() {
       `/product/getallbranchProduct?branch=${selectedreduxbranch}`
   )
 
-  const { data: partners } = UseFetch("/customer/getallpartners")
   const isCollectionLoading =
     loading ||
     !loggedUser ||
     !selectedreduxbranch ||
     !Array.isArray(collectionlead) ||
-    !Array.isArray(partners) ||
     !isCollectionPrepared
 
   useEffect(() => {
@@ -278,7 +275,6 @@ export default function CollectionUpdate() {
     if (
       loading ||
       !Array.isArray(collectionlead) ||
-      !Array.isArray(partners) ||
       !loggedUser
     ) {
       setIsCollectionPrepared(false)
@@ -320,15 +316,13 @@ export default function CollectionUpdate() {
         setTableData(normalizeTableData(collectionlead))
       }
 
-      setPartner(partners)
     } else {
       setTableData([])
       setforcefullyClosedLeads([])
-      setPartner(partners)
     }
 
     setIsCollectionPrepared(true)
-  }, [collectionlead, partners, loggedUser, loading, verifiedLead])
+  }, [collectionlead, loggedUser, loading, verifiedLead])
   const normalizeTableData = (data) => {
     if (Array.isArray(data)) {
       return [{ staffName: null, leads: data }]
@@ -1295,14 +1289,10 @@ export default function CollectionUpdate() {
         />
       )}
 
-      {collectionupdateModal &&
-        selectedData &&
-        partner &&
-        partner.length > 0 && (
+      {collectionupdateModal && selectedData && (
           <CollectionupdateModal
             data={selectedData}
             closemodal={setcollectionUpdateModal}
-            partnerlist={partner}
             loggedUser={loggedUser}
             handleCollectionUpdate={handleCollectionUpdate}
           />
