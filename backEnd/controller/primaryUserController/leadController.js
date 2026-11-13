@@ -3946,7 +3946,7 @@ export const getBranchwiseMarketingPendingTasks = async (req, res) => {
     const leads = await LeadMaster.find({ leadBranch: branchId })
       .populate("activityLog.taskId")
       .populate("customerName", "customerName")
-      .populate("leadFor.productorServiceId", "productName serviceName shortName")
+      .populate("leadFor.productorServiceId", "productName serviceName")
       .lean(); // lean() is fine since we're manually attaching taskallocatedTo below
 
     // Some historical leadFor records only retain productorServiceId and do
@@ -3972,21 +3972,21 @@ export const getBranchwiseMarketingPendingTasks = async (req, res) => {
 
     const [productDocs, serviceDocs] = await Promise.all([
       Product.find({ _id: { $in: [...productIds] } })
-        .select("productName shortName")
+        .select("productName")
         .lean(),
       Service.find({ _id: { $in: [...serviceIds] } })
-        .select("serviceName shortName")
+        .select("serviceName")
         .lean()
     ]);
 
     const productNameById = new Map([
       ...productDocs.map((item) => [
         String(item._id),
-        item.shortName || item.productName || ""
+        item.productName || ""
       ]),
       ...serviceDocs.map((item) => [
         String(item._id),
-        item.shortName || item.serviceName || ""
+        item.serviceName || ""
       ])
     ]);
 
@@ -4045,11 +4045,10 @@ export const getBranchwiseMarketingPendingTasks = async (req, res) => {
                   );
 
                   return (
-                    item?.productorServiceName ||
-                    item?.productorServiceId?.shortName ||
                     item?.productorServiceId?.productName ||
                     item?.productorServiceId?.serviceName ||
-                    productNameById.get(String(referencedId || ""))
+                    productNameById.get(String(referencedId || "")) ||
+                    item?.productorServiceName
                   );
                 }
               )
