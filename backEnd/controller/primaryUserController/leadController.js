@@ -4222,9 +4222,19 @@ export const Getallsalesfunnels = async (req, res) => {
     const staffObjectId = ownLeadOnly
       ? new mongoose.Types.ObjectId(staffId)
       : null;
-    const systemStudyTaskId = new mongoose.Types.ObjectId(
-      "689c23613e94902039b9774b"
-    )
+    const buildFollowupCloseMatch = (taskDescription) => ({
+      submissionDate: { $gte: start, $lte: end },
+      followupClosed: true,
+      ...(taskDescription ? { taskDescription } : {}),
+      ...(ownLeadOnly
+        ? {
+            $or: [
+              { submittedUser: staffObjectId },
+              { taskallocatedTo: staffObjectId },
+            ],
+          }
+        : {}),
+    });
 
     // 1️⃣ Aggregation Pipeline
     const result = await LeadMaster.aggregate([
@@ -4249,27 +4259,11 @@ export const Getallsalesfunnels = async (req, res) => {
         }
       },
 
-      // Classify funnel stage
+      // Conversion is calculated in its own lead-level pipeline below. This
+      // activity pipeline remains for the other funnel stages.
       {
         $addFields: {
-          stage: {
-            $switch: {
-              branches: [
-                {
-                  case: {
-                    $and: [
-                      { $eq: ["$activityLog.followupClosed", true] },
-                      { $ne: ["$leadConvertedDate", null] },
-                      { $gte: ["$leadConvertedDate", start] },
-                      { $lte: ["$leadConvertedDate", end] }
-                    ]
-                  },
-                  then: "Converted"
-                },
-              ],
-              default: "Uncategorized"
-            }
-          }
+          stage: "Uncategorized"
         }
       },
 
@@ -4305,6 +4299,51 @@ export const Getallsalesfunnels = async (req, res) => {
             }
           }
         }
+      },
+      // Converted includes either a Follow-Up-only closure (not confirmed),
+      // or a direct lead closure (closed and confirmed with the explicit
+      // "Follow-Up Closed" activity description).
+      {
+        $unionWith: {
+          coll: LeadMaster.collection.name,
+          pipeline: [
+            {
+              $match: {
+                leadBranch: branchObjectId,
+                leadLost: { $ne: true },
+                $or: [
+                  {
+                    leadConfirmed: false,
+                    activityLog: {
+                      $elemMatch: buildFollowupCloseMatch(),
+                    },
+                  },
+                  {
+                    leadClosed: true,
+                    leadConfirmed: true,
+                    activityLog: {
+                      $elemMatch: buildFollowupCloseMatch("Follow-Up Closed"),
+                    },
+                  },
+                ],
+              },
+            },
+            {
+              $group: {
+                _id: null,
+                count: { $sum: 1 },
+                value: { $sum: "$netAmount" },
+              },
+            },
+            {
+              $project: {
+                _id: "Converted",
+                count: 1,
+                value: 1,
+              },
+            },
+          ],
+        },
       },
       // New Leads is independent of activity history: it includes every
       // lead created in the selected period, exactly once.
@@ -4411,9 +4450,9 @@ export const Getallsalesfunnels = async (req, res) => {
           ]
         }
       },
-      // System Study is identified only by its task ID. Its origin does not
-      // matter, so direct allocations are included and every other task
-      // (Demo, Coding, Implementation, etc.) is excluded.
+      // System Study means a task was created *from* Follow-Up and remains
+      // pending. Do not count the original Follow-Up row itself: tasks created
+      // from it are explicitly marked with taskfromFollowup: true.
       {
         $unionWith: {
           coll: LeadMaster.collection.name,
@@ -4421,11 +4460,16 @@ export const Getallsalesfunnels = async (req, res) => {
             {
               $match: {
                 leadBranch: branchObjectId,
+                leadLost: { $ne: true },
+                leadConvertedDate: null,
                 activityLog: {
                   $elemMatch: {
-                    taskId: systemStudyTaskId,
+                    taskfromFollowup: true,
                     ...(ownLeadOnly ? { taskallocatedTo: staffObjectId } : {}),
-                    submissionDate: { $gte: start, $lte: end }
+                    allocationChanged: false,
+                    allocatedClosed: false,
+                    taskClosed: false,
+                    followupClosed: false,
                   }
                 }
               }
@@ -16021,7 +16065,10 @@ export const GetownLeadList = async (req, res) => {
       query.leadFor = { $elemMatch: leadForMatch };
     }
 
-    if (ownlead === "true") {
+    if (
+      ownlead === "true" &&
+      !["System Study", "Converted"].includes(salesFunnelStage)
+    ) {
       query.leadBy = objectId;
     } else if (ownlead === "false" && role === "Staff") {
       return res.status(200).json({ message: "lead not found", data: [] });
@@ -16042,10 +16089,6 @@ export const GetownLeadList = async (req, res) => {
       parsedEnd.setDate(parsedEnd.getDate() + 1)
 
       const dateRange = { $gte: parsedStart, $lt: parsedEnd };
-      const systemStudyTaskId = new mongoose.Types.ObjectId(
-        "689c23613e94902039b9774b"
-      );
-
       switch (salesFunnelStage) {
         case "Contacted":
           query.activityLog = {
@@ -16056,10 +16099,16 @@ export const GetownLeadList = async (req, res) => {
           };
           break;
         case "System Study":
+          query.leadLost = { $ne: true };
+          query.leadConvertedDate = null;
           query.activityLog = {
             $elemMatch: {
-              taskId: systemStudyTaskId,
-              submissionDate: dateRange,
+              taskfromFollowup: true,
+              ...(ownlead === "true" ? { taskallocatedTo: objectId } : {}),
+              allocationChanged: false,
+              allocatedClosed: false,
+              taskClosed: false,
+              followupClosed: false,
             },
           };
           break;
@@ -16068,8 +16117,45 @@ export const GetownLeadList = async (req, res) => {
           query.leadLostDate = dateRange;
           break;
         case "Converted":
-          query.leadConvertedDate = dateRange;
-          query.activityLog = { $elemMatch: { followupClosed: true } };
+          query.leadLost = { $ne: true };
+          query.$or = [
+            {
+              leadConfirmed: false,
+              activityLog: {
+                $elemMatch: {
+                  submissionDate: dateRange,
+                  followupClosed: true,
+                  ...(ownlead === "true"
+                    ? {
+                        $or: [
+                          { submittedUser: objectId },
+                          { taskallocatedTo: objectId },
+                        ],
+                      }
+                    : {}),
+                },
+              },
+            },
+            {
+              leadClosed: true,
+              leadConfirmed: true,
+              activityLog: {
+                $elemMatch: {
+                  submissionDate: dateRange,
+                  followupClosed: true,
+                  taskDescription: "Follow-Up Closed",
+                  ...(ownlead === "true"
+                    ? {
+                        $or: [
+                          { submittedUser: objectId },
+                          { taskallocatedTo: objectId },
+                        ],
+                      }
+                    : {}),
+                },
+              },
+            },
+          ];
           break;
         case "New Leads":
         default:
