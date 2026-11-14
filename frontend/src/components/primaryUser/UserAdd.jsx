@@ -7,6 +7,7 @@ import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons"
 import { FaEdit, FaTrash, FaUserPlus, FaUserCircle, FaSitemap, FaCamera } from "react-icons/fa"
 import Select from "react-select"
 import ImageInput from "../common/ImageInput"
+import { getProfileImageUrl } from "../../helper/profileImage"
 import UseFetch from "../../hooks/useFetch"
 import PropTypes from "prop-types"
 
@@ -458,11 +459,11 @@ console.log(url)
   }
   return (
     <div
-      className="min-h-screen bg-[#ADD8E6] p-2 sm:p-4 lg:p-5"
+      className="min-h-screen bg-[#ADD8E6] p-2 sm:p-2.5 lg:p-3"
       // style={{ backgroundImage: "url('/userbackground.jpg')" }}
     >
       <div className="mx-auto w-full max-w-[1680px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-400/20">
-        <div className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-indigo-50 px-4 py-3 sm:px-5">
+        <div className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-indigo-50 px-3 py-2 sm:px-4">
           <div className="absolute -right-14 -top-16 h-44 w-80 rounded-full bg-indigo-200/30 blur-2xl" />
           <div className="relative flex items-center gap-3">
             <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-sm shadow-indigo-200"><FaUserPlus size={16} /></span>
@@ -484,28 +485,29 @@ console.log(url)
             {formMessage}
           </div>
         )}
-        <form onSubmit={handleSubmit(onSubmit)} autoComplete="off" className="space-y-3 p-3 sm:p-4 [&_label]:mb-1 [&_label]:block [&_label]:text-[10px] [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-[0.05em] [&_label]:text-slate-600 [&_input]:!mt-0 [&_input]:!min-h-8 [&_input]:!w-full [&_input]:!rounded-md [&_input]:!border-slate-200 [&_input]:!bg-slate-50 [&_input]:!px-2.5 [&_input]:!py-1 [&_input]:!text-xs [&_input]:!text-slate-800 [&_input]:!shadow-none [&_input]:!outline-none [&_input]:!transition [&_input]:hover:!border-slate-300 [&_input]:focus:!border-indigo-500 [&_input]:focus:!bg-white [&_input]:focus:!ring-2 [&_input]:focus:!ring-indigo-100 [&_select]:!mt-0 [&_select]:!min-h-8 [&_select]:!w-full [&_select]:!rounded-md [&_select]:!border-slate-200 [&_select]:!bg-slate-50 [&_select]:!px-2.5 [&_select]:!py-1 [&_select]:!text-xs [&_select]:!text-slate-800 [&_select]:!shadow-none [&_select]:!outline-none [&_select]:!transition [&_select]:hover:!border-slate-300 [&_select]:focus:!border-indigo-500 [&_select]:focus:!bg-white [&_select]:focus:!ring-2 [&_select]:focus:!ring-indigo-100">
-          <div className="grid gap-3 xl:grid-cols-[104px_minmax(0,1fr)] xl:items-start">
-            <aside className="flex flex-row items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 xl:flex-col xl:bg-transparent xl:p-0">
+        <form onSubmit={handleSubmit(onSubmit)} autoComplete="off" className="space-y-2 p-2 sm:p-2.5 [&_label]:mb-0.5 [&_label]:block [&_label]:text-[10px] [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-[0.05em] [&_label]:text-slate-600 [&_input]:!mt-0 [&_input]:!min-h-8 [&_input]:!w-full [&_input]:!rounded-md [&_input]:!border-slate-200 [&_input]:!bg-slate-50 [&_input]:!px-2.5 [&_input]:!py-1 [&_input]:!text-xs [&_input]:!text-slate-800 [&_input]:!shadow-none [&_input]:!outline-none [&_input]:!transition [&_input]:hover:!border-slate-300 [&_input]:focus:!border-indigo-500 [&_input]:focus:!bg-white [&_input]:focus:!ring-2 [&_input]:focus:!ring-indigo-100 [&_select]:!mt-0 [&_select]:!min-h-8 [&_select]:!w-full [&_select]:!rounded-md [&_select]:!border-slate-200 [&_select]:!bg-slate-50 [&_select]:!px-2.5 [&_select]:!py-1 [&_select]:!text-xs [&_select]:!text-slate-800 [&_select]:!shadow-none [&_select]:!outline-none [&_select]:!transition [&_select]:hover:!border-slate-300 [&_select]:focus:!border-indigo-500 [&_select]:focus:!bg-white [&_select]:focus:!ring-2 [&_select]:focus:!ring-indigo-100">
+          <div className="grid gap-2 xl:grid-cols-[128px_minmax(0,1fr)] xl:items-start">
+            <aside className="flex flex-row items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-1.5 xl:flex-col xl:bg-transparent xl:p-0">
               <div className="relative rounded-full border-4 border-white bg-gradient-to-br from-indigo-100 to-blue-100 p-1 shadow-md shadow-indigo-100">
                 {profileImageUrl ? (
                   <img
-                    src={profileImageUrl}
+                    src={getProfileImageUrl(profileImageUrl, 160)}
                     alt="User profile"
-                    className="h-16 w-16 rounded-full object-cover sm:h-20 sm:w-20"
+                    decoding="async"
+                    className="h-16 w-16 rounded-full object-cover sm:h-[72px] sm:w-[72px]"
                   />
                 ) : (
-                  <span className="grid h-16 w-16 place-items-center rounded-full bg-slate-100 text-2xl font-bold text-indigo-500 sm:h-20 sm:w-20">
+                  <span className="grid h-16 w-16 place-items-center rounded-full bg-slate-100 text-2xl font-bold text-indigo-500 sm:h-[72px] sm:w-[72px]">
                     {(watch("name") || "U").trim().charAt(0).toUpperCase()}
                   </span>
                 )}
                 <span className="absolute bottom-0 right-0 grid h-6 w-6 place-items-center rounded-full border-2 border-white bg-blue-600 text-white shadow-sm"><FaCamera size={10} /></span>
               </div>
-              <p className="text-[11px] font-semibold text-slate-500 xl:mt-2 xl:text-center">Profile photo</p>
+              <p className="text-[11px] font-semibold text-slate-500 xl:mt-1 xl:text-center">Profile photo</p>
             </aside>
-            <div className="min-w-0 space-y-3">
-          <div className="grid grid-cols-1 gap-x-3 gap-y-2.5 rounded-lg border border-violet-100 bg-violet-50/60 p-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="col-span-full flex items-center gap-1.5 border-b border-slate-200 pb-2 text-xs font-bold text-slate-800"><FaUserCircle className="text-indigo-600" /> Personal information</div>
+            <div className="min-w-0 space-y-2">
+          <div className="grid grid-cols-1 gap-x-2 gap-y-1.5 rounded-lg border border-violet-100 bg-violet-50/60 p-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="col-span-full flex items-center gap-1.5 border-b border-slate-200 pb-1 text-xs font-bold text-slate-800"><FaUserCircle className="text-indigo-600" /> Personal information</div>
             <div>
               <label className="block mb-1 font-semibold">Name</label>
               <input
@@ -690,9 +692,9 @@ console.log(url)
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <section className="order-1 grid grid-cols-1 gap-x-3 gap-y-2 rounded-lg border border-blue-100 bg-blue-50/60 p-3 sm:grid-cols-2">
-            <div className="col-span-full flex items-center gap-1.5 border-b border-blue-100 pb-1.5 text-xs font-bold text-blue-900"><FaUserCircle className="text-blue-600" /> Employment details</div>
+          <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+            <section className="order-1 grid grid-cols-1 gap-x-2 gap-y-1.5 rounded-lg border border-blue-100 bg-blue-50/60 p-2 sm:grid-cols-2">
+            <div className="col-span-full flex items-center gap-1.5 border-b border-blue-100 pb-1 text-xs font-bold text-blue-900"><FaUserCircle className="text-blue-600" /> Employment details</div>
             <div>
               <label htmlFor="department" className="block mb-1 font-semibold">
                 Department
@@ -728,8 +730,8 @@ console.log(url)
             </div>
             </section>
 
-            <section className="order-3 grid grid-cols-1 gap-x-3 gap-y-2 rounded-lg border border-teal-100 bg-teal-50/60 p-3 sm:grid-cols-2">
-            <div className="col-span-full flex items-center gap-1.5 border-b border-teal-100 pb-1.5 text-xs font-bold text-teal-900"><FaUserCircle className="text-teal-600" /> Access &amp; security</div>
+            <section className="order-3 grid grid-cols-1 gap-x-2 gap-y-1.5 rounded-lg border border-teal-100 bg-teal-50/60 p-2 sm:grid-cols-2">
+            <div className="col-span-full flex items-center gap-1.5 border-b border-teal-100 pb-1 text-xs font-bold text-teal-900"><FaUserCircle className="text-teal-600" /> Access &amp; security</div>
             <div className="relative">
               <label htmlFor="password" className="block mb-1 font-semibold">
                 Password
@@ -843,8 +845,8 @@ console.log(url)
 
             </section>
 
-            <section className="order-2 grid grid-cols-1 gap-x-3 gap-y-2 rounded-lg border border-violet-100 bg-violet-50/60 p-3 sm:grid-cols-2">
-            <div className="col-span-full flex items-center gap-1.5 border-b border-violet-100 pb-1.5 text-xs font-bold text-violet-900"><FaUserCircle className="text-violet-600" /> Leave configuration</div>
+            <section className="order-2 grid grid-cols-1 gap-x-2 gap-y-1.5 rounded-lg border border-violet-100 bg-violet-50/60 p-2 sm:grid-cols-2">
+            <div className="col-span-full flex items-center gap-1.5 border-b border-violet-100 pb-1 text-xs font-bold text-violet-900"><FaUserCircle className="text-violet-600" /> Leave configuration</div>
             <div>
               <label className="block mb-1 font-semibold">
                 Privilege Leave Starts From
@@ -895,19 +897,19 @@ console.log(url)
 
             </section>
 
-            <section className="order-4 grid grid-cols-1 gap-x-3 gap-y-2 rounded-lg border border-orange-100 bg-orange-50/60 p-3 sm:grid-cols-2">
-            <div className="col-span-full flex items-center gap-1.5 border-b border-orange-100 pb-1.5 text-xs font-bold text-orange-900"><FaUserCircle className="text-orange-600" /> Uploads</div>
-            <ImageInput onSelect={profileImage} tag={"UploadProfile"} compact />
+            <section className="order-4 grid grid-cols-1 gap-x-2 gap-y-1.5 rounded-lg border border-orange-100 bg-orange-50/60 p-2 sm:grid-cols-2">
+            <div className="col-span-full flex items-center gap-1.5 border-b border-orange-100 pb-1 text-xs font-bold text-orange-900"><FaUserCircle className="text-orange-600" /> Uploads</div>
+            <ImageInput onSelect={profileImage} tag={"UploadProfile"} compact profilePhoto />
             <ImageInput onSelect={documentImage} tag={"UploadDocument"} compact />
           </section>
           </div>
 
-          <div className="rounded-lg border border-violet-100 bg-white p-3 shadow-sm shadow-violet-100/50">
-            <div className="mb-2 flex flex-wrap items-baseline gap-x-2">
+          <div className="rounded-lg border border-violet-100 bg-white p-2 shadow-sm shadow-violet-100/50">
+            <div className="mb-1 flex flex-wrap items-baseline gap-x-2">
               <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800"><FaSitemap className="text-indigo-600" /> Branch access</h3>
               <p className="text-xs text-slate-500">Select each company and branch this user can access.</p>
             </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
               <div>
                 <label
                   htmlFor="companyName"
@@ -951,7 +953,7 @@ console.log(url)
             </div>
             {showTable && (
               <div>
-                <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+                <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
                   <table className="w-full min-w-[620px] divide-y divide-slate-200">
                     <thead className="bg-slate-50">
                       <tr>
@@ -1022,7 +1024,7 @@ console.log(url)
             )}
           </div>
 
-          <div className="flex justify-center gap-3 border-t border-slate-200 pt-3">
+          <div className="flex justify-center gap-2 border-t border-slate-200 pt-2">
             <button
               type="button"
               onClick={() => reset()}

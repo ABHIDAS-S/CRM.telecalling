@@ -347,7 +347,20 @@ const handleMetricTab = (tab) => {
   console.log(open)
   console.log(targetData)
 
-  const isAmountMode = String(splitType || "").trim().toLowerCase() === "amount"
+  // The modal is opened for one category. Its measurement type is the source
+  // of truth; the period-level type can be different when a period has mixed
+  // amount and quantity categories.
+  const categoryMeasurementType = userWiseResults
+    .flatMap((user) => user.categories || [])
+    .find(
+      (item) =>
+        String(item.categoryId) === String(categoryId) &&
+        String(item.measurementType || "").toLowerCase() !== "incentive"
+    )?.measurementType
+  const isAmountMode =
+    String(categoryMeasurementType || splitType || "")
+      .trim()
+      .toLowerCase() === "amount"
 
   const formatValue = (val) => {
     const num = Number(val || 0)
@@ -972,7 +985,7 @@ console.log("h")
   return (
 
 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Achieved leads">
-  <div className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+  <div className="flex max-h-[94vh] w-[calc(100vw-2rem)] max-w-[1440px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
     <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-4 py-3">
       <div>
         <p className="text-sm font-semibold text-slate-800">
@@ -994,20 +1007,21 @@ console.log("h")
       </div>
     </div>
 
-    <div className="overflow-auto p-4">
+    <div className="overflow-y-auto overflow-x-hidden p-3 sm:p-4">
       {uniqueLeads.length ? (
         <div className="overflow-hidden border border-slate-300">
-          <table className="min-w-[1000px] w-full table-fixed border-collapse text-xs">
+          <table className="w-full table-fixed border-collapse text-xs">
             <thead className="bg-blue-600 text-[11px] uppercase tracking-wide text-white">
               <tr>
-                <th className="w-56 border-r border-blue-400 px-3 py-2 text-left">Name</th>
-                <th className="border-r border-blue-400 px-3 py-2 text-left">Lead ID</th>
-                <th className="border-r border-blue-400 px-3 py-2 text-left">Mobile</th>
-                <th className="border-r border-blue-400 px-3 py-2 text-center">License No.</th>
-                <th className="border-r border-blue-400 px-3 py-2 text-center">Product Name</th>
-                <th className="border-r border-blue-400 px-3 py-2 text-center">Event Log</th>
-                <th className="border-r border-blue-400 px-3 py-2 text-center">View</th>
-                <th className="px-3 py-2 text-right">₹ Achieved Amount</th>
+                <th className="w-[17%] border-r border-blue-400 px-2 py-2 text-left">Name</th>
+                <th className="w-[8%] border-r border-blue-400 px-2 py-2 text-left">Lead ID</th>
+                <th className="w-[10%] border-r border-blue-400 px-2 py-2 text-left">Mobile</th>
+                <th className="w-[8%] border-r border-blue-400 px-2 py-2 text-center">License No.</th>
+                <th className="w-[10%] border-r border-blue-400 px-2 py-2 text-center">Product Name</th>
+                <th className="w-[8%] border-r border-blue-400 px-2 py-2 text-center">Event Log</th>
+                <th className="w-[8%] border-r border-blue-400 px-2 py-2 text-center">View</th>
+                <th className="w-[11%] break-words border-r border-blue-400 px-1 py-2 text-right leading-tight">₹ Achv. Amt. (Before Tax)</th>
+                <th className="w-[14%] px-2 py-2 text-right">₹ Collection Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1076,15 +1090,15 @@ console.log(lead?.categoryItems)
                         View
                       </button>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-green-700">
+                    <td className="whitespace-nowrap border-r border-slate-200 px-2 py-2 text-right font-semibold text-green-700">
                       ₹ {Number(
-                        String(lead.measurementType || "").toLowerCase() ===
-                        "amount"
-                          ? lead.forcefullyClosedTarget
-                            ? lead.netAmount
-                            : lead.achievedValue
-                          : lead.netAmount || lead.verifiedCategoryAmount || 0
+                        Number(lead.discountAmount || 0) > 0
+                          ? 0
+                          : lead.achievedValue || 0
                       ).toLocaleString("en-IN")}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-slate-700">
+                      ₹ {Number(lead.totalPaidAmount || 0).toLocaleString("en-IN")}
                     </td>
                   </tr>
                 );
