@@ -395,6 +395,13 @@ const leadSchema = new mongoose.Schema(
     },
     selfAllocationDueDate: { type: Date, default: null },
     selfAllocation: { type: Boolean, default: false },
+    // Target-only leads are included in target counts but never in incentives.
+    isZeroAmountLead: { type: Boolean, default: false },
+    zeroAmountTask: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Task",
+      default: null,
+    },
     taskfromFollowup: { type: Boolean, default: false },
   },
   { timestamps: true }

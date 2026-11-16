@@ -70,7 +70,8 @@ const UserAdd = ({
     trigger
   } = useForm({
     defaultValues: {
-      permissionLevel: [] // Initialize as an array
+      permissionLevel: [], // Initialize as an array
+      canSelfAllocateLeads: "false"
     }
   })
 
@@ -710,10 +711,16 @@ console.log(url)
               <label className="block mb-1 font-semibold">
                 Can self-allocate leads?
               </label>
-              <select {...register("canSelfAllocateLeads")}>
-                <option value="false">No</option>
-                <option value="true">Yes</option>
-              </select>
+              <ModernSelect
+                name="canSelfAllocateLeads"
+                control={control}
+                placeholder="Select self-allocation access"
+                styles={selectStyles}
+                options={[
+                  { value: "false", label: "No" },
+                  { value: "true", label: "Yes" }
+                ]}
+              />
               <p className="mt-1 text-[10px] normal-case tracking-normal text-slate-500">
                 Allow this user to create and work on self-allocated leads.
               </p>
