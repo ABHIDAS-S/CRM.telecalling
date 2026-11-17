@@ -13,20 +13,13 @@ const styles = `
     padding: 0;
   }
 
-  html,
-  body,
-  #root {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-  }
-
   .cn-root {
     width: 100%;
-    height: 91vh;
+    height: calc(100dvh - 76px);
+    min-height: 0;
     overflow: hidden;
     background: #ADD8E6;
-    padding: 18px;
+    padding: 8px;
     font-family: 'DM Sans', sans-serif;
   }
 
@@ -48,8 +41,8 @@ const styles = `
     height: 100%;
     overflow: hidden;
     background: #ffffff;
-    border-radius: 24px;
-    box-shadow: 0 10px 35px rgba(0,0,0,.08);
+    border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.08);
     display: flex;
     flex-direction: column;
   }
@@ -61,12 +54,12 @@ const styles = `
     top: 0;
     z-index: 40;
     flex-shrink: 0;
-    height: 62px;
+    height: 46px;
     background: #1a1d2e;
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 0 24px;
+    gap: 10px;
+    padding: 0 16px;
   }
 
   .cn-header-icon {
@@ -87,7 +80,7 @@ const styles = `
 
   .cn-header-title {
     color: #ffffff;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     letter-spacing: .5px;
   }
@@ -96,7 +89,7 @@ const styles = `
     margin-left: auto;
     background: rgba(99,102,241,.25);
     color: #c7d2fe;
-    padding: 4px 10px;
+    padding: 3px 8px;
     border-radius: 999px;
     font-size: 11px;
     font-weight: 700;
@@ -109,7 +102,7 @@ const styles = `
   .cn-body {
     flex: 1;
     overflow: hidden;
-    padding: 18px;
+    padding: 8px;
     background: #f4f7fb;
     display: flex;
     flex-direction: column;
@@ -139,21 +132,19 @@ const styles = `
     min-height: 0;
     background: #ffffff;
     border: 1px solid #e6ebf3;
-    border-radius: 18px;
+    border-radius: 10px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-width:63%;
-  
-
-  margin: 0 auto;
+    width: min(100%, 980px);
+    margin: 0 auto;
   }
 
   /* ───────────────── INPUT SECTION ───────────────── */
 
   .cn-input-section {
     flex-shrink: 0;
-    padding: 22px;
+    padding: 12px;
     border-bottom: 1px solid #edf1f7;
     background: #ffffff;
   }
@@ -162,7 +153,7 @@ width:63%;
     font-size: 11px;
     font-weight: 700;
     color: #7c8db0;
-    margin-bottom: 14px;
+    margin-bottom: 8px;
     letter-spacing: 1px;
     text-transform: uppercase;
   }
@@ -175,10 +166,10 @@ width:63%;
 
   .cn-input {
     flex: 1;
-    height: 44px;
+    height: 36px;
     border: 1.5px solid #dfe5ef;
     border-radius: 10px;
-    padding: 0 14px;
+    padding: 0 10px;
     background: #f8f9fc;
     outline: none;
     font-size: 14px;
@@ -192,10 +183,10 @@ width:63%;
   }
 
   .cn-btn {
-    height: 44px;
+    height: 36px;
     border: none;
-    border-radius: 10px;
-    padding: 0 20px;
+    border-radius: 8px;
+    padding: 0 14px;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -233,7 +224,7 @@ width:63%;
 
   .cn-table-header {
     flex-shrink: 0;
-    padding: 16px 22px;
+    padding: 9px 12px;
     background: #f8f9fc;
     border-bottom: 1px solid #edf1f7;
   }
@@ -263,6 +254,7 @@ width:63%;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior: contain;
   }
 
   .cn-table-wrap::-webkit-scrollbar {
@@ -285,7 +277,7 @@ width:63%;
     top: 0;
     z-index: 40;
     background: #f8f9fc;
-    padding: 14px 18px;
+    padding: 9px 12px;
     border-bottom: 1px solid #e5e7eb;
     font-size: 11px;
     font-weight: 700;
@@ -304,7 +296,7 @@ width:63%;
   }
 
   .cn-table td {
-    padding: 14px 18px;
+    padding: 8px 12px;
     font-size: 13px;
     color: #1e293b;
     vertical-align: middle;
@@ -357,10 +349,10 @@ width:63%;
   }
 
   .cn-action-btn {
-    width: 34px;
-    height: 34px;
+    width: 28px;
+    height: 28px;
     border: none;
-    border-radius: 8px;
+    border-radius: 7px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -409,7 +401,8 @@ width:63%;
   @media (max-width: 768px) {
 
     .cn-root {
-      padding: 10px;
+      height: calc(100dvh - 64px);
+      padding: 6px;
     }
 
     .cn-fixed-wrapper {
@@ -417,7 +410,7 @@ width:63%;
     }
 
     .cn-body {
-      padding: 10px;
+      padding: 6px;
     }
 
     .cn-input-row {
