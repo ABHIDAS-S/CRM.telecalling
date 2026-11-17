@@ -14,6 +14,7 @@ export function complaintServiceAuth(req, res, next) {
 const router = express.Router();
 const controller = createAccuanetComplaintController();
 router.use(complaintServiceAuth);
+router.post("/start-without-license", controller.startWithoutLicense);
 router.post("/check-license", controller.checkLicense);
 router.post("/send-otp", controller.sendOtp);
 router.post("/verify-otp", controller.verifyOtp);

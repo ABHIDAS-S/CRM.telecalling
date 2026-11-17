@@ -11,7 +11,7 @@ const schema = new mongoose.Schema({
   verifiedAt: { type: Date, default: null },
   verifiedUntil: Date,
   verificationHash: String,
-  submission: { type: new mongoose.Schema({ contactNumber: String, description: String, callNoteId: String }, { _id: false }), default: null },
+  submission: { type: new mongoose.Schema({ companyName: String, contactNumber: String, description: String, callNoteId: String }, { _id: false }), default: null },
   submittedAt: Date,
   notificationStatus: { type: String, default: "pending" },
   notificationStartedAt: Date,
