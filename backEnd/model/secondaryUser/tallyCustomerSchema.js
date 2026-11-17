@@ -6,6 +6,8 @@ const TallyCustomerSchema = new mongoose.Schema(
   {
     Customer: { type: String, trim: true, default: "" },
     Address: { type: String, trim: true, default: "" },
+    State: { type: String, trim: true, default: "" },
+    Country: { type: String, trim: true, default: "" },
     Contactperson: { type: String, trim: true, default: "" },
     ContactNumber: { type: String, trim: true, default: "" },
     Mobilenumber: { type: String, trim: true, default: "" },
