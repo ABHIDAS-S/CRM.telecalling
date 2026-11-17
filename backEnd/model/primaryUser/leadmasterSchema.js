@@ -401,6 +401,16 @@ const leadSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Task",
       default: null,
+      // UI select components may return `{ value, label }` or a populated
+      // Task object. Keep only its id; malformed metadata must never cause a
+      // Cast to ObjectId failure during an unrelated lead edit.
+      set: (value) => {
+        const candidate =
+          value && typeof value === "object"
+            ? value._id ?? value.value ?? null
+            : value;
+        return mongoose.Types.ObjectId.isValid(candidate) ? candidate : null;
+      },
     },
     taskfromFollowup: { type: Boolean, default: false },
   },

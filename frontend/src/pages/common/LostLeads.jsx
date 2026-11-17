@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react"
+import React, { forwardRef, useEffect, useState } from "react"
+import DatePicker from "react-datepicker"
+import "react-datepicker/dist/react-datepicker.css"
 import UseFetch from "../../hooks/useFetch"
 import { useNavigate } from "react-router-dom"
 import { useLocation } from "react-router-dom"
@@ -21,13 +23,67 @@ import {
   ChevronRight,
   IndianRupee,
   BellRing, // Follow-up
-  History // Event Log
+  History, // Event Log
+  FileSearch
 } from "lucide-react"
 import { getLocalStorageItem } from "../../helper/localstorage"
 import AdminHeader from "../../header/AdminHeader"
 import StaffHeader from "../../header/StaffHeader"
 import { StaticSidebar } from "../../components/primaryUser/StaticSidebar"
 import { PerformanceModal } from "../../components/primaryUser/PerformanceModal"
+
+const formatDateForRequest = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+const CalendarDateInput = forwardRef(({ value, onClick, ariaLabel }, ref) => (
+  <button
+    ref={ref}
+    type="button"
+    onClick={onClick}
+    aria-label={ariaLabel}
+    className="flex min-w-[125px] items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-left text-xs font-medium text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-100"
+  >
+    <Calendar className="h-3.5 w-3.5 shrink-0 text-blue-600" aria-hidden="true" />
+    <span className="whitespace-nowrap">{value}</span>
+  </button>
+))
+
+CalendarDateInput.displayName = "CalendarDateInput"
+
+const EmptyLostLeads = ({ startDate, endDate }) => (
+  <div className="flex min-h-[380px] items-center justify-center bg-slate-50/70 p-6">
+    <section className="w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_12px_30px_-22px_rgba(15,23,42,0.4)]">
+      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-3">
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Lost lead report</span>
+        <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600">0 results</span>
+      </div>
+      <div className="px-6 py-8 text-center sm:px-10">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
+          <FileSearch className="h-6 w-6" strokeWidth={1.8} aria-hidden="true" />
+        </div>
+        <h3 className="text-lg font-semibold text-slate-800">No lost leads for this period</h3>
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-500">
+          No records matched the reporting period selected above.
+        </p>
+        <div className="mt-5 inline-flex max-w-full items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm">
+          <Calendar className="mr-2 h-3.5 w-3.5 shrink-0 text-blue-600" aria-hidden="true" />
+          <span className="truncate">
+            {startDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+            <span className="mx-2 text-slate-300">—</span>
+            {endDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+          </span>
+        </div>
+        <p className="mt-5 text-xs text-slate-400">
+          Adjust the date range above to review a different period.
+        </p>
+      </div>
+    </section>
+  </div>
+)
 
 export default function LostLeads() {
   const [showFullName, setShowFullName] = useState(false)
@@ -58,6 +114,13 @@ export default function LostLeads() {
   const [productlist, setproductList] = useState([])
   const [achievedproducts, setacheivedProducts] = useState([])
   const [selectedPeriod, setselectedPeriod] = useState("")
+  const [lostDateRange, setLostDateRange] = useState(() => {
+    const today = new Date()
+    return {
+      startDate: new Date(today.getFullYear(), today.getMonth(), 1),
+      endDate: new Date(today.getFullYear(), today.getMonth() + 1, 0)
+    }
+  })
   const navigate = useNavigate()
   const selbranch = useSelector((branch) => branch.companyBranch.selectedBranch)
   console.log(selbranch)
@@ -75,8 +138,8 @@ export default function LostLeads() {
 console.log(location?.state?.endDate)
   const url = shouldFetch
     ? location?.state?.staffId
-      ? `/lead/lostlead?userId=${loggedUser._id}&role=${loggedUser.role}&selectedBranch=${location?.state?.branchId}&ownlead=${ownLead}&startDate=${location?.state?.date?.startDate}&endDate=${location?.state?.date?.endDate}`
-      : `/lead/lostlead?userId=${loggedUser._id}&role=${loggedUser.role}&selectedBranch=${selectedCompanyBranch}&ownlead=${ownLead}`
+      ? `/lead/lostlead?userId=${loggedUser._id}&role=${loggedUser.role}&selectedBranch=${location?.state?.branchId}&ownlead=${ownLead}&startDate=${formatDateForRequest(lostDateRange.startDate)}&endDate=${formatDateForRequest(lostDateRange.endDate)}`
+      : `/lead/lostlead?userId=${loggedUser._id}&role=${loggedUser.role}&selectedBranch=${selectedCompanyBranch}&ownlead=${ownLead}&startDate=${formatDateForRequest(lostDateRange.startDate)}&endDate=${formatDateForRequest(lostDateRange.endDate)}`
     : null
   console.log(selectedCompanyBranch)
   console.log(location?.state)
@@ -163,7 +226,13 @@ console.log(location?.state?.endDate)
     }
   }, [selbranch, companybranches])
   useEffect(() => {
-    if (lostlead && lostlead.length > 0) {
+    if (!Array.isArray(lostlead) || lostlead.length === 0) {
+      setTableData([])
+      settotalAmount(0)
+      return
+    }
+
+    {
       console.log(lostlead)
       console.log(location?.state)
       let filteredLeads = []
@@ -398,41 +467,41 @@ leadsToGroup.forEach((lead) => {
     }
   }
   const renderTable = (data) => (
-    <table className="border-collapse border border-gray-300 w-full text-sm">
+    <table className="w-full border-collapse border border-gray-300 text-xs leading-tight">
       <thead className="whitespace-nowrap bg-gradient-to-r from-blue-600 to-blue-700 text-white sticky top-0 z-30 text-xs">
         <tr>
-          <th className="border border-gray-300 px-3 py-1 text-left">
+          <th className="border border-gray-300 px-2 py-1 text-left">
             <div className="flex items-center gap-1.5">
               <User className="w-3 h-3" />
               <span>Name</span>
             </div>
           </th>
-          <th className="border border-gray-300 px-3 py-2 min-w-[140px] text-left">
+          <th className="border border-gray-300 px-2 py-1 min-w-[130px] text-left">
             <div className="flex items-center gap-1.5">
               <Phone className="w-3 h-3" />
               <span>Mobile</span>
             </div>
           </th>
-          <th className="border border-gray-300 px-3 py-2 text-left">
+          <th className="border border-gray-300 px-2 py-1 text-left">
             <div className="flex items-center gap-1.5">
               <Phone className="w-3 h-3" />
               <span>Phone</span>
             </div>
           </th>
-          <th className="border border-gray-300 px-3 py-1 text-left">
+          <th className="border border-gray-300 px-2 py-1 text-left">
             <div className="flex items-center gap-1.5">
               <Mail className="w-3 h-3" />
               <span>Email</span>
             </div>
           </th>
-          <th className="border border-gray-300 px-3 py-1 min-w-[90px] text-left">
+          <th className="border border-gray-300 px-2 py-1 min-w-[80px] text-left">
             Lead Id
           </th>
 
-          <th className="border border-gray-300 px-3 py-1 min-w-[90px]">
+          <th className="border border-gray-300 px-2 py-1 min-w-[96px]">
             Action
           </th>
-          <th className="border border-gray-300 px-3 py-1">Net Amount</th>
+          <th className="border border-gray-300 px-2 py-1 whitespace-nowrap">Net Amount</th>
         </tr>
       </thead>
       <tbody>
@@ -442,7 +511,7 @@ leadsToGroup.forEach((lead) => {
               <tr className="bg-white border border-b-0 border-gray-300 hover:bg-blue-50 transition-colors">
                 <td
                   onClick={() => setShowFullName(!showFullName)}
-                  className={`px-3 min-w-[120px] py-1 cursor-pointer overflow-hidden font-medium text-gray-900 ${
+                  className={`px-2 min-w-[110px] py-1 cursor-pointer overflow-hidden font-medium text-gray-900 ${
                     showFullName
                       ? "whitespace-normal max-h-[3em]"
                       : "truncate whitespace-nowrap max-w-[120px]"
@@ -451,65 +520,65 @@ leadsToGroup.forEach((lead) => {
                 >
                   {item?.customerName?.customerName || item?.customerName}
                 </td>
-                <td className="px-3 py-1 text-gray-700">{item?.mobile}</td>
-                <td className="px-3 py-1 text-gray-700">{item?.phone}</td>
-                <td className="px-3 py-1 text-gray-600 truncate max-w-[180px]">
+                <td className="px-2 py-1 text-gray-700">{item?.mobile}</td>
+                <td className="px-2 py-1 text-gray-700">{item?.phone}</td>
+                <td className="max-w-[160px] truncate px-2 py-1 text-gray-600">
                   {item?.email}
                 </td>
-                <td className="px-3 py-1 font-medium text-blue-700">
+                <td className="px-2 py-1 font-medium text-blue-700">
                   {item?.leadId}
                 </td>
 
-                <td className="border border-b-0 border-gray-300 px-2 py-1 text-center">
+                <td className="border border-b-0 border-gray-300 px-1.5 py-1 text-center">
                   <button
                     type="button"
                     onClick={() => handleHistory(item)}
-                    className="inline-flex items-center gap-1 px-2  py-1 text-xs font-semibold text-white bg-indigo-600 rounded hover:bg-indigo-700 transition-colors w-full justify-center"
+                    className="inline-flex w-full min-w-[82px] items-center justify-center gap-1 whitespace-nowrap rounded bg-indigo-600 px-1.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
                   >
                     <BellRing className="w-3.5 h-3.5" />
-                    Event Log
+                    <span className="whitespace-nowrap">Event Log</span>
                   </button>
                 </td>
-                <td className="border border-b-0 border-gray-300 px-3 py-1"></td>
+                <td className="border border-b-0 border-gray-300 px-2 py-1"></td>
               </tr>
 
               <tr className="font-medium bg-gradient-to-r from-gray-100 to-gray-50 text-xs text-gray-600">
-                <td className="px-3 py-1 border-t border-gray-200">
+                <td className="px-2 py-0.5 border-t border-gray-200">
                   <div className="flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5 text-blue-600" />
                     <span>Lead by</span>
                   </div>
                 </td>
-                <td className="px-3 py-1 border-t border-gray-200">
+                <td className="px-2 py-0.5 border-t border-gray-200">
                   <div className="flex items-center gap-1.5">
                     <UserCheck className="w-3.5 h-3.5 text-green-600" />
                     <span>Assigned to</span>
                   </div>
                 </td>
-                <td className="px-3 py-1 border-t border-gray-200 text-nowrap">
+                <td className="px-2 py-0.5 border-t border-gray-200 text-nowrap">
                   <div className="flex items-center gap-1.5">
                     <UserPlus className="w-3.5 h-3.5 text-purple-600" />
                     <span>Assigned by</span>
                   </div>
                 </td>
-                <td className="px-3 py-1 border-t border-gray-200">
+                <td className="px-2 py-0.5 border-t border-gray-200">
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-orange-600" />
                     <span>No. of Followups</span>
                   </div>
                 </td>
-                <td className="px-3 py-1 border-t border-gray-200 min-w-[120px]">
+                <td className="min-w-[110px] border-t border-gray-200 px-2 py-0.5">
                   <div className="flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-blue-600" />
                     <span>Lead Date</span>
                   </div>
                 </td>
 
-                <td className="border border-t-0 border-b-0 border-gray-300 px-2 py-1 bg-white"></td>
-                <td className="border border-t-0 border-b-0 border-gray-300 px-3  bg-white font-semibold">
+                <td className="border border-t-0 border-b-0 border-gray-300 px-1.5 py-0.5 bg-white"></td>
+                <td className="border border-t-0 border-b-0 border-gray-300 px-2 bg-white font-semibold">
                   <div className="flex items-center justify-start">
                     <IndianRupee className="w-4 h-3.5 text-green-600 mr-1" />
-                    <span className="text-lg font-semibold">
+                    <span className="text-base font-semibold">
                       {" "}
                       {item.netAmount}
                     </span>
@@ -518,21 +587,21 @@ leadsToGroup.forEach((lead) => {
               </tr>
 
               <tr className="bg-white">
-                <td className="border border-t-0 border-gray-300 px-3 py-1 text-gray-900">
+                <td className="border border-t-0 border-gray-300 px-2 py-0.5 text-gray-900">
                   {item?.leadBy?.name}
                 </td>
-                <td className="border border-t-0 border-gray-300 px-3 py-1 text-gray-700">
+                <td className="border border-t-0 border-gray-300 px-2 py-0.5 text-gray-700">
                   {item?.taskallocatedTo?.name || "-"}
                 </td>
-                <td className="border border-t-0 border-gray-300 px-3 py-1 text-gray-700">
+                <td className="border border-t-0 border-gray-300 px-2 py-0.5 text-gray-700">
                   {item?.taskallocatedBy?.name || "-"}
                 </td>
-                <td className="border border-t-0 border-gray-300 px-3 py-1 text-gray-700"></td>
-                <td className="border border-t-0 border-gray-300 px-3 py-1 text-gray-900">
+                <td className="border border-t-0 border-gray-300 px-2 py-0.5 text-gray-700"></td>
+                <td className="border border-t-0 border-gray-300 px-2 py-0.5 text-gray-900">
                   {item.leadDate?.toString().split("T")[0]}
                 </td>
 
-                <td className="border border-t-0 border-b-0 border-gray-300 px-2 py-1">
+                <td className="border border-t-0 border-b-0 border-gray-300 px-1.5 py-0.5">
                   {" "}
                   {/* {pending && item.sameUser && (
                     <button
@@ -547,11 +616,11 @@ leadsToGroup.forEach((lead) => {
                     </button>
                   )} */}
                 </td>
-                <td className="border border-t-0 border-b-0 border-gray-300 px-3 py-1"></td>
+                <td className="border border-t-0 border-b-0 border-gray-300 px-2 py-0.5"></td>
               </tr>
 
               <tr className="font-medium bg-gradient-to-r from-gray-100 to-gray-50 text-xs text-gray-600">
-                <td colSpan={5} className="px-3 py-1 border-t border-gray-200">
+                <td colSpan={5} className="px-2 py-0.5 border-t border-gray-200">
                   <span>Remark :</span>
                   <span className="ml-2 text-red-500">
                     {item?.activityLog[item?.activityLog?.length - 1]?.remarks}
@@ -559,8 +628,8 @@ leadsToGroup.forEach((lead) => {
                 </td>
 
                 {/* <td className="border border-t-0 border-b-0 border-gray-300 px-3 bg-white"></td> */}
-                <td className="border border-t-0 border-b-0 border-gray-300 px-2 py-1 bg-white"></td>
-                <td className="border border-t-0 border-b-0 border-gray-300 px-3 bg-white"></td>
+                <td className="border border-t-0 border-b-0 border-gray-300 px-1.5 py-0.5 bg-white"></td>
+                <td className="border border-t-0 border-b-0 border-gray-300 px-2 bg-white"></td>
               </tr>
 
               {index !== data.length - 1 && (
@@ -654,9 +723,9 @@ leadsToGroup.forEach((lead) => {
               </div>
             </div>
           </header> */}
-          <div className="flex justify-between items-center m-3 mb-1">
-            <h2 className="text-lg font-bold">Lost Leads</h2>
-            <div className="flex justify-end items-center">
+          <div className="m-2 mb-0.5 flex items-center justify-between">
+            <h2 className="text-base font-bold">Lost Leads</h2>
+            <div className="flex items-center justify-end gap-2">
               {/* <select
                 value={selectedCompanyBranch || ""}
                 onChange={(e) => {
@@ -672,20 +741,55 @@ leadsToGroup.forEach((lead) => {
                 ))}
               </select> */}
 
+              <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                <DatePicker
+                  selected={lostDateRange.startDate}
+                  onChange={(date) => {
+                    if (!date) return
+                    setLostDateRange((current) => ({
+                      startDate: date,
+                      endDate: date > current.endDate ? date : current.endDate
+                    }))
+                  }}
+                  maxDate={lostDateRange.endDate}
+                  dateFormat="dd MMM yyyy"
+                  ariaLabel="Lost leads start date"
+                  customInput={<CalendarDateInput ariaLabel="Open lost leads start date calendar" />}
+                  calendarClassName="!rounded-xl !border-slate-200 !font-sans !shadow-xl"
+                  popperPlacement="bottom-end"
+                />
+                <span className="text-xs font-medium text-slate-400">to</span>
+                <DatePicker
+                  selected={lostDateRange.endDate}
+                  onChange={(date) => {
+                    if (!date) return
+                    setLostDateRange((current) => ({
+                      startDate: date < current.startDate ? date : current.startDate,
+                      endDate: date
+                    }))
+                  }}
+                  minDate={lostDateRange.startDate}
+                  dateFormat="dd MMM yyyy"
+                  ariaLabel="Lost leads end date"
+                  customInput={<CalendarDateInput ariaLabel="Open lost leads end date calendar" />}
+                  calendarClassName="!rounded-xl !border-slate-200 !font-sans !shadow-xl"
+                  popperPlacement="bottom-end"
+                />
+              </div>
               <button
                 onClick={() =>
                   loggedUser?.role === "Admin"
                     ? navigate("/admin/transaction/lead")
                     : navigate("/staff/transaction/lead")
                 }
-                className="bg-black text-white py-1 px-3 rounded-lg shadow-lg hover:bg-gray-600"
+                className="rounded-md bg-black px-2.5 py-1 text-sm text-white shadow hover:bg-gray-600"
               >
                 New Lead
               </button>
             </div>
           </div>
           {tableData && tableData.length > 0 && (
-            <div className="flex justify-end md:mx-5 text-blue-700 font-semibold  whitespace-nowrap">
+            <div className="mr-2 flex justify-end whitespace-nowrap text-sm font-semibold text-blue-700 md:mx-3">
               <span>Total Amount :</span>
               <span className="ml-1 flex items-center">
                 <IndianRupee className="w-4 h-4 mr-1 text-blue-700" />
@@ -694,7 +798,7 @@ leadsToGroup.forEach((lead) => {
             </div>
           )}
           {/* Responsive Table Container this is the newest design*/}
-          <div className="flex-1 overflow-x-auto rounded-lg overflow-y-auto shadow-xl mx-2 md:mx-3 mb-3 bg-white">
+          <div className="mx-2 mb-2 flex-1 overflow-x-auto overflow-y-auto rounded-md bg-white shadow-md md:mx-2">
             <>
               {/* {(() => {
                 const hasLeads =
@@ -713,7 +817,7 @@ leadsToGroup.forEach((lead) => {
                 }
 
                 return tableData.map(({ staffName, leads }, index) => (
-                  <div key={staffName || `group-${index}`} className="mb-6">
+                    <div key={staffName || `group-${index}`} className="mb-2">
                     {staffName && (
                       <h3 className="text-base font-semibold text-gray-800 mb-2 ml-1">
                         {staffName}{" "}
@@ -750,17 +854,18 @@ leadsToGroup.forEach((lead) => {
                 // 3. Empty state
                 if (!hasLeads) {
                   return (
-                    <div className="text-center text-gray-500 py-6">
-                      No Lost Leads Available
-                    </div>
+                    <EmptyLostLeads
+                      startDate={lostDateRange.startDate}
+                      endDate={lostDateRange.endDate}
+                    />
                   )
                 }
 
                 // 4. Render grouped data
                 return tableData.map(({ staffName, leads = [] }, index) => (
-                  <div key={staffName || `group-${index}`} className="mb-6">
+                  <div key={staffName || `group-${index}`} className="mb-2">
                     {staffName && (
-                      <h3 className="ml-1 mb-2 text-base font-semibold text-gray-800">
+                      <h3 className="mb-1 px-1 text-sm font-semibold text-gray-800">
                         {staffName}{" "}
                         <span className="text-sm font-normal text-gray-500">
                           ({leads.length} Leads)

@@ -6396,8 +6396,12 @@ export const UpdateLeadRegister = async (req, res) => {
 
   const toObjectIdOrNull = (value) => {
     if (!isValidValue(value)) return null;
-    return mongoose.Types.ObjectId.isValid(value)
-      ? new mongoose.Types.ObjectId(value)
+    const candidate =
+      value && typeof value === "object"
+        ? value._id ?? value.value ?? null
+        : value;
+    return mongoose.Types.ObjectId.isValid(candidate)
+      ? new mongoose.Types.ObjectId(candidate)
       : null;
   };
 
@@ -6997,7 +7001,7 @@ export const UpdateLeadRegister = async (req, res) => {
 
   try {
     const transactionResult = await session.withTransaction(async () => {
-      const {
+      let {
         data = {},
         leadData = [],
         from,
@@ -7022,13 +7026,41 @@ export const UpdateLeadRegister = async (req, res) => {
         throw Object.assign(new Error("Lead not found"), { statusCode: 404 });
       }
 
+      // The edit form can contain an old react-select value (for example
+      // `{ type: "string" }`) instead of a Task id. Never spread that raw
+      // value into the Mongoose update. A target-only lead retains its saved
+      // task unless the request supplies a valid replacement.
+      const {
+        zeroAmountTask: incomingZeroAmountTask,
+        isZeroAmountLead: incomingZeroAmountLead,
+        ...safeLeadData
+      } = data && typeof data === "object" ? data : {};
+      const isTargetOnlyLead =
+        matchedDoc.isZeroAmountLead === true ||
+        incomingZeroAmountLead === true ||
+        incomingZeroAmountLead === "true";
+      const zeroAmountTask = isTargetOnlyLead
+        ? toObjectIdOrNull(incomingZeroAmountTask) ||
+          toObjectIdOrNull(matchedDoc.zeroAmountTask)
+        : null;
+
+      if (isTargetOnlyLead && !zeroAmountTask) {
+        throw Object.assign(
+          new Error("The zero amount lead does not have a valid task assigned"),
+          { statusCode: 400 }
+        );
+      }
+
+      data = {
+        ...safeLeadData,
+        isZeroAmountLead: isTargetOnlyLead,
+        zeroAmountTask,
+      };
+
       let leadItemsForUpdate = leadData;
 
       // A target-only lead must remain zero-value throughout later edits,
       // even when a product is replaced with one that has Product Master pricing.
-      const isTargetOnlyLead = Boolean(
-        matchedDoc.isZeroAmountLead || data?.isZeroAmountLead
-      );
       if (isTargetOnlyLead) {
         matchedDoc.isZeroAmountLead = true;
         data.taxableAmount = 0;
