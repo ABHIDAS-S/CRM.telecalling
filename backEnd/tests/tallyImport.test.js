@@ -130,6 +130,40 @@ test("normal JSON objects and arrays stream into batches and reject malformed ar
   assert.deepEqual(received, [unicode])
 })
 
+test("data wrappers accept single and bulk customers without buffering the whole array", async () => {
+  const payloads = [
+    { data: record("wrapped-one") },
+    { data: Array.from({ length: 1001 }, (_, i) => record(`wrapped-${i}`)) },
+  ]
+  for (const payload of payloads) {
+    const response = await fetch(`${base}/integration/imports`, { method: "POST", headers: {
+      "Content-Type": "application/json", "X-Tally-API-Key": key,
+    }, body: JSON.stringify(payload, null, 2) })
+    assert.equal(response.status, 202)
+    const job = await response.json()
+    assert.equal(job.total, Array.isArray(payload.data) ? 1001 : 1)
+    if (Array.isArray(payload.data)) assert.equal(job.batchCount, 3)
+    await processNextTallyImport()
+  }
+  assert.equal(await Customer.countDocuments(), 1002)
+  const repeat = await fetch(`${base}/integration/imports`, { method: "POST", headers: {
+    "Content-Type": "application/json", "X-Tally-API-Key": key,
+  }, body: JSON.stringify({ data: { ...record("wrapped-one"), Address: "Updated through wrapper" } }) })
+  assert.equal(repeat.status, 202)
+  await processNextTallyImport()
+  assert.equal(await Customer.countDocuments(), 1002)
+  assert.equal((await Customer.findOne({ Tallyserialno: "wrapped-one" }).lean()).Address, "Updated through wrapper")
+  const received = []
+  const reader = createTallyJsonReader(async value => received.push(value))
+  for (const byte of Buffer.from(JSON.stringify({ data: [record("split")] }))) await reader.write(Buffer.from([byte]))
+  await reader.end()
+  assert.deepEqual(received, [record("split")])
+  for (const invalid of ['{"data":null}', '{"data":123}', '{"data":[{},]}', '{"data":[{}]', '{"data":{},"extra":1}', '{"data":{},"data":{}}']) {
+    const malformed = createTallyJsonReader(async () => {})
+    await assert.rejects(async () => { await malformed.write(Buffer.from(invalid)); await malformed.end() })
+  }
+})
+
 test("agreed eight-field matching updates details and inserts when any matching field changes", async () => {
   const original = record("shared-installation", { Customer: "ABC Traders", Address: "Old address", Emailid: "old@example.com" })
   assert.equal((await upload([original], "original")).status, 202)

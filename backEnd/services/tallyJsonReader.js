@@ -5,10 +5,32 @@ import { StringDecoder } from "node:string_decoder"
 // enclosing array, separators, trailing data and truncated input.
 export function createTallyJsonReader(accept, maxRecordBytes = 16384) {
   const decoder = new StringDecoder("utf8")
-  let state = "start", array = false, text = "", stack = [], quoted = false, escaped = false, count = 0
+  let state = "start", array = false, wrapped = false, text = "", stack = [], quoted = false, escaped = false, count = 0
   const invalid = message => { throw Object.assign(new Error(message), { status: 422 }) }
   const feed = async input => {
     for (const char of input) {
+      if (state === "rootHeader") {
+        text += char
+        if (text.length > maxRecordBytes) throw Object.assign(new Error("A customer record exceeds 16 KiB."), { status: 413 })
+        if (quoted) {
+          if (escaped) escaped = false
+          else if (char === "\\") escaped = true
+          else if (char === '"') quoted = false
+        } else if (char === '"') quoted = true
+        else if (char === ":") {
+          let header
+          try { header = JSON.parse(text + "null}") } catch { invalid("Invalid JSON object header.") }
+          if (Object.keys(header)[0] === "data") {
+            wrapped = true; text = ""; stack = []; state = "wrappedValue"
+          } else state = "record"
+        } else if (char === "}") {
+          let value
+          try { value = JSON.parse(text) } catch { invalid("Invalid JSON object.") }
+          await accept(value, ++count)
+          text = ""; state = "done"
+        }
+        continue
+      }
       if (state === "record") {
         text += char
         if (text.length > maxRecordBytes) throw Object.assign(new Error("A customer record exceeds 16 KiB."), { status: 413 })
@@ -26,7 +48,7 @@ export function createTallyJsonReader(accept, maxRecordBytes = 16384) {
             try { value = JSON.parse(text) } catch { invalid(`Record ${count + 1}: invalid JSON.`) }
             await accept(value, ++count)
             text = ""
-            state = array ? "separator" : "done"
+            state = array ? "separator" : wrapped ? "wrapperEnd" : "done"
           }
         }
         continue
@@ -35,13 +57,15 @@ export function createTallyJsonReader(accept, maxRecordBytes = 16384) {
         if (!" \t\r\n".includes(char)) invalid("Invalid JSON whitespace.")
         continue
       }
-      if (state === "start" && char === "[") { array = true; state = "first"; continue }
-      if ((state === "first" || state === "separator") && char === "]") { state = "done"; continue }
+      if (["start", "wrappedValue"].includes(state) && char === "[") { array = true; state = "first"; continue }
+      if ((state === "first" || state === "separator") && char === "]") { state = wrapped ? "wrapperEnd" : "done"; continue }
+      if (state === "wrapperEnd" && char === "}") { state = "done"; continue }
       if (state === "separator" && char === ",") { state = "next"; continue }
-      if (["start", "first", "next"].includes(state) && char === "{") {
-        text = "{"; stack = ["{"]; quoted = false; escaped = false; state = "record"; continue
+      if (["start", "wrappedValue", "first", "next"].includes(state) && char === "{") {
+        const isRoot = state === "start"
+        text = "{"; stack = ["{"]; quoted = false; escaped = false; state = isRoot ? "rootHeader" : "record"; continue
       }
-      invalid("Expected a customer JSON object or an array of customer objects.")
+      invalid('Expected a customer object, array, or {"data": [...]} wrapper with no other wrapper fields.')
     }
   }
   return {
