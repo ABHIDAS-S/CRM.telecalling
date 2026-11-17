@@ -5,7 +5,17 @@ import { useSelector } from "react-redux"
 import { parsePhoneNumberFromString } from "libphonenumber-js/mobile"
 import { Country, State } from "country-state-city"
 import BarLoader from "react-spinners/BarLoader"
-import { FaSpinner } from "react-icons/fa"
+import {
+  FaSpinner,
+  FaUser,
+  FaBuilding,
+  FaMapMarkerAlt,
+  FaEnvelope,
+  FaPhone,
+  FaGlobeAsia,
+  FaHashtag,
+  FaLandmark,
+} from "react-icons/fa"
 import Select from "react-select"
 import { useForm, Controller } from "react-hook-form"
 import PopUp from "../../components/common/PopUp"
@@ -17,6 +27,166 @@ import Breadcrumb from "../../components/common/Breadcrumb"
 import { Loader } from "lucide-react"
 import * as XLSX from "xlsx"
 import FullScreenLoader from "../../components/common/FullScreenLoader"
+
+const modernMenuSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: 32,
+    borderRadius: 8,
+    borderColor: state.isFocused ? "#1B2A4A" : "#e2e8f0",
+    boxShadow: state.isFocused ? "0 0 0 4px rgba(27, 42, 74, 0.1)" : "0 1px 2px rgba(15, 23, 42, 0.05)",
+    cursor: state.isDisabled ? "not-allowed" : "pointer",
+    backgroundColor: state.isDisabled ? "#f1f5f9" : "#ffffff",
+    "&:hover": { borderColor: state.isFocused ? "#1B2A4A" : "#cbd5e1" }
+  }),
+  valueContainer: (base) => ({ ...base, padding: "0 10px" }),
+  singleValue: (base) => ({ ...base, color: "#334155", fontWeight: 500 }),
+  placeholder: (base) => ({ ...base, color: "#94a3b8" }),
+  indicatorSeparator: () => ({ display: "none" }),
+  dropdownIndicator: (base) => ({ ...base, color: "#94a3b8", padding: 6 }),
+  menu: (base) => ({
+    ...base,
+    zIndex: 30,
+    overflow: "hidden",
+    borderRadius: 10,
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 12px 24px rgba(15, 23, 42, 0.14)"
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  option: (base, state) => ({
+    ...base,
+    padding: "10px 12px",
+    color: state.isSelected ? "#ffffff" : "#334155",
+    backgroundColor: state.isSelected
+      ? "#1B2A4A"
+      : state.isFocused
+        ? "#eff6ff"
+        : "#ffffff",
+    cursor: "pointer"
+  })
+}
+
+const customerModalSelectStyles = {
+  control: (base, state) => ({
+    ...base,
+    minHeight: 20,
+    borderRadius: 0,
+    border: 0,
+    boxShadow: "none",
+    fontSize: 12,
+    backgroundColor: "transparent",
+    "&:hover": { border: 0 }
+  }),
+  valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+  indicatorsContainer: (base) => ({ ...base, height: 20 }),
+  dropdownIndicator: (base) => ({ ...base, padding: 0, color: "#64748b" }),
+  indicatorSeparator: () => ({ display: "none" }),
+  menu: (base) => ({
+    ...base,
+    zIndex: 9999,
+    overflow: "hidden",
+    border: "1px solid #dfe5ee",
+    borderRadius: 10,
+    boxShadow: "0 12px 28px rgba(15, 23, 42, 0.16)"
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  option: (base, state) => ({
+    ...base,
+    padding: "9px 11px",
+    fontSize: 12,
+    color: state.isSelected ? "#ffffff" : "#334155",
+    backgroundColor: state.isSelected
+      ? "#1B2A4A"
+      : state.isFocused
+        ? "#eff6ff"
+        : "#ffffff",
+    cursor: "pointer"
+  })
+}
+
+const customerModalFieldGridClass =
+  "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4 [&>div]:relative [&>div]:rounded-xl [&>div]:border [&>div]:border-[#edf1f7] [&>div]:bg-white [&>div]:px-3 [&>div]:py-1.5 [&>div]:pl-10 [&>div]:transition [&>div]:hover:border-[#dbe6ff] [&>div>input]:border-0 [&>div>input]:bg-transparent [&>div>input]:px-2 [&>div>textarea]:border-0 [&>div>textarea]:bg-transparent [&>div>textarea]:px-2"
+
+function CustomerFieldLabel({ icon, iconBg = "bg-[#edf6ff]", iconColor = "text-[#5aa2ff]", children }) {
+  return (
+    <>
+      <span className={`absolute left-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md ${iconBg} ${iconColor}`}>
+        {icon}
+      </span>
+      <label className="mb-1 flex items-center gap-1 text-[11px] font-semibold text-[#8c96ad]">
+        {children}
+      </label>
+    </>
+  )
+}
+
+function CustomerModalSelect({ options, value, onChange, placeholder }) {
+  return (
+    <Select
+      options={options}
+      value={options.find((option) => option.value === value) || null}
+      onChange={(option) => onChange(option?.value || "")}
+      placeholder={placeholder}
+      isSearchable={false}
+      styles={customerModalSelectStyles}
+      menuPortalTarget={typeof document === "undefined" ? null : document.body}
+      noOptionsMessage={() => "No options available"}
+    />
+  )
+}
+
+function CustomerInfoCard({
+  icon,
+  iconBg,
+  iconColor,
+  label,
+  children,
+  error,
+  plain = false
+}) {
+  if (plain) return children
+
+  return (
+    <div className="rounded-xl border border-[#edf1f7] bg-white px-2.5 py-1.5 transition hover:border-[#dbe6ff]">
+      <div className="flex items-start gap-3">
+        <div
+          className={`mt-[2px] flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${iconBg} ${iconColor}`}
+        >
+          {icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="mb-1 text-[11px] font-medium text-[#8c96ad]">
+            {label}
+          </p>
+          {children}
+          {error ? <p className="mt-1 text-[11px] text-red-500">{error}</p> : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ModernMenuSelect({
+  options,
+  value,
+  onChange,
+  isDisabled = false,
+  placeholder = "Select an option"
+}) {
+  return (
+    <Select
+      options={options}
+      value={options.find((option) => option.value === value) || null}
+      onChange={(option) => onChange(option?.value || "")}
+      isDisabled={isDisabled}
+      isSearchable={false}
+      placeholder={placeholder}
+      styles={modernMenuSelectStyles}
+      menuPortalTarget={typeof document === "undefined" ? null : document.body}
+      noOptionsMessage={() => "No options available"}
+    />
+  )
+}
 // import { parse } from "path"
 // ─────────────────────────────────────────────────────────────────────────────
 // DropdownPortal — keeps dropdown aligned on scroll/resize
@@ -1628,6 +1798,15 @@ console.log(originalCustomerTableData)
   const dropdownLeadforRef = useRef(null)
   const registrationType = watchModal("registrationType")
   const selectedCountrymodal = watchModal("country")
+  const selectedCountryCode =
+    typeof selectedCountrymodal === "string"
+      ? selectedCountrymodal.trim().toUpperCase()
+      : selectedCountrymodal?.value?.trim()?.toUpperCase() ||
+        selectedCountrymodal?.code?.trim()?.toUpperCase() ||
+        ""
+  const isIndiaCustomer = selectedCountryCode === "IN"
+  const isPartnerModal = watchModal("isPartner") === true
+  const isZeroAmountLead = watchMain("isZeroAmountLead") === true
   const navigate = useNavigate()
   const location = useLocation()
   const mobileValue = watchModal("mobile")
@@ -1693,6 +1872,14 @@ console.log(originalCustomerTableData)
   )
   console.log(filter)
   const { data: tasks } = UseFetch("lead/getallTask")
+  const zeroAmountTaskOptions = useMemo(
+    () =>
+      (tasks || []).map((task) => ({
+        value: task?._id,
+        label: task?.taskName || task?.name || "Task"
+      })).filter((task) => task.value),
+    [tasks]
+  )
   const { data: companybranches } = UseFetch("/branch/getBranch")
   const { data: partners } = UseFetch("/customer/getallpartners")
   const { data: serviceData } = UseFetch(
@@ -1701,6 +1888,24 @@ console.log(originalCustomerTableData)
       `/product/getallServices?branchselected=${selectedBranch}`
   )
   console.log(haveprimaryProduct)
+  useEffect(() => {
+    if (!isZeroAmountLead) return
+
+    setselfAllocation(false)
+    setValueMain("selfAllocation", false)
+    setValueMain("allocationType", null)
+    setValueMain("taxableAmount", 0)
+    setValueMain("taxAmount", 0)
+    setValueMain("netAmount", 0)
+    setValueMain("discamnt", 0)
+    setSelectedLeadList((rows) => {
+      const needsReset = rows.some(
+        (row) => Number(row?.productPrice) !== 0 || Number(row?.hsn) !== 0 || Number(row?.netAmount) !== 0
+      )
+      if (!needsReset) return rows
+      return rows.map((row) => ({ ...row, productPrice: 0, hsn: 0, netAmount: 0 }))
+    })
+  }, [isZeroAmountLead, setValueMain])
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -1817,7 +2022,6 @@ console.log(originalCustomerTableData)
   const partnerCustomerOptions = useMemo(
     () =>
       (Array.isArray(partnerCustomers) ? partnerCustomers : [])
-        .filter((customer) => customer?.isPartner === true)
         .map((customer) => ({
           customerId: String(customer._id),
           value: String(customer._id),
@@ -1838,8 +2042,10 @@ console.log(originalCustomerTableData)
     netAmount: ""
   }
 
-  const canSelfAllocate =
-    loggeduser?.department?.code === "DEPARTMENT3" || console.log(loggeduser)
+  const canSelfAllocate = Boolean(
+    loggeduser?.canSelfAllocateLeads ||
+      loggeduser?.department?.code === "DEPARTMENT3"
+  )
   const isMarketingStaff =
     String(loggeduser?.role || "").toLowerCase() === "staff" &&
     (loggeduser?.department?.code === "DEPARTMENT3" ||
@@ -2112,6 +2318,8 @@ console.log(originalCustomerTableData)
           : ""
         setValueMain("dueDate", formattedDate)
       }
+      setValueMain("isZeroAmountLead", Boolean(Data[0]?.isZeroAmountLead))
+      setValueMain("zeroAmountTask", Data[0]?.zeroAmountTask?._id || Data[0]?.zeroAmountTask || "")
       console.log(Data[0])
       setValueMain("source", Data[0]?.source || "")
       setValueMain("customerName", Data[0]?.customerName?._id)
@@ -2591,11 +2799,32 @@ console.log(licenses)
   }, [originalCustomerTableData, temporaryCustomerTableData])
   useEffect(() => {
     if (customerData && customerData.length && selectedBranch) {
+      const primaryProductIds = new Set(
+        (leadList || [])
+          .filter(
+            (product) =>
+              String(product?.productorservicetype || "").toLowerCase() ===
+              "primaryproduct"
+          )
+          .map((product) => String(product?._id || ""))
+          .filter(Boolean)
+      )
+
       const options = customerData.flatMap((item) => {
         const branchProducts = (item.selected || []).filter(
-          (sel) =>
-            String(sel?.branch_id?._id || sel?.branch_id || "") ===
-            String(selectedBranch || "")
+          (sel) => {
+            const productId = String(
+              sel?.product_id?._id || sel?.product_id || ""
+            )
+            const isPrimaryProduct =
+              String(sel?.productorservicetype || "").toLowerCase() ===
+                "primaryproduct" || primaryProductIds.has(productId)
+
+            return (
+              String(sel?.branch_id?._id || sel?.branch_id || "") ===
+                String(selectedBranch || "") && isPrimaryProduct
+            )
+          }
         )
         const customerFields = {
           value: item?._id,
@@ -2673,26 +2902,25 @@ console.log(licenses)
             }))
           })
 
-        // A customer without products at this branch can still be selected
-        // when creating a new lead.
-        return productOptions.length
-          ? productOptions
-          : [
-              {
-                ...customerFields,
-                optionId: `${item?._id}-no-product`,
-                license: "",
-                productName: "",
-                searchText: [item?.customerName, item?.mobile]
-                  .filter(Boolean)
-                  .join(" ")
-                  .toLowerCase()
-              }
-            ]
+        // Preserve the product-specific options, but do not hide customers
+        // that have not yet been assigned a primary product. They must remain
+        // selectable so a lead can be created and products added afterwards.
+        if (productOptions.length) return productOptions
+
+        return [{
+          ...customerFields,
+          optionId: `${item?._id}-no-product`,
+          license: "",
+          productName: "",
+          searchText: [item?.customerName, item?.mobile]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+        }]
       })
       setCustomerOptions(options)
     }
-  }, [customerData, selectedBranch])
+  }, [customerData, leadList, selectedBranch])
 
   useEffect(() => {
     console.log("hhh")
@@ -2938,8 +3166,8 @@ console.log(licenses)
       setlicenseloading(false)
     }
   }
-  const stateOptions = selectedCountry
-    ? State.getStatesOfCountry(selectedCountry.value).map((state) => ({
+  const stateOptions = selectedCountryCode
+    ? State.getStatesOfCountry(selectedCountryCode).map((state) => ({
         label: state.name,
         value: state.isoCode
       }))
@@ -2971,12 +3199,12 @@ console.log(licenses)
     console.log("defaultState:", defaultState)
     console.log("currentState:", currentState)
     console.log("condition:", defaultState && !currentState)
-    if (defaultState && !currentState) {
+    if (selectedCountryCode === "IN" && defaultState && !currentState) {
       console.log("jjjj")
       setSelectedState(defaultState)
       setValueModal("state", defaultState.value)
     }
-  }, [defaultState, getValuesModal, setValueModal])
+  }, [defaultState, getValuesModal, selectedCountryCode, setValueModal])
 
   const handleOpenmodal = (text = null) => {
     console.log(selectedCustomer)
@@ -2998,12 +3226,45 @@ console.log(licenses)
       setValueModal("landline", selectedCustomer?.landline)
       setValueModal("contactPerson", selectedCustomer?.contactPerson)
       setValueModal("address1", selectedCustomer?.address1)
+      setValueModal("address2", selectedCustomer?.address2)
       setValueModal("pincode", selectedCustomer?.pincode)
-      setValueModal("partner", selectedCustomer?.partner?._id)
+      setValueModal(
+        "partner",
+        selectedCustomer?.partner?._id || selectedCustomer?.partner || ""
+      )
+      setValueModal(
+        "partnerSelection",
+        selectedCustomer?.partnerSelection?._id ||
+          selectedCustomer?.partnerSelection ||
+          ""
+      )
+      setValueModal(
+        "isPartner",
+        selectedCustomer?.isPartner ?? Boolean(selectedCustomer?.partner)
+      )
       setValueModal("registrationType", selectedCustomer?.registrationType)
       setValueModal("gstNo", selectedCustomer?.gstNo)
       setValueModal("city", selectedCustomer?.city)
       setValueModal("country", selectedCustomer?.country)
+      setValueModal("state", selectedCustomer?.state)
+      setSelectedCountry(
+        countryOptions.find(
+          (country) => country.value === selectedCustomer?.country
+        ) || null
+      )
+      setSelectedState(
+        State.getStatesOfCountry(selectedCustomer?.country || "").find(
+          (state) => state.isoCode === selectedCustomer?.state
+        )
+          ? {
+              value: selectedCustomer?.state,
+              label: State.getStatesOfCountry(selectedCustomer?.country || "").find(
+                (state) => state.isoCode === selectedCustomer?.state
+              )?.name
+            }
+          : null
+      )
+      setValueModal("isActive", selectedCustomer?.isActive || "Running")
       console.log("hhh")
     }
   }
@@ -3776,6 +4037,8 @@ console.log(licenses)
       taxAmount: "",
       netAmount: "",
       selfAllocation: false,
+      isZeroAmountLead: false,
+      zeroAmountTask: "",
       leadId: "",
       leadBy: loggeduser?._id || loggeduser?.id || ""
     })
@@ -4325,6 +4588,10 @@ console.log(licenses)
     setsubmitLoading(true)
     if (duplicateWarning) return
     const submitData = { ...data }
+    if (submitData.zeroAmountTask && typeof submitData.zeroAmountTask === "object") {
+      submitData.zeroAmountTask =
+        submitData.zeroAmountTask._id || submitData.zeroAmountTask.value || ""
+    }
     const synchronizedLeadData = buildDiscountSynchronizedLeadData(
       selectedleadlist,
       submitData.discamnt
@@ -4611,7 +4878,13 @@ console.log(licenses)
   }
   console.log(duplicateWarning)
   const onmodalsubmit = async (data) => {
-    console.log(data)
+    const customerData = {
+      ...data,
+      // State is an India-only field in this customer workflow. Clear a
+      // previously selected Indian state when saving an overseas customer.
+      state: String(data?.country || "").toUpperCase() === "IN" ? data?.state || "" : ""
+    }
+    console.log(customerData)
     console.log("hhhh")
     console.log(duplicateWarning)
     if (duplicateWarning) return
@@ -4619,23 +4892,23 @@ console.log(licenses)
 
     if (modalloader) return
     console.log(checknewcustomer)
-    console.log(data?.customerid)
-    console.log(data)
-    console.log(data?.customerid && !checknewcustomer)
-    if (data?.customerid) {
+    console.log(customerData?.customerid)
+    console.log(customerData)
+    console.log(customerData?.customerid && !checknewcustomer)
+    if (customerData?.customerid) {
       console.log("hhhhh")
     }
 
     try {
       setModalLoader(true)
-      console.log(data)
+      console.log(customerData)
       let response
       console.log(checknewcustomer)
-      if (data?.customerid) {
+      if (customerData?.customerid) {
         if (checknewcustomer) return
         console.log("hhh")
         response = await api.post("/customer/customereditonlead", {
-          customerData: data
+          customerData
         })
       } else {
         const createdFrom = "lead"
@@ -4643,11 +4916,11 @@ console.log(licenses)
         response = await api.post(
           `/customer/customerRegistration?createdfrom=${createdFrom}`,
           {
-            customerData: data
+            customerData
           }
         )
       }
-      if (data?.customerid && response.status === 200) {
+      if (customerData?.customerid && response.status === 200) {
         console.log("hhhh")
         setcustomerapichange(true)
         refreshHook()
@@ -5305,7 +5578,7 @@ convertexcel
                           styles={{
                             control: (base, state) => ({
                               ...base,
-                              minHeight: 38,
+                              minHeight: 32,
                               borderRadius: 8,
                               borderColor: state.isFocused ? "#1B2A4A" : "#CBD5E1",
                               backgroundColor: state.isDisabled ? "#F1F5F9" : "#FFFFFF",
@@ -5322,7 +5595,7 @@ convertexcel
                             }),
                             valueContainer: (base) => ({
                               ...base,
-                              padding: "0 10px"
+                              padding: "0 8px"
                             }),
                             placeholder: (base) => ({
                               ...base,
@@ -5344,7 +5617,7 @@ convertexcel
                             dropdownIndicator: (base, state) => ({
                               ...base,
                               color: state.isFocused ? "#1B2A4A" : "#64748B",
-                              padding: 7,
+                              padding: 5,
                               "&:hover": { color: "#1B2A4A" }
                             }),
                             menu: (base) => ({
@@ -5409,14 +5682,18 @@ convertexcel
                   </div>
 
                   <div className="flex md:justify-end items-end">
-                    <select
-                      {...registerMain("leadBranch")}
+                    <div className="min-w-[150px]">
+                      <ModernMenuSelect
                       value={selectedBranch}
-                      disabled={isReadOnly}
-                      onChange={(e) => {
-                        console.log(e.target.value)
+                      isDisabled={isReadOnly}
+                      options={(companybranches || []).map((branch) => ({
+                        value: branch._id,
+                        label: branch.branchName
+                      }))}
+                      onChange={(branchId) => {
+                        console.log(branchId)
                         setDuplicateWarning("")
-                        setSelectedBranch(e.target.value)
+                        setSelectedBranch(branchId)
                         console.log("hhh")
                         //           dispatch(setsliceselectedBranch(e.target.value))
                         // console.log("hhh")
@@ -5445,14 +5722,9 @@ convertexcel
                           leadId: ""
                         })
                       }}
-                      className={`h-[38px] min-w-[140px] rounded border border-gray-300 bg-[#1B2A4A] px-3 text-sm text-white outline-none hover:bg-[#243660] ${isReadOnly ? "cursor-not-allowed" : "cursor-pointer"}`}
-                    >
-                      {companybranches?.map((b, i) => (
-                        <option key={i} value={b._id}>
-                          {b.branchName}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Select branch"
+                    />
+                    </div>
                   </div>
                 </div>
 
@@ -5467,7 +5739,7 @@ convertexcel
                       {...registerMain("email")}
                       disabled={isReadOnly}
                       placeholder="Email..."
-                      className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
+                      className={`h-8 w-full border border-gray-300 rounded px-3 text-sm outline-none bg-[#EEF2F8] ${
                         isReadOnly ? "cursor-not-allowed opacity-70" : ""
                       }`}
                     />
@@ -5480,7 +5752,7 @@ convertexcel
                       {...registerMain("phone")}
                       disabled={isReadOnly}
                       placeholder="Landline..."
-                      className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
+                      className={`h-8 w-full border border-gray-300 rounded px-3 text-sm outline-none bg-[#EEF2F8] ${
                         isReadOnly ? "cursor-not-allowed opacity-70" : ""
                       }`}
                     />
@@ -5497,7 +5769,7 @@ convertexcel
                         isMobileTypedByUser.current = true
                         mobileRegister.onChange(e)
                       }}
-                      className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
+                      className={`h-8 w-full border border-gray-300 rounded px-3 text-sm outline-none bg-[#EEF2F8] ${
                         isReadOnly ? "cursor-not-allowed opacity-70" : ""
                       }`}
                     />
@@ -5516,20 +5788,26 @@ convertexcel
                     <label className="block text-xs font-semibold text-gray-600 mb-1">
                       Source of Lead
                     </label>
-                    <select
-                      disabled={isReadOnly}
-                      {...registerMain("source", {
-                        required: "Source is Required"
-                      })}
-                      className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${isReadOnly ? "cursor-not-allowed" : "cursor-pointer"}`}
-                    >
-                      <option value="">Select Source</option>
-                      <option value="whatsapp">WhatsApp</option>
-                      <option value="instagram">Instagram</option>
-                      <option value="facebook">Facebook</option>
-                      <option value="Direct">Direct</option>
-                      <option value="justDial">Just Dial</option>
-                    </select>
+                    <Controller
+                      name="source"
+                      control={controlMain}
+                      rules={{ required: "Source is Required" }}
+                      render={({ field }) => (
+                        <ModernMenuSelect
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          isDisabled={isReadOnly}
+                          placeholder="Select source"
+                          options={[
+                            { value: "whatsapp", label: "WhatsApp" },
+                            { value: "instagram", label: "Instagram" },
+                            { value: "facebook", label: "Facebook" },
+                            { value: "Direct", label: "Direct" },
+                            { value: "justDial", label: "Just Dial" }
+                          ]}
+                        />
+                      )}
+                    />
                     {errorsMain.source && (
                       <p className="text-red-500 text-xs mt-1">
                         {errorsMain.source.message}
@@ -5540,34 +5818,123 @@ convertexcel
                     <label className="block text-xs font-semibold text-gray-600 mb-1">
                       Partner
                     </label>
-                    <select
-                      {...registerMain("partnerSelection")}
-                      disabled={isReadOnly}
-                      className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
-                        isReadOnly
-                          ? "cursor-not-allowed opacity-70"
-                          : "cursor-pointer"
-                      }`}
-                    >
-                      <option value="">Select Partner</option>
-                      {partnerCustomerOptions.map((partnerCustomer) => (
-                        <option
-                          key={partnerCustomer.customerId}
-                          value={partnerCustomer.value}
-                        >
-                          {partnerCustomer.label}
-                          {partnerCustomer.mobile
-                            ? ` - ${partnerCustomer.mobile}`
-                            : ""}
-                        </option>
-                      ))}
-                    </select>
+                    <Controller
+                      name="partnerSelection"
+                      control={controlMain}
+                      render={({ field }) => (
+                        <ModernMenuSelect
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          isDisabled={isReadOnly}
+                          placeholder="Select partner"
+                          options={partnerCustomerOptions.map((partnerCustomer) => ({
+                            value: partnerCustomer.value,
+                            label: `${partnerCustomer.label}${
+                              partnerCustomer.mobile
+                                ? ` - ${partnerCustomer.mobile}`
+                                : ""
+                            }`
+                          }))}
+                        />
+                      )}
+                    />
                     {errorsMain.partnerSelection && (
                       <p className="text-red-500 text-xs mt-1">
                         {errorsMain.partnerSelection.message}
                       </p>
                     )}
                   </div>
+                {isZeroAmountLead && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                    Target-only lead: product prices, tax, and net amount are locked to ₹0. This lead counts toward targets but not incentives.
+                  </div>
+                )}
+
+                {process === "Registration" && showInput && (
+                    <div>
+                      <label className="mb-1 flex items-center gap-2 text-xs font-semibold text-gray-700">
+                        <input
+                          type="checkbox"
+                          disabled={isReadOnly}
+                          {...registerMain("isZeroAmountLead")}
+                          className="h-4 w-4 rounded border-slate-300 text-[#1B2A4A] focus:ring-[#1B2A4A]"
+                        />
+                        Zero amount / target-only lead
+                      </label>
+                      <p className="text-[10px] text-slate-500">Included in targets, excluded from incentives.</p>
+                    </div>
+                  )}
+                  {process === "Registration" && showInput && isZeroAmountLead && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">
+                        Direct task allocation <span className="text-red-500">*</span>
+                      </label>
+                      <Controller
+                        name="zeroAmountTask"
+                        control={controlMain}
+                        rules={{ required: "Select a task for this zero amount lead" }}
+                        render={({ field }) => (
+                          <ModernMenuSelect
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            isDisabled={isReadOnly}
+                            placeholder="Select task"
+                            options={zeroAmountTaskOptions}
+                          />
+                        )}
+                      />
+                      {errorsMain.zeroAmountTask && <p className="mt-1 text-xs text-red-500">{errorsMain.zeroAmountTask.message}</p>}
+                    </div>
+                  )}
+                  {process === "Registration" && showInput && !isZeroAmountLead && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">
+                        Self Allocation / Other
+                      </label>
+                      <Controller
+                        name="selfAllocation"
+                        control={controlMain}
+                        defaultValue={false}
+                        rules={{
+                          validate: (value) =>
+                            value === true || value === false
+                              ? true
+                              : "This field is required"
+                        }}
+                        render={({ field }) => (
+                          <ModernMenuSelect
+                            value={field.value ? "true" : "false"}
+                            isDisabled={!isSelfAllocationChangable}
+                            onChange={(value) => {
+                              const isSelfAllocated = value === "true"
+                              field.onChange(isSelfAllocated)
+                              setValueMain("allocationType", "followup")
+                              setselfAllocation(isSelfAllocated)
+                            }}
+                            options={[
+                              ...(canSelfAllocate
+                                ? [
+                                    {
+                                      value: "true",
+                                      label: "Self Allocate"
+                                    }
+                                  ]
+                                : []),
+                              {
+                                value: "false",
+                                label: "Allocate To Other"
+                              }
+                            ]}
+                          />
+                        )}
+                      />
+                      {errorsMain.selfAllocation && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errorsMain.selfAllocation.message}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {process === "Registration" && selfAllocation && showInput && (
@@ -5576,19 +5943,21 @@ convertexcel
                       <label className="block text-xs font-semibold text-gray-600 mb-1">
                         Allocation Type
                       </label>
-                      <select
-                        disabled={!isSelfAllocationChangable}
-                        {...registerMain("allocationType", {
-                          required: "Allocation type is required"
-                        })}
-                        className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
-                          !isSelfAllocationChangable
-                            ? "cursor-not-allowed opacity-70"
-                            : ""
-                        }`}
-                      >
-                        <option value="followup">Followup</option>
-                      </select>
+                      <Controller
+                        name="allocationType"
+                        control={controlMain}
+                        rules={{ required: "Allocation type is required" }}
+                        render={({ field }) => (
+                          <ModernMenuSelect
+                            value={field.value || "followup"}
+                            onChange={field.onChange}
+                            isDisabled={!isSelfAllocationChangable}
+                            options={[
+                              { value: "followup", label: "Followup" }
+                            ]}
+                          />
+                        )}
+                      />
                       {errorsMain.allocationType && (
                         <p className="text-red-500 text-xs mt-1">
                           {errorsMain.allocationType.message}
@@ -5604,7 +5973,7 @@ convertexcel
                         {...registerMain("dueDate", {
                           required: "Due Date is required"
                         })}
-                        className="w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8]"
+                        className="h-8 w-full border border-gray-300 rounded px-3 text-sm outline-none bg-[#EEF2F8]"
                       />
                       {errorsMain.dueDate && (
                         <p className="text-red-500 text-xs mt-1">
@@ -6090,45 +6459,7 @@ convertexcel
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3 pt-2">
                   {/* left: self allocation or lead id */}
                   <div className="w-full sm:w-1/2">
-                    {process === "Registration" && showInput ? (
-                      <>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">
-                          Self Allocation / Other
-                        </label>
-
-                        <select
-                          disabled={!isSelfAllocationChangable}
-                          {...registerMain("selfAllocation", {
-                            setValueAs: (v) => v === "true",
-                            validate: (v) =>
-                              v === true || v === false
-                                ? true
-                                : "This field is required",
-                            onChange: (e) => {
-                              setValueMain("allocationType", "followup")
-                              setselfAllocation(e.target.value === "true")
-                            }
-                          })}
-                          defaultValue="false" // default is Allocate To Other
-                          className={`w-full border border-gray-300 rounded px-3 py-[7px] text-sm outline-none bg-[#EEF2F8] ${
-                            !isSelfAllocationChangable
-                              ? "cursor-not-allowed opacity-70"
-                              : "cursor-pointer"
-                          }`}
-                        >
-                          {/* always allow 'Allocate To Other' */}
-                          {canSelfAllocate && (
-                            <option value="true">Self Allocate</option>
-                          )}
-                          <option value="false">Allocate To Other</option>
-                        </select>
-                        {errorsMain.selfAllocation && (
-                          <p className="text-red-500 text-xs mt-1">
-                            {errorsMain.selfAllocation.message}
-                          </p>
-                        )}
-                      </>
-                    ) : (
+                    {process === "Registration" && showInput ? null : (
                       <>
                         <label className="block text-xs font-semibold text-gray-600 mb-1">
                           Lead Id
@@ -6150,16 +6481,23 @@ convertexcel
                         <label className="text-xs font-semibold text-gray-600 italic whitespace-nowrap">
                           Lead by:
                         </label>
-                        <select
-                          {...registerMain("leadBy")}
-                          className="border border-gray-300 rounded px-2 py-1 text-sm bg-[#EEF2F8] outline-none"
-                        >
-                          {allstaff?.map((u) => (
-                            <option key={u._id} value={u._id}>
-                              {u.name}
-                            </option>
-                          ))}
-                        </select>
+                        <Controller
+                          name="leadBy"
+                          control={controlMain}
+                          render={({ field }) => (
+                            <div className="min-w-[180px]">
+                              <ModernMenuSelect
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                options={(allstaff || []).map((user) => ({
+                                  value: user._id,
+                                  label: user.name
+                                }))}
+                                placeholder="Select staff"
+                              />
+                            </div>
+                          )}
+                        />
                       </div>
                     ) : (
                       <div className="flex items-center">
@@ -6329,7 +6667,7 @@ convertexcel
                                 value={detailsForm.name}
                                 onChange={handleDetailsChange}
                                 placeholder="List of Primary Products"
-                                className="h-10 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 outline-none"
+                                className="h-9 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 outline-none"
                               />
                             </div>
 
@@ -6360,7 +6698,7 @@ convertexcel
                                   aria-label="Search software trades"
                                   aria-expanded={isTradeOpen}
                                   aria-haspopup="listbox"
-                                  className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 pr-10 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                                  className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 pr-10 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                                 />
                                 <svg
                                   className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 transition-transform ${
@@ -6458,7 +6796,7 @@ convertexcel
                                 name="applicationDate"
                                 value={detailsForm.applicationDate}
                                 onChange={handleDetailsChange}
-                                className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                                className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                               />
                             </div>
 
@@ -6470,7 +6808,7 @@ convertexcel
                                 name="status"
                                 value={detailsForm.status}
                                 onChange={handleDetailsChange}
-                                className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                                className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                               >
                                 <option value="Running">Active</option>
                                 <option value="Deactive">DE active</option>
@@ -6498,7 +6836,7 @@ convertexcel
                                   value={detailsForm.name}
                                   onChange={handleDetailsChange}
                                   placeholder="List of additional service"
-                                  className="h-10 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 outline-none"
+                                  className="h-9 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 outline-none"
                                 />
                               </div>
 
@@ -6512,7 +6850,7 @@ convertexcel
                                     name="nextDue"
                                     value={detailsForm.nextDue}
                                     onChange={handleDetailsChange}
-                                    className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                                    className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                                   />
                                 </div>
                               )}
@@ -6525,7 +6863,7 @@ convertexcel
                                   name="status"
                                   value={detailsForm.status}
                                   onChange={handleDetailsChange}
-                                  className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                                  className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                                 >
                                   <option value="Running">Active</option>
                                   <option value="Deactive">DE active</option>
@@ -6959,20 +7297,21 @@ convertexcel
 
           {modalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 sm:p-4">
-              <div className="flex w-full max-w-4xl max-h-[88vh] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+              <div className="flex w-[calc(100vw-2rem)] max-w-[1180px] max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-[20px] border border-[#edf1f7] bg-white shadow-2xl">
                 {/* Header */}
-                <div className="flex shrink-0 items-start justify-between border-b border-slate-200 bg-[#1B2A4A] px-5 py-3.5 sm:px-6">
-                  <div>
-                    <h2 className="text-sm font-semibold tracking-wide text-white sm:text-base">
-                      {checknewcustomer
-                        ? "Add New Customer"
-                        : "Update Customer Details"}
+                <div className="flex shrink-0 items-center justify-between border-b border-[#edf1f7] bg-white px-4 py-2.5 sm:px-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#eef5ff] text-[#4b87ff]">
+                      <FaUser size={14} />
+                    </div>
+                    <div>
+                    <h2 className="text-[16px] font-semibold text-[#162033]">
+                      Customer Details
                     </h2>
-                    {!Data && (
-                      <p className="mt-0.5 text-[11px] text-blue-200">
-                        Fill in the details to register a new customer
-                      </p>
-                    )}
+                    <p className="text-[12px] text-[#7f8aa3]">
+                      Fill customer master information
+                    </p>
+                    </div>
                   </div>
 
                   <button
@@ -6981,22 +7320,11 @@ convertexcel
                       setModalOpen(false)
                       clearmodalErros()
                       resetModal()
+                      setchecknewcustomer(false)
                     }}
-                    className="rounded-full p-1.5 text-blue-200 transition hover:bg-white/10 hover:text-white"
+                    className="rounded-md border border-[#e6ebf3] bg-white px-3 py-2 text-[12px] font-medium text-[#6d7890] transition hover:bg-[#f8fafc]"
                   >
-                    <svg
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
+                    Cancel
                   </button>
                 </div>
 
@@ -7006,7 +7334,7 @@ convertexcel
                   className="flex min-h-0 flex-1 flex-col"
                 >
                   {/* Scrollable body only */}
-                  <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
+                  <div className="min-h-0 flex-1 overflow-y-auto bg-white p-2.5 sm:p-3">
                     <input
                       type="hidden"
                       {...registerModal("customerid")}
@@ -7023,18 +7351,21 @@ convertexcel
                       }
                     />
 
+                    <div className="space-y-2">
                     {/* Basic Information */}
-                    <div className="mb-4">
-                      <p className="mb-2 border-b border-slate-200 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#1B2A4A]">
-                        Basic Information
-                      </p>
-
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <CustomerInfoCard
+                      plain
+                      icon={<FaUser size={12} />}
+                      iconBg="bg-[#edf6ff]"
+                      iconColor="text-[#5aa2ff]"
+                      label="Customer Information"
+                    >
+                      <div className={customerModalFieldGridClass}>
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaUser size={12} />}>
                             Customer Name
                             <span className="text-red-500">*</span>
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="text"
                             {...registerModal("customerName", {
@@ -7047,7 +7378,7 @@ convertexcel
                               )
                             }
                             placeholder="Customer Name"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                           {errorsModal.customerName && (
                             <p className="mt-1 text-[11px] text-red-500">
@@ -7057,21 +7388,21 @@ convertexcel
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaEnvelope size={12} />} iconBg="bg-[#eefbf2]" iconColor="text-[#4cbf73]">
                             Email
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="email"
                             {...registerModal("email")}
                             placeholder="Email"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
-                            Mobile <span className="text-red-500">*</span>
-                          </label>
+                          <CustomerFieldLabel icon={<FaPhone size={12} />} iconBg="bg-[#eafaf5]" iconColor="text-[#36b882]">
+                            Mobile {isIndiaCustomer && <span className="text-red-500">*</span>}
+                          </CustomerFieldLabel>
                           {/* <input
                             type="tel"
                             {...registerModal("mobile", {
@@ -7090,70 +7421,47 @@ convertexcel
                               setValueModal("mobile", e.target.value.trim())
                             }
                             placeholder="Mobile"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           /> */}
                           <input
                             type="tel"
                             {...registerModal("mobile", {
-                              required: "Mobile is Required",
-
                               validate: (value) => {
                                 const phone = String(value ?? "").trim()
 
-                                if (!phone) {
-                                  return "Mobile number is required"
-                                }
-
-                                const country =
-                                  typeof selectedCountrymodal === "string"
-                                    ? selectedCountrymodal.trim().toUpperCase()
-                                    : selectedCountrymodal?.value
-                                        ?.trim()
-                                        ?.toUpperCase() ||
-                                      selectedCountrymodal?.code
-                                        ?.trim()
-                                        ?.toUpperCase() ||
-                                      ""
-
-                                // Country selection is required for every number.
-                                if (!country) {
-                                  return "Select a country before entering a mobile number"
-                                }
+                                if (selectedCountryCode !== "IN") return true
+                                if (!phone) return "Mobile number is required for India"
 
                                 try {
                                   const parsed = phone.startsWith("+")
                                     ? parsePhoneNumberFromString(phone)
-                                    : parsePhoneNumberFromString(phone, country)
+                                    : parsePhoneNumberFromString(phone, "IN")
 
                                   if (!parsed) {
-                                    return `Enter a valid mobile number for ${country}`
+                                    return "Enter a valid Indian mobile number"
                                   }
 
                                   if (!parsed.isPossible()) {
-                                    return `Mobile number is too short or too long for ${country}`
+                                    return "Indian mobile number must have 10 digits"
                                   }
 
                                   if (!parsed.isValid()) {
-                                    return `Enter a valid mobile number for ${country}`
+                                    return "Enter a valid Indian mobile number"
                                   }
 
-                                  // Ensures +91... cannot be accepted when user selected AE, US, etc.
-                                  if (
-                                    parsed.country &&
-                                    parsed.country !== country
-                                  ) {
-                                    return `Mobile number does not match the selected country (${country})`
+                                  if (parsed.country && parsed.country !== "IN") {
+                                    return "Mobile number must match India (+91)"
                                   }
 
                                   return true
                                 } catch (error) {
                                   console.error("Mobile validation failed:", {
                                     phone,
-                                    country,
+                                    country: "IN",
                                     error: error?.message
                                   })
 
-                                  return `Unable to validate the mobile number for ${country}`
+                                  return "Unable to validate the Indian mobile number"
                                 }
                               }
                             })}
@@ -7161,7 +7469,7 @@ convertexcel
                               setValueModal("mobile", e.target.value.trim())
                             }
                             placeholder="Mobile"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                           {duplicateWarning && (
                             <p className="mt-1 text-xs font-medium text-red-500">
@@ -7176,9 +7484,9 @@ convertexcel
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaPhone size={12} />} iconBg="bg-[#fff1f7]" iconColor="text-[#ee82a9]">
                             Landline
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="tel"
                             {...registerModal("landline")}
@@ -7186,15 +7494,15 @@ convertexcel
                               setValueModal("landline", e.target.value.trim())
                             }
                             placeholder="Landline"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaUser size={12} />} iconBg="bg-[#eaf9f8]" iconColor="text-[#35b8ba]">
                             Contact Person{" "}
                             <span className="text-red-500">*</span>
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="text"
                             {...registerModal("contactPerson", {
@@ -7207,7 +7515,7 @@ convertexcel
                               )
                             }
                             placeholder="Contact Person"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                           {errorsModal.contactPerson && (
                             <p className="mt-1 text-[11px] text-red-500">
@@ -7216,47 +7524,60 @@ convertexcel
                           )}
                         </div>
 
-                        <div className="md:col-span-2">
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                        <div className="sm:col-span-2">
+                          <CustomerFieldLabel icon={<FaMapMarkerAlt size={12} />} iconBg="bg-[#fff0f8]" iconColor="text-[#ef7db2]">
                             Address
-                          </label>
+                          </CustomerFieldLabel>
                           <textarea
                             {...registerModal("address1")}
                             onBlur={(e) =>
                               setValueModal("address1", e.target.value.trim())
                             }
                             placeholder="Address"
-                            rows={2}
-                            className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10 resize-none"
+                            rows={1}
+                            className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10 resize-none"
                           />
                         </div>
+
                       </div>
-                    </div>
+                    </CustomerInfoCard>
 
                     {/* Location */}
-                    <div className="mb-4">
-                      <p className="mb-2 border-b border-slate-200 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#1B2A4A]">
-                        Location
-                      </p>
-
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <CustomerInfoCard
+                      plain
+                      icon={<FaMapMarkerAlt size={12} />}
+                      iconBg="bg-[#fff0f8]"
+                      iconColor="text-[#ef7db2]"
+                      label="Location"
+                    >
+                      <div className={customerModalFieldGridClass}>
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaGlobeAsia size={12} />} iconBg="bg-[#fff4ea]" iconColor="text-[#f0a24d]">
                             Country
-                          </label>
+                          </CustomerFieldLabel>
                           <Controller
                             name="country"
                             control={controlModal}
                             render={({ field }) => (
                               <Select
                                 options={countryOptions}
+                                styles={customerModalSelectStyles}
                                 value={
                                   countryOptions.find(
                                     (opt) => opt.value === field.value
                                   ) || null
                                 }
-                                onChange={(option) =>
+                                onChange={(option) => {
                                   field.onChange(option?.value || "")
+                                  setSelectedCountry(option || null)
+                                  setSelectedState(null)
+                                  setValueModal("state", "")
+                                  clearmodalErros("state")
+                                }}
+                                menuPortalTarget={
+                                  typeof document === "undefined"
+                                    ? null
+                                    : document.body
                                 }
                                 getOptionLabel={(o) => o.label}
                                 getOptionValue={(o) => o.value}
@@ -7265,16 +7586,18 @@ convertexcel
                           />
                         </div>
 
+                        {isIndiaCustomer && (
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaMapMarkerAlt size={12} />} iconBg="bg-[#f1edff]" iconColor="text-[#8769eb]">
                             State
-                          </label>
+                          </CustomerFieldLabel>
                           <Controller
                             name="state"
                             control={controlModal}
                             render={({ field }) => (
                               <Select
                                 options={stateOptions}
+                                styles={customerModalSelectStyles}
                                 value={
                                   stateOptions.find(
                                     (opt) => opt.value === field.value
@@ -7284,16 +7607,22 @@ convertexcel
                                   field.onChange(option?.value || "")
                                   setSelectedState(option)
                                 }}
-                                isDisabled={!selectedCountry}
+                                menuPortalTarget={
+                                  typeof document === "undefined"
+                                    ? null
+                                    : document.body
+                                }
+                                isDisabled={!isIndiaCustomer}
                               />
                             )}
                           />
                         </div>
+                        )}
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaBuilding size={12} />} iconBg="bg-[#fff4ea]" iconColor="text-[#f0a24d]">
                             City
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="text"
                             {...registerModal("city")}
@@ -7301,14 +7630,14 @@ convertexcel
                               setValueModal("city", e.target.value.trim())
                             }
                             placeholder="City"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaHashtag size={12} />} iconBg="bg-[#f1edff]" iconColor="text-[#8769eb]">
                             Pincode
-                          </label>
+                          </CustomerFieldLabel>
                           <input
                             type="text"
                             {...registerModal("pincode")}
@@ -7316,64 +7645,86 @@ convertexcel
                               setValueModal("pincode", e.target.value.trim())
                             }
                             placeholder="Pincode"
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                            className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                           />
                         </div>
                       </div>
-                    </div>
+                    </CustomerInfoCard>
 
                     {/* Business Information */}
-                    <div>
-                      <p className="mb-2 border-b border-slate-200 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-[#1B2A4A]">
-                        Business Information
-                      </p>
-
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                      <div className="hidden">
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
-                            Partnership Type
-                          </label>
-                          <select
-                            {...registerModal("partner")}
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
-                          >
-                            <option value="">Select Partner</option>
-                            {partner?.map((p, i) => (
-                              <option key={i} value={p._id}>
-                                {p.partner}
-                              </option>
-                            ))}
-                          </select>
+                    <CustomerInfoCard
+                      plain
+                      icon={<FaBuilding size={12} />}
+                      iconBg="bg-[#fff4ea]"
+                      iconColor="text-[#f0a24d]"
+                      label="Registration Information"
+                    >
+                      <div className={customerModalFieldGridClass}>
+                        <div>
+                          <CustomerFieldLabel icon={<FaLandmark size={12} />} iconBg="bg-[#fff8df]" iconColor="text-[#d1a91b]">
+                            Partner Selection
+                          </CustomerFieldLabel>
+                          <Controller
+                            name="partnerSelection"
+                            control={controlModal}
+                            render={({ field }) => (
+                              <CustomerModalSelect
+                                value={
+                                  field.value?._id || field.value?.id || field.value || ""
+                                }
+                                onChange={field.onChange}
+                                placeholder="Select partner customer"
+                                options={partnerCustomerOptions.map(
+                                  (partnerCustomer) => ({
+                                    value: partnerCustomer.value,
+                                    label: `${partnerCustomer.label}${
+                                      partnerCustomer.mobile
+                                        ? ` - ${partnerCustomer.mobile}`
+                                        : ""
+                                    }`
+                                  })
+                                )}
+                              />
+                            )}
+                          />
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                          <CustomerFieldLabel icon={<FaHashtag size={12} />} iconBg="bg-[#f1edff]" iconColor="text-[#8769eb]">
                             Registration Type
-                          </label>
-                          <select
-                            {...registerModal("registrationType")}
-                            className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
-                          >
-                            <option value="">Select Type</option>
-                            <option value="unregistered">
-                              Unregistered / Consumer
-                            </option>
-                            <option value="regular">Regular</option>
-                          </select>
+                          </CustomerFieldLabel>
+                          <Controller
+                            name="registrationType"
+                            control={controlModal}
+                            render={({ field }) => (
+                              <CustomerModalSelect
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                placeholder="Select type"
+                                options={[
+                                  {
+                                    value: "unregistered",
+                                    label: "Unregistered / Consumer"
+                                  },
+                                  { value: "regular", label: "Regular" }
+                                ]}
+                              />
+                            )}
+                          />
                         </div>
 
                         {registrationType === "regular" && (
                           <div>
-                            <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                            <CustomerFieldLabel icon={<FaLandmark size={12} />} iconBg="bg-[#fff1f7]" iconColor="text-[#ee82a9]">
                               GSTIN / UIN{" "}
                               <span className="text-red-500">*</span>
-                            </label>
+                            </CustomerFieldLabel>
                             <input
                               {...registerModal("gstNo", {
                                 required: "GST is required"
                               })}
                               placeholder="e.g. 22AAAAA0000A1Z5"
-                              className="h-10 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
+                              className="h-8 w-full rounded-lg border border-slate-300 bg-slate-50 px-2.5 text-[12px] outline-none transition focus:border-[#1B2A4A] focus:ring-2 focus:ring-[#1B2A4A]/10"
                             />
                             {errorsModal.gstNo && (
                               <p className="mt-1 text-[11px] text-red-500">
@@ -7382,12 +7733,123 @@ convertexcel
                             )}
                           </div>
                         )}
+                        <div>
+                          <CustomerFieldLabel icon={<FaHashtag size={12} />} iconBg="bg-[#eefbf2]" iconColor="text-[#4cbf73]">
+                            Status
+                          </CustomerFieldLabel>
+                          <Controller
+                            name="isActive"
+                            control={controlModal}
+                            render={({ field }) => (
+                              <CustomerModalSelect
+                                value={field.value || "Running"}
+                                onChange={field.onChange}
+                                placeholder="Select status"
+                                options={[
+                                  { value: "Running", label: "Running" },
+                                  { value: "Deactive", label: "Deactive" }
+                                ]}
+                              />
+                            )}
+                          />
+                        </div>
                       </div>
+                    </CustomerInfoCard>
+
+                    <div className="border-t border-[#edf1f7] pt-2">
+                      <div
+                        className={`grid grid-cols-1 gap-2 ${
+                          isPartnerModal
+                            ? "max-w-[540px] sm:grid-cols-2"
+                            : "max-w-[264px]"
+                        }`}
+                      >
+                        <CustomerInfoCard
+                          icon={<FaBuilding size={12} />}
+                          iconBg="bg-[#fff8df]"
+                          iconColor="text-[#d1a91b]"
+                          label="Is this customer also a partner?"
+                        >
+                          <Controller
+                            name="isPartner"
+                            control={controlModal}
+                            defaultValue={false}
+                            render={({ field }) => (
+                              <div className="inline-flex w-full rounded-lg border border-[#dce3ee] bg-[#f7f9fc] p-1">
+                                <button
+                                  type="button"
+                                  aria-pressed={!field.value}
+                                  onClick={() => {
+                                    field.onChange(false)
+                                    setValueModal("partner", "")
+                                  }}
+                                  className={`flex-1 rounded-md px-3 py-1.5 text-[11px] font-semibold transition ${
+                                    !field.value
+                                      ? "bg-white text-[#5d6983] shadow-sm"
+                                      : "text-[#8c96ad]"
+                                  }`}
+                                >
+                                  No
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-pressed={Boolean(field.value)}
+                                  onClick={() => field.onChange(true)}
+                                  className={`flex-1 rounded-md px-3 py-1.5 text-[11px] font-semibold transition ${
+                                    field.value
+                                      ? "bg-[#1B2A4A] text-white shadow-sm"
+                                      : "text-[#8c96ad]"
+                                  }`}
+                                >
+                                  Yes
+                                </button>
+                              </div>
+                            )}
+                          />
+                        </CustomerInfoCard>
+
+                        {isPartnerModal && (
+                          <CustomerInfoCard
+                            icon={<FaBuilding size={12} />}
+                            iconBg="bg-[#fff8df]"
+                            iconColor="text-[#d1a91b]"
+                            label="Partner Type"
+                          >
+                            <Controller
+                              name="partner"
+                              control={controlModal}
+                              rules={{ required: "Select a partner type" }}
+                              render={({ field }) => (
+                                <CustomerModalSelect
+                                  value={
+                                    field.value?._id ||
+                                    field.value?.id ||
+                                    field.value ||
+                                    ""
+                                  }
+                                  onChange={field.onChange}
+                                  placeholder="Select partner"
+                                  options={partner.map((item) => ({
+                                    value: item._id,
+                                    label: item.partner
+                                  }))}
+                                />
+                              )}
+                            />
+                            {errorsModal.partner && (
+                              <p className="mt-1 text-[11px] text-red-500">
+                                {errorsModal.partner.message}
+                              </p>
+                            )}
+                          </CustomerInfoCard>
+                        )}
+                      </div>
+                    </div>
                     </div>
                   </div>
 
                   {/* Fixed footer */}
-                  <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-200 bg-white px-5 py-3 sm:px-6">
+                  <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 bg-white px-4 py-2 sm:px-5">
                     <button
                       type="button"
                       onClick={() => {

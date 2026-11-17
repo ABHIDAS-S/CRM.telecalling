@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import UseFetch from "../../hooks/useFetch"
 import Breadcrumb from "../../components/common/Breadcrumb"
 import { useLocation, useNavigate } from "react-router-dom"
@@ -7,6 +7,7 @@ import { PerformanceModal } from "../../components/primaryUser/PerformanceModal"
 import SkeletonTable from "../../components/loader/SkeletonTable"
 import NodataAvailable from "../../components/NodataAvailable"
 import MyDatePicker from "../../components/common/MyDatePicker"
+import { CustomSelect } from "../../components/common/CustomSelect"
 import api from "../../api/api"
 import {
   Mail,
@@ -70,6 +71,9 @@ export default function OwnLeadList() {
   const [openRow, setOpenRow] = useState(null)
   const [activeUserId, setActiveUserId] = useState(null)
   const [leadSearch, setLeadSearch] = useState("")
+  const [selectedProductFilter, setSelectedProductFilter] = useState("")
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("")
+  const [leadStatusFilter, setLeadStatusFilter] = useState("all")
 
   const nav = [
     { label: "Lead", path: "" },
@@ -97,8 +101,13 @@ export default function OwnLeadList() {
     selecteduserBranch,
     dates,
     location,
-    ownLead
+    ownLead,
+    selectedProductFilter,
+    selectedCategoryFilter,
+    leadStatusFilter
   }) => {
+    const [productModel = "", productId = ""] = selectedProductFilter.split(":")
+
     return useQuery({
       queryKey: [
         "ownedlead",
@@ -109,7 +118,11 @@ export default function OwnLeadList() {
         ownLead,
         location?.state?.role,
         location?.state?.newLeadOnly,
-        location?.state?.salesFunnelStage
+        location?.state?.salesFunnelStage,
+        productId,
+        productModel,
+        selectedCategoryFilter,
+        leadStatusFilter
       ],
       queryFn: async () => {
         const res = await api.get(`/lead/ownregisteredLead`, {
@@ -123,7 +136,11 @@ export default function OwnLeadList() {
             startDate: dates.startDate,
             endDate: dates.endDate,
             newLeadOnly: location?.state?.newLeadOnly === true,
-            salesFunnelStage: location?.state?.salesFunnelStage || ""
+            salesFunnelStage: location?.state?.salesFunnelStage || "",
+            productId,
+            productModel,
+            categoryId: selectedCategoryFilter,
+            status: leadStatusFilter
           }
         })
         console.log(res.data.data)
@@ -142,12 +159,52 @@ export default function OwnLeadList() {
     selecteduserBranch,
     dates,
     location,
-    ownLead
+    ownLead,
+    selectedProductFilter,
+    selectedCategoryFilter,
+    leadStatusFilter
   })
   const { data: branchProduct = [] } = UseFetch(
     selecteduserBranch &&
       `/product/getallbranchProduct?branch=${selecteduserBranch}`
   )
+  const productFilterOptions = useMemo(() => {
+    const uniqueProducts = new Map()
+
+    ;(Array.isArray(branchProduct) ? branchProduct : []).forEach((item) => {
+      const productId = String(item?._id || "")
+      if (!productId) return
+
+      const productModel = item?.serviceName ? "Service" : "Product"
+      const label = item?.shortName || item?.productName || item?.serviceName
+      if (!label) return
+
+      uniqueProducts.set(`${productModel}:${productId}`, { label, productModel, productId })
+    })
+
+    return [...uniqueProducts.values()].sort((left, right) =>
+      left.label.localeCompare(right.label)
+    )
+  }, [branchProduct])
+
+  const categoryFilterOptions = useMemo(() => {
+    const categories = new Map()
+    const branchId = String(selecteduserBranch || "")
+
+    ;(Array.isArray(branchProduct) ? branchProduct : []).forEach((product) => {
+      ;(product?.selected || []).forEach((selection) => {
+        const selectionBranchId = String(selection?.branch_id?._id || selection?.branch_id || "")
+        const categoryId = String(selection?.category_id?._id || selection?.category_id || "")
+        if (!categoryId || (branchId && selectionBranchId !== branchId)) return
+
+        categories.set(categoryId, selection?.categoryName || "Unnamed category")
+      })
+    })
+
+    return [...categories.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((left, right) => left.label.localeCompare(right.label))
+  }, [branchProduct, selecteduserBranch])
   useEffect(() => {
     const now = new Date()
 
@@ -795,35 +852,9 @@ console.log(item?.leadBy?._id)
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <Breadcrumb items={Breadcrumblist} />
             <div className="m-2 shrink-0 rounded-lg border border-slate-200 bg-white/70 px-3 py-2 shadow-sm md:m-3">
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <h2 className="shrink-0 text-base font-bold tracking-tight text-slate-800">
-                    {ownLead ? "Own Lead" : "All Lead"}
-                  </h2>
-
-                  {loggedUser?.role !== "Staff" && (
-                    <div className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5">
-                      <button
-                        onClick={() => {
-                          setTableData([])
-                          setownLead((prev) => !prev)
-                        }}
-                        className={`relative h-6 w-11 rounded-full transition-colors duration-300 ${
-                          ownLead ? "bg-emerald-500" : "bg-slate-300"
-                        }`}
-                      >
-                        <div
-                          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-300 ${
-                            ownLead ? "translate-x-5" : "translate-x-0.5"
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex w-full flex-wrap items-end gap-2 lg:w-auto lg:flex-nowrap lg:justify-end">
-                  <div className="relative w-full sm:w-52 lg:w-48 xl:w-52">
+              <div>
+                <div className="grid w-full grid-cols-1 items-center gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(10rem,1.1fr)_repeat(3,minmax(8rem,0.9fr))_minmax(16rem,1.3fr)_auto]">
+                  <div className="relative w-full">
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                     <input
                       type="search"
@@ -843,13 +874,50 @@ console.log(item?.leadBy?._id)
                       </button>
                     )}
                   </div>
+                  <CustomSelect
+                    value={selectedProductFilter}
+                    onChange={setSelectedProductFilter}
+                    placeholder="All products"
+                    className="w-full"
+                    options={[
+                      { value: "", label: "All products" },
+                      ...productFilterOptions.map((product) => ({
+                        value: `${product.productModel}:${product.productId}`,
+                        label: product.label
+                      }))
+                    ]}
+                  />
+                  <CustomSelect
+                    value={selectedCategoryFilter}
+                    onChange={setSelectedCategoryFilter}
+                    placeholder="All categories"
+                    className="w-full"
+                    options={[
+                      { value: "", label: "All categories" },
+                      ...categoryFilterOptions
+                    ]}
+                  />
+                  <CustomSelect
+                    value={leadStatusFilter}
+                    onChange={setLeadStatusFilter}
+                    className="w-full"
+                    options={[
+                      { value: "all", label: "All leads" },
+                      { value: "other", label: "Other leads" },
+                      { value: "lost", label: "Lost leads" },
+                      { value: "completed", label: "Completed leads" }
+                    ]}
+                  />
                   {dates.startDate && (
-                    <div className="w-full sm:w-[22rem]">
+                    <div className="w-full sm:col-span-2 lg:col-span-1">
                       <MyDatePicker
                         setDates={setDates}
                         dates={dates}
                         compact
+                        fullWidth
                         inlineOnMobile
+                        hideLabels
+                        paymentHistoryStyle
                       />
                     </div>
                   )}
@@ -860,7 +928,7 @@ console.log(item?.leadBy?._id)
                         ? navigate("/admin/transaction/lead")
                         : navigate("/staff/transaction/lead")
                     }
-                    className="inline-flex h-8 shrink-0 items-center justify-center rounded-md bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-700"
+                    className="inline-flex h-8 w-full items-center justify-center rounded-md bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-700 sm:col-span-2 sm:justify-self-end sm:w-auto lg:col-span-1"
                   >
                     New Lead
                   </button>
@@ -869,6 +937,50 @@ console.log(item?.leadBy?._id)
             </div>
 
             <div className="mx-2 mb-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-white shadow-xl md:mx-3">
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
+                {loggedUser?.role !== "Staff" ? (
+                  <div className="inline-flex h-8 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 shadow-sm">
+                    <span
+                      className={`min-w-[4.5rem] text-xs font-semibold transition-colors ${
+                        ownLead ? "text-emerald-700" : "text-slate-700"
+                      }`}
+                    >
+                      {ownLead ? "Own Leads" : "All Leads"}
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={ownLead}
+                      aria-label={ownLead ? "Show all leads" : "Show own leads"}
+                      onClick={() => {
+                        setTableData([])
+                        setownLead((prev) => !prev)
+                      }}
+                      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 ${
+                        ownLead ? "bg-emerald-500" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-md transition-transform duration-300 ${
+                          ownLead ? "translate-x-5" : "translate-x-0.5"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                ) : (
+                  <span />
+                )}
+
+                {hasLeads && (
+                  <div className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
+                    <span>Total Net Amount</span>
+                    <span className="flex items-center gap-0.5 rounded-md bg-white/15 px-2 py-0.5 text-sm">
+                      <IndianRupee className="h-3.5 w-3.5" />
+                      {totalNetAmount.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                )}
+              </div>
               {loading ? (
                 <div className="p-4">
                   <SkeletonTable rows={5} columns={8} />
@@ -882,15 +994,6 @@ console.log(item?.leadBy?._id)
                 </div>
               ) : (
                 <>
-                  <div className="sticky top-0 z-20 flex shrink-0 justify-end border-b border-slate-200 bg-white px-3 py-2 shadow-sm">
-                    <div className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
-                      <span>Total Net Amount</span>
-                      <span className="flex items-center gap-0.5 rounded-md bg-white/15 px-2 py-0.5 text-sm">
-                        <IndianRupee className="h-3.5 w-3.5" />
-                        {totalNetAmount.toLocaleString("en-IN")}
-                      </span>
-                    </div>
-                  </div>
                   <div className="min-h-0 flex-1 overflow-auto">
                     {renderTable(visibleTableData)}
                   </div>

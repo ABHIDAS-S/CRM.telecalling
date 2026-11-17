@@ -253,7 +253,12 @@ function LeadEdit() {
     previousLeadCustomer,
     isCustomerChanged
   ) => {
-    console.log(data)
+    const submitData = { ...data }
+    if (submitData.zeroAmountTask && typeof submitData.zeroAmountTask === "object") {
+      submitData.zeroAmountTask =
+        submitData.zeroAmountTask._id || submitData.zeroAmountTask.value || ""
+    }
+    console.log(submitData)
     console.log(leadData)
     console.log(from)
     console.log(isCustomerChanged)
@@ -272,7 +277,7 @@ function LeadEdit() {
       const response = await api.put(
         `/lead/leadRegisterUpdate?docID=${objectId}&previousCustomer=${previousLeadCustomer}`,
         {
-          data,
+          data: submitData,
           leadData,
           from,
           previousleadCustomer: previousLeadCustomer,

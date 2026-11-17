@@ -27,4 +27,7 @@ status:{type:String,enum:["Active","Inactive"]},
   GSTIN: String
 }, { timestamps: true })
 
+// Supports branch/category lookups used by the Own Lead List filters.
+productSchema.index({ "selected.branch_id": 1, "selected.category_id": 1 })
+
 export default mongoose.model("Product", productSchema)

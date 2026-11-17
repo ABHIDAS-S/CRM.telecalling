@@ -2338,20 +2338,27 @@ export const gettargetResult = async (req, res) => {
       endMonth
     );
 
-    // Targets are now credited by payment date. Keep the lead-date branch of
+    // Targets are credited by verified-payment date. Keep the lead-date branch of
     // this query for the existing incentive flow, and include payments made in
     // the selected target period so an older lead can be credited correctly.
     const leads = await LeadMaster.find({
       leadBranch: selectedBranch,
       $or: [
         { leadDate: activePeriodRange },
-        { "paymentHistory.paymentDate": activePeriodRange },
+        {
+          paymentHistory: {
+            $elemMatch: {
+              paymentVerified: true,
+              verifiedAt: activePeriodRange,
+            },
+          },
+        },
         { forcefullyClosedTargetDate: activePeriodRange },
       ],
     })
       .select(`
         leadId leadDate customerName mobile phone leadClosed paymentVerified
-        netAmount balanceAmount totalPaidAmount
+        taxableAmount taxAmount netAmount discountAmount balanceAmount totalPaidAmount
         forcefullyClosedTarget forcefullyClosedTargetDate
         leadFor paymentHistory activityLog
       `)
@@ -2610,10 +2617,13 @@ export const gettargetResult = async (req, res) => {
 
       objects(lead.paymentHistory)
         .map((payment, index) => ({ payment, index }))
-        .filter(({ payment }) => payment.paymentVerified === true)
+        .filter(
+          ({ payment }) =>
+            payment.paymentVerified === true && getVerifiedAt(payment)
+        )
         .sort((left, right) =>
-          getPaymentDate(left.payment)?.getTime() -
-          getPaymentDate(right.payment)?.getTime()
+          getVerifiedAt(left.payment)?.getTime() -
+          getVerifiedAt(right.payment)?.getTime()
         )
         .forEach(({ payment, index }) => {
           const categoryAmount = objects(payment.paymentEntries).reduce(
@@ -2642,8 +2652,8 @@ export const gettargetResult = async (req, res) => {
       [...getVerifiedCategoryAmountsByPayment(lead, configCategoryId).values()]
         .reduce((total, amount) => total + amount, 0);
 
-    const getPaymentDate = (payment) => {
-      const date = new Date(payment?.paymentDate);
+    const getVerifiedAt = (payment) => {
+      const date = new Date(payment?.verifiedAt);
       return Number.isNaN(date.getTime()) ? null : date;
     };
 
@@ -2664,10 +2674,10 @@ export const gettargetResult = async (req, res) => {
       );
 
       for (const [index, payment] of objects(lead.paymentHistory).entries()) {
-        const paymentDate = getPaymentDate(payment);
+        const verifiedAt = getVerifiedAt(payment);
         if (
           payment.paymentVerified !== true ||
-          !isDateInTargetMonth(paymentDate, targetMonth)
+          !isDateInTargetMonth(verifiedAt, targetMonth)
         ) {
           continue;
         }
@@ -2678,13 +2688,105 @@ export const gettargetResult = async (req, res) => {
       return total;
     };
 
-    const getLastPaymentDate = (lead) => {
-      const paymentDates = objects(lead.paymentHistory)
-        .map(getPaymentDate)
+    // Amount targets exclude GST/tax. Payment entries store the received
+    // (tax-inclusive) value, so convert each category receipt before it is
+    // counted toward a target.
+    const getEntryTaxRate = (lead, entry) => {
+      const productId = String(entry?.productorServiceId || "");
+      const leadItem = objects(lead.leadFor).find(
+        (item) => String(item?.productorServiceId || "") === productId
+      );
+      const inclusiveAmount = num(
+        leadItem?.taxinclusiveamount ?? leadItem?.actualNetAmount ?? leadItem?.netAmount
+      );
+      const taxableAmount = num(
+        leadItem?.taxexclusiveAmount ?? leadItem?.productPrice
+      );
+      const derivedRate = taxableAmount > 0 && inclusiveAmount >= taxableAmount
+        ? ((inclusiveAmount - taxableAmount) / taxableAmount) * 100
+        : 0;
+
+      return [
+        entry?.leadTax,
+        entry?.taxRate,
+        entry?.tax,
+        entry?.hsn,
+        leadItem?.leadTax,
+        leadItem?.taxRate,
+        leadItem?.hsn,
+        leadItem?.actualHsn,
+        derivedRate,
+      ]
+        .map((value) => Number(value))
+        .find((value) => Number.isFinite(value) && value >= 0) || 0;
+    };
+
+    const getTaxExclusiveVerifiedAmountForCategory = (
+      lead,
+      configCategoryId,
+      targetMonth = null
+    ) => {
+      const cappedAmounts = getVerifiedCategoryAmountsByPayment(
+        lead,
+        configCategoryId
+      );
+
+      const verifiedAmount = objects(lead.paymentHistory).reduce(
+        (total, payment, paymentIndex) => {
+          const verifiedAt = getVerifiedAt(payment);
+          if (
+            payment.paymentVerified !== true ||
+            !verifiedAt ||
+            (targetMonth && !isDateInTargetMonth(verifiedAt, targetMonth))
+          ) {
+            return total;
+          }
+
+          let remainingInclusiveAmount = cappedAmounts.get(paymentIndex) || 0;
+          const taxExclusiveAmount = objects(payment.paymentEntries).reduce(
+            (paymentTotal, entry) => {
+              const meta = getItemMeta(entry);
+              if (
+                remainingInclusiveAmount <= 0 ||
+                String(meta?.categoryId || "") !== String(configCategoryId)
+              ) {
+                return paymentTotal;
+              }
+
+              const inclusiveAmount = Math.min(
+                num(entry.receivedAmount),
+                remainingInclusiveAmount
+              );
+              remainingInclusiveAmount -= inclusiveAmount;
+              const taxRate = getEntryTaxRate(lead, entry);
+              return paymentTotal + inclusiveAmount / (1 + taxRate / 100);
+            },
+            0
+          );
+
+          return total + taxExclusiveAmount;
+        },
+        0
+      );
+
+      return Number(verifiedAmount.toFixed(2));
+    };
+
+    const getTaxExclusiveLeadAmount = (lead) =>
+      Math.max(
+        num(lead.taxableAmount),
+        num(lead.netAmount) - num(lead.taxAmount),
+        0
+      );
+
+    const getLastVerifiedDate = (lead) => {
+      const verifiedDates = objects(lead.paymentHistory)
+        .filter((payment) => payment.paymentVerified === true)
+        .map(getVerifiedAt)
         .filter(Boolean);
 
-      if (!paymentDates.length) return null;
-      return new Date(Math.max(...paymentDates.map((date) => date.getTime())));
+      if (!verifiedDates.length) return null;
+      return new Date(Math.max(...verifiedDates.map((date) => date.getTime())));
     };
 
     const isLeadFullyVerified = (lead) => {
@@ -2905,8 +3007,8 @@ export const gettargetResult = async (req, res) => {
 
           That staff/admin does not need a target configured.
         */
-        // Target achievement is determined by payment month, not lead date.
-        // `leads` also includes older leads that received a payment this month.
+        // Target achievement is determined by verification month, not lead date.
+        // `leads` also includes older leads with a payment verified this month.
         for (const lead of leads) {
           const categoryItems = getLeadCategoryItems(
             lead,
@@ -2943,9 +3045,9 @@ export const gettargetResult = async (req, res) => {
                 isDateInTargetMonth(forcefullyClosedTargetDate, targetMonth) &&
                 lead.leadClosed === true &&
                 closingActivity.followupClosed === true
-                ? num(lead.netAmount)
+                ? getTaxExclusiveLeadAmount(lead)
                 : 0
-              : getVerifiedAmountForCategoryInMonth(
+              : getTaxExclusiveVerifiedAmountForCategory(
                 lead,
                 configCategoryId,
                 targetMonth
@@ -2961,7 +3063,7 @@ export const gettargetResult = async (req, res) => {
               lead.balanceAmount !== "" &&
               num(lead.balanceAmount) === 0 &&
               num(lead.totalPaidAmount) >= num(lead.netAmount);
-            const lastPaymentDate = getLastPaymentDate(lead);
+            const lastVerifiedDate = getLastVerifiedDate(lead);
             const forcefullyClosedTargetSourceDate =
               lead.forcefullyClosedTargetDate || lead.leadDate;
             const forcefullyClosedTargetDate = forcefullyClosedTargetSourceDate
@@ -2987,11 +3089,11 @@ export const gettargetResult = async (req, res) => {
                   : 0;
             } else {
               // Normal quantity leads are credited once, in the month of
-              // their final payment, only after full verified payment.
+              // their final verified payment, only after full verified payment.
               leadAchievement =
                 isFullyVerified &&
                 isFullyPaid &&
-                isDateInTargetMonth(lastPaymentDate, targetMonth) &&
+                isDateInTargetMonth(lastVerifiedDate, targetMonth) &&
                 lead.leadClosed === true &&
                 closingActivity.followupClosed === true
                   ? 1
@@ -3065,6 +3167,8 @@ export const gettargetResult = async (req, res) => {
                 achievedValue: leadAchievement,
 
                 netAmount: num(lead.netAmount),
+                taxAmount: num(lead.taxAmount),
+                discountAmount: num(lead.discountAmount),
                 balanceAmount: num(lead.balanceAmount),
                 totalPaidAmount: num(lead.totalPaidAmount),
 
@@ -3074,7 +3178,7 @@ export const gettargetResult = async (req, res) => {
                 isFullyVerified: isLeadFullyVerified(lead),
 
                 verifiedCategoryAmount:
-                  getVerifiedAmountForCategory(
+                  getTaxExclusiveVerifiedAmountForCategory(
                     lead,
                     configCategoryId
                   ),
@@ -3431,6 +3535,25 @@ const buildIncentiveReportData = async ({
         )
       : [];
   const num = (value) => Number(value) || 0;
+  // Some older leads record the discount only on their product/service item.
+  // Prefer the lead-level amount, but derive it from the item totals when that
+  // field was not populated so those leads receive the same treatment.
+  const getLeadDiscountAmount = (lead) => {
+    const recordedDiscount = num(lead.discountAmount);
+    if (recordedDiscount > 0) return recordedDiscount;
+
+    return objects(lead.leadFor).reduce((total, item) => {
+      const netDiscount = Math.max(
+        num(item.actualNetAmount) - num(item.netAmount),
+        0
+      );
+      const priceDiscount = Math.max(
+        num(item.actualproductPrice) - num(item.productPrice),
+        0
+      );
+      return total + (netDiscount || priceDiscount);
+    }, 0);
+  };
   // The first activity represents lead creation, so the Lead incentive belongs
   // to leadBy. A submitted user or an assignment correction on that activity
   // must not move the Lead reward away from the person who generated the lead.
@@ -3518,7 +3641,14 @@ const buildIncentiveReportData = async ({
 
   const leads = await LeadMaster.find({
     leadBranch: { $in: branchIds },
-    "paymentHistory.paymentDate": { $gte: periodStart, $lte: periodEnd },
+    paymentHistory: {
+      $elemMatch: {
+        paymentVerified: true,
+        // Earlier verified payments are needed when a task is completed later
+        // in this reporting period and must receive a one-time catch-up.
+        verifiedAt: { $lte: periodEnd },
+      },
+    },
   })
     .select(
       `leadId leadDate leadBranch customerName paymentVerified netAmount
@@ -3677,6 +3807,72 @@ const buildIncentiveReportData = async ({
         ? total + num(entry.receivedAmount)
         : total;
     }, 0);
+  // Payment receipts are stored tax-inclusive. Percentage incentives must be
+  // calculated on the tax-exclusive receipt amount, while fixed incentives
+  // and collection caps continue to use the original inclusive value.
+  const getEntryTaxRate = (lead, entry) => {
+    const productId = String(entry?.productorServiceId || "");
+    const leadItem = objects(lead.leadFor).find(
+      (item) => String(item?.productorServiceId || "") === productId
+    );
+    const leadTaxableAmount = Math.max(
+      num(lead.netAmount) - num(lead.taxAmount),
+      0
+    );
+    const derivedLeadRate = leadTaxableAmount > 0
+      ? (num(lead.taxAmount) / leadTaxableAmount) * 100
+      : 0;
+    const inclusiveAmount = num(
+      leadItem?.taxinclusiveamount ?? leadItem?.actualNetAmount
+    );
+    const exclusiveAmount = num(
+      leadItem?.taxexclusiveAmount ?? leadItem?.productPrice
+    );
+    const derivedItemRate = exclusiveAmount > 0 && inclusiveAmount >= exclusiveAmount
+      ? ((inclusiveAmount - exclusiveAmount) / exclusiveAmount) * 100
+      : 0;
+
+    return [
+      entry?.leadTax,
+      entry?.taxRate,
+      entry?.tax,
+      entry?.hsn,
+      leadItem?.leadTax,
+      leadItem?.taxRate,
+      leadItem?.hsn,
+      leadItem?.actualHsn,
+      derivedItemRate,
+      derivedLeadRate,
+    ]
+      .map((value) => Number(value))
+      .find((value) => Number.isFinite(value) && value >= 0) || 0;
+  };
+  const getTaxExclusiveCategoryPaymentAmount = (
+    lead,
+    payment,
+    categoryId,
+    cappedInclusiveAmount
+  ) => {
+    let remainingInclusiveAmount = Math.max(num(cappedInclusiveAmount), 0);
+
+    return objects(payment.paymentEntries).reduce((total, entry) => {
+      if (
+        remainingInclusiveAmount <= 0 ||
+        categoryMap.get(String(entry.productorServiceId || "")) !==
+          String(categoryId)
+      ) {
+        return total;
+      }
+
+      const inclusiveAmount = Math.min(
+        num(entry.receivedAmount),
+        remainingInclusiveAmount
+      );
+      remainingInclusiveAmount -= inclusiveAmount;
+      const taxRate = getEntryTaxRate(lead, entry);
+      return total + inclusiveAmount / (1 + taxRate / 100);
+    }, 0);
+  };
   const getCappedVerifiedCategoryAmountsByPayment = (lead, categoryId) => {
     const cappedAmounts = new Map();
     const netAmount = Math.max(num(lead.netAmount), 0);
@@ -3684,11 +3880,14 @@ const buildIncentiveReportData = async ({
 
     objects(lead.paymentHistory)
       .map((payment, index) => ({ payment, index }))
-      .filter(({ payment }) => payment.paymentVerified === true)
+      .filter(
+        ({ payment }) =>
+          payment.paymentVerified === true && validDate(payment.verifiedAt)
+      )
       .sort(
         (left, right) =>
-          validDate(left.payment.paymentDate)?.getTime() -
-          validDate(right.payment.paymentDate)?.getTime()
+          validDate(left.payment.verifiedAt)?.getTime() -
+          validDate(right.payment.verifiedAt)?.getTime()
       )
       .forEach(({ payment, index }) => {
         const categoryAmount = getPaymentCategoryAmount(payment, categoryId);
@@ -3703,9 +3902,26 @@ const buildIncentiveReportData = async ({
 
     return cappedAmounts;
   };
-  const getLeadVerifiedCategoryAmount = (lead, categoryId) =>
-    [...getCappedVerifiedCategoryAmountsByPayment(lead, categoryId).values()]
-      .reduce((total, amount) => total + amount, 0);
+  const getLeadVerifiedTaxExclusiveCategoryAmount = (lead, categoryId) => {
+    const cappedAmounts = getCappedVerifiedCategoryAmountsByPayment(
+      lead,
+      categoryId
+    );
+
+    return objects(lead.paymentHistory).reduce(
+      (total, payment, paymentIndex) =>
+        payment.paymentVerified === true
+          ? total +
+            getTaxExclusiveCategoryPaymentAmount(
+              lead,
+              payment,
+              categoryId,
+              cappedAmounts.get(paymentIndex) || 0
+            )
+          : total,
+      0
+    );
+  };
   const isCompleted = (activity) =>
     activity.taskClosed === true ||
     activity.followupClosed === true ||
@@ -3741,7 +3957,165 @@ const buildIncentiveReportData = async ({
     activity.allocationDate ||
     (activityIndex === 0 ? lead.leadDate : null);
 
+  // Discounted leads remain visible in the report and contribute their
+  // tax-exclusive lead amount. They must never increase an incentive count,
+  // a payable incentive, or the total incentive amount.
+  const addDiscountedLeadDetails = (lead) => {
+    const branchId = String(lead.leadBranch);
+    const activities = objects(lead.activityLog);
+    const taxExclusiveLeadAmount = Math.max(
+      num(lead.netAmount) - num(lead.taxAmount),
+      0
+    );
+
+    for (const config of targetConfigs.filter(
+      (item) => String(item.branch) === branchId
+    )) {
+      // The category mapping is mandatory when calculating a reward. For a
+      // discounted zero-value reference row, however, old products without
+      // that mapping must remain visible in the selected branch/period.
+
+      const rules = new Map(
+        objects(config.allocationValues).map((rule) => [
+          String(rule.allocationId || ""),
+          rule,
+        ])
+      );
+      let hasDiscountedDetail = false;
+      const addReportMetric = (owner, allocationId) => {
+        if (!allocationMetricsByBranch.has(branchId)) {
+          allocationMetricsByBranch.set(branchId, new Map());
+        }
+        const branchMetrics = allocationMetricsByBranch.get(branchId);
+        if (!branchMetrics.has(owner.userId)) {
+          branchMetrics.set(owner.userId, new Map());
+        }
+        const userMetrics = branchMetrics.get(owner.userId);
+        if (!userMetrics.has(allocationId)) {
+          userMetrics.set(allocationId, {
+            leadIds: new Set(),
+            discountedLeadIds: new Set(),
+            amount: 0,
+            incentive: 0,
+          });
+        }
+
+        const metric = userMetrics.get(allocationId);
+        metric.discountedLeadIds ||= new Set();
+        if (!metric.discountedLeadIds.has(String(lead._id))) {
+          metric.discountedLeadIds.add(String(lead._id));
+          metric.amount += taxExclusiveLeadAmount;
+        }
+      };
+      const addDetail = ({ owner, allocationId, eventDate }) => {
+        const rule = rules.get(allocationId);
+        if (!owner || !rule || !eventDate) return;
+
+        userModels.set(
+          owner.userId,
+          owner.userModel === "Admin" ? "Admin" : "Staff"
+        );
+        details.push({
+          userId: owner.userId,
+          branchId,
+          leadId: lead.leadId || "",
+          leadMongoId: String(lead._id),
+          partyName: customerMap.get(String(lead.customerName || "")) || "",
+          productName: getLeadProductName(lead),
+          date: eventDate,
+          allocationId,
+          allocationLabel:
+            taskMap.get(allocationId) || rule.allocationName || "Allocation",
+          incentiveMode: String(
+            rule.incentiveType || rule.mode || "amount"
+          ).trim().toLowerCase(),
+          configuredValue: num(rule.value),
+          percentageBaseAmount: 0,
+          netAmount: num(lead.netAmount),
+          taxAmount: num(lead.taxAmount),
+          leadAmount: taxExclusiveLeadAmount,
+          discountAmount: getLeadDiscountAmount(lead),
+          incentiveAmount: 0,
+          amount: 0,
+          isDiscounted: true,
+        });
+        addReportMetric(owner, allocationId);
+        hasDiscountedDetail = true;
+      };
+
+      for (const [activityIndex, activity] of activities.entries()) {
+        const isEligibleActivity =
+          activityIndex === 0 || isTaskCompletionEvent(activity);
+        const eventDate = validDate(
+          activityCompletedAt(lead, activity, activityIndex)
+        );
+        if (!isEligibleActivity || !eventDate || !isWithinPeriod(eventDate, config)) {
+          continue;
+        }
+
+        const owner = getIncentiveOwner(
+          lead,
+          activity,
+          activityIndex,
+          activities
+        );
+        if (!owner) continue;
+
+        const taskById = String(activity.taskBy || "");
+        const taskId = String(activity.taskId || "");
+        const allocationId = rules.has(taskById)
+          ? taskById
+          : rules.has(taskId)
+            ? taskId
+            : "";
+        if (!allocationId) continue;
+
+        addDetail({ owner, allocationId, eventDate });
+      }
+
+      // Legacy activity rows can lack the task identity used by the target
+      // configuration. A discounted lead must still be visible to its creator
+      // in the report, so fall back to its configured lead/allocation task.
+      if (!hasDiscountedDetail) {
+        const eventDate = validDate(lead.leadDate);
+        const leadOwner = lead.leadBy
+          ? {
+              userId: String(lead.leadBy),
+              userModel: lead.leadByModel || "Staff",
+            }
+          : null;
+        const leadTaskId = String(lead.allocationType || "");
+        const leadNamedTaskId = [...rules.keys()].find((allocationId) =>
+          String(taskMap.get(allocationId) || "").toLowerCase().includes("lead")
+        );
+        const fallbackAllocationId = rules.has(leadTaskId)
+          ? leadTaskId
+          : leadNamedTaskId || [...rules.keys()][0];
+
+        if (
+          eventDate &&
+          isWithinPeriod(eventDate, config) &&
+          fallbackAllocationId
+        ) {
+          addDetail({
+            owner: leadOwner,
+            allocationId: fallbackAllocationId,
+            eventDate,
+          });
+        }
+      }
+    }
+  };
+
   for (const lead of leads) {
+    // A discounted lead still contributes to target achievement (calculated
+    // elsewhere), but must never create an incentive of any type. It is kept
+    // in the detail response at zero so users can see why it was excluded.
+    if (getLeadDiscountAmount(lead) > 0) {
+      addDiscountedLeadDetails(lead);
+      continue;
+    }
+
     const payments = objects(lead.paymentHistory);
     const fullyPaidEligible =
       num(lead.netAmount) > 0 &&
@@ -3839,6 +4213,7 @@ const buildIncentiveReportData = async ({
         if (!userMetrics.has(allocationId)) {
           userMetrics.set(allocationId, {
             leadIds: new Set(),
+            discountedLeadIds: new Set(),
             amount: 0,
             incentive: 0,
           });
@@ -3867,7 +4242,7 @@ const buildIncentiveReportData = async ({
           netAmount: num(lead.netAmount),
           taxAmount: num(lead.taxAmount),
           leadAmount: taxExclusiveLeadAmount,
-          discountAmount: num(lead.discountAmount),
+          discountAmount: getLeadDiscountAmount(lead),
           incentiveAmount,
           amount: incentiveAmount,
         });
@@ -3878,17 +4253,80 @@ const buildIncentiveReportData = async ({
           lead,
           categoryId
         );
-        for (const [paymentIndex, payment] of payments.entries()) {
-          if (payment.paymentVerified !== true || !isWithinPeriod(payment.paymentDate, config)) continue;
-          const paymentAmount = cappedPaymentAmounts.get(paymentIndex) || 0;
-          if (paymentAmount <= 0) continue;
-          for (const [activityIndex, activity] of activities.entries()) {
-            if (!isWithinPeriod(activityCompletedAt(lead, activity, activityIndex), config)) continue;
+        const verifiedPayments = payments
+          .map((payment, paymentIndex) => ({
+            payment,
+            paymentIndex,
+            verifiedAt: validDate(payment.verifiedAt),
+          }))
+          .filter(
+            ({ payment, verifiedAt }) =>
+              payment.paymentVerified === true && verifiedAt
+          );
+
+        for (const [activityIndex, activity] of activities.entries()) {
+          const completedAt = validDate(
+            activityCompletedAt(lead, activity, activityIndex)
+          );
+          const isEligibleActivity =
+            activityIndex === 0 || isTaskCompletionEvent(activity);
+
+          if (!completedAt || !isEligibleActivity) continue;
+
+          // A task completed in this target period receives a one-time
+          // catch-up for all payments verified before its completion.
+          if (isWithinPeriod(completedAt, config)) {
+            const catchUpAmount = verifiedPayments
+              .filter(({ verifiedAt }) => verifiedAt <= completedAt)
+              .reduce(
+                (total, { payment, paymentIndex }) =>
+                  total +
+                  getTaxExclusiveCategoryPaymentAmount(
+                    lead,
+                    payment,
+                    categoryId,
+                    cappedPaymentAmounts.get(paymentIndex) || 0
+                  ),
+                0
+              );
+
+            if (catchUpAmount > 0) {
+              awardActivity({
+                activity,
+                activityIndex,
+                percentageBaseAmount: catchUpAmount,
+                eventDate: completedAt,
+                paymentKey: `catch-up-${activityIndex}`,
+              });
+            }
+          }
+
+          // After a task is complete, every later verified payment in the
+          // target period earns that task's configured percentage.
+          for (const { payment, paymentIndex, verifiedAt } of verifiedPayments) {
+            if (
+              verifiedAt <= completedAt ||
+              !isWithinPeriod(verifiedAt, config)
+            ) {
+              continue;
+            }
+
+            const paymentAmount = cappedPaymentAmounts.get(paymentIndex) || 0;
+            if (paymentAmount <= 0) continue;
+            const taxExclusivePaymentAmount =
+              getTaxExclusiveCategoryPaymentAmount(
+                lead,
+                payment,
+                categoryId,
+                paymentAmount
+              );
+            if (taxExclusivePaymentAmount <= 0) continue;
+
             awardActivity({
               activity,
               activityIndex,
-              percentageBaseAmount: paymentAmount,
-              eventDate: payment.paymentDate,
+              percentageBaseAmount: taxExclusivePaymentAmount,
+              eventDate: verifiedAt,
               paymentKey: String(payment._id || paymentIndex),
             });
           }
@@ -3896,17 +4334,17 @@ const buildIncentiveReportData = async ({
       } else {
         if (!fullyPaidEligible) continue;
         const lastVerifiedPayment = payments
-          .filter((payment) => payment.paymentVerified === true && validDate(payment.paymentDate))
-          .sort((left, right) => validDate(right.paymentDate) - validDate(left.paymentDate))[0];
-        if (!lastVerifiedPayment || !isWithinPeriod(lastVerifiedPayment.paymentDate, config)) continue;
+          .filter((payment) => payment.paymentVerified === true && validDate(payment.verifiedAt))
+          .sort((left, right) => validDate(right.verifiedAt) - validDate(left.verifiedAt))[0];
+        if (!lastVerifiedPayment || !isWithinPeriod(lastVerifiedPayment.verifiedAt, config)) continue;
         for (const [activityIndex, activity] of activities.entries()) {
           awardActivity({
             activity,
             activityIndex,
             percentageBaseAmount: lead.forcefullyClosedTarget === true
-              ? num(lead.netAmount)
-              : getLeadVerifiedCategoryAmount(lead, categoryId),
-            eventDate: lastVerifiedPayment.paymentDate,
+              ? taxExclusiveLeadAmount
+              : getLeadVerifiedTaxExclusiveCategoryAmount(lead, categoryId),
+            eventDate: lastVerifiedPayment.verifiedAt,
           });
         }
       }
@@ -3944,7 +4382,18 @@ const buildIncentiveReportData = async ({
         });
       }
     }
-    const ids = new Set([...branchConfiguredIds, ...branchUsers.keys()]);
+    // A discounted lead has a zero-value detail row and deliberately never
+    // enters `branchUsers` (that map drives payable totals). Include detail
+    // owners as well, otherwise a staff member with only discounted leads is
+    // hidden from the Incentive Report entirely.
+    const detailUserIds = details
+      .filter((detail) => detail.branchId === branchId)
+      .map((detail) => detail.userId);
+    const ids = new Set([
+      ...branchConfiguredIds,
+      ...branchUsers.keys(),
+      ...detailUserIds,
+    ]);
     const users = [...ids]
       .map((userId) => {
         const user = userMap.get(userId);
@@ -4107,6 +4556,7 @@ export const getIncentiveLeads = async (req, res) => {
           configuredValue: Number(detail.configuredValue || 0),
           percentageBaseAmount: Number(detail.percentageBaseAmount || 0),
           amount: Number(detail.incentiveAmount || 0),
+          isDiscounted: Boolean(detail.isDiscounted),
         });
       }
     }
@@ -4124,6 +4574,7 @@ export const getIncentiveLeads = async (req, res) => {
         taxAmount: lead.taxAmount,
         leadAmount: lead.leadAmount,
         discountAmount: lead.discountAmount,
+        isDiscounted: allocations.some((allocation) => allocation.isDiscounted),
         allocations,
         totalAmount: allocations.reduce(
           (total, allocation) => total + Number(allocation.amount || 0),

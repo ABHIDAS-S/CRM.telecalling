@@ -144,13 +144,18 @@ const getCompletedAt = (item) => item.taskCompletedAt || [...(item.taskTimeline 
   .reverse()
   .find((event) => event.event === "Development Completed")?.at
 
-const isCompletedInSelectedPeriod = (item, month, year) => {
-  const completedAt = getCompletedAt(item)
-  if (!completedAt) return false
+const getReportDate = (item) =>
+  getCompletedAt(item) ||
+  item.allocationDate ||
+  item.followupClosedDate ||
+  item.taskStartedAt ||
+  item.expectedCompletionDate
 
-  const completedDate = new Date(completedAt)
-  return completedDate.getFullYear() === Number(year)
-    && months[completedDate.getMonth()] === month
+const isInSelectedPeriod = (item, month, year) => {
+  const reportDate = new Date(getReportDate(item))
+  return !Number.isNaN(reportDate.getTime()) &&
+    reportDate.getFullYear() === Number(year) &&
+    months[reportDate.getMonth()] === month
 }
 
 const codingAndQcTaskId = "689c23493e94902039b97743"
@@ -344,29 +349,28 @@ export default function ResearchandDevelopement() {
     }
   }, [])
 
-  const scopedWorkItems = workItems.filter((item) =>
-    leadScope !== "Owned" || String(item.assignedDeveloperId) === String(loggedUser?._id)
-  )
+  const scopedWorkItems = workItems.filter((item) => {
+    if (!isInSelectedPeriod(item, month, year)) return false
+
+    // New leads are unallocated, so they do not belong to a particular
+    // developer yet. Keep them visible (and counted) in both lead scopes.
+    return item.status === "New" ||
+      leadScope !== "Owned" ||
+      String(item.assignedDeveloperId) === String(loggedUser?._id)
+  })
 
   const matchesStatus = (item, status) => {
-    if (status === "Completed") {
-      // The month selector is an all-leads report filter. A developer's own
-      // completed work remains visible regardless of when it was completed.
-      return item.status === "Completed"
-        && (leadScope === "Owned" || isCompletedInSelectedPeriod(item, month, year))
-    }
+    if (status === "Completed") return item.status === "Completed"
     if (status === "Overdue") return isOverdue(item)
-    // An overdue task is shown in the Overdue bucket, not counted twice as
-    // both In Progress and Overdue.
-    if (status === "In Progress") return item.status === status && !isOverdue(item)
+    // Overdue is a date condition of an active task, so it remains part of
+    // In Progress while also being available through the Overdue tile.
+    if (status === "In Progress") return item.status === status
     return item.status === status
   }
 
   const statusCounts = workStatuses.map((status) => {
     const count = status.label === "All"
-      ? workStatuses
-        .filter((item) => item.label !== "All")
-        .reduce((total, item) => total + scopedWorkItems.filter((work) => matchesStatus(work, item.label)).length, 0)
+      ? scopedWorkItems.length
       : scopedWorkItems.filter((item) => matchesStatus(item, status.label)).length
 
     return { ...status, count }
@@ -411,7 +415,17 @@ export default function ResearchandDevelopement() {
     setModal("allocation")
   }
 
+  const canOperateTask = (item) =>
+    String(item?.assignedDeveloperId) === String(loggedUser?._id)
+
+  const requireAssignedDeveloper = (item) => {
+    if (canOperateTask(item)) return true
+    toast.error("Only the allocated developer can work on or update this task")
+    return false
+  }
+
   const openUpdate = (item) => {
+    if (!requireAssignedDeveloper(item)) return
     setSelectedWork(item)
     setUpdate({
       status: item.status === "New" ? "Pending" : item.status,
@@ -483,6 +497,7 @@ export default function ResearchandDevelopement() {
   }
 
   const startTask = async (item) => {
+    if (!requireAssignedDeveloper(item)) return
     try {
       const response = await api.post("/lead/rnd-task-update", {
         leadDocId: item.leadDocId,
@@ -497,6 +512,7 @@ export default function ResearchandDevelopement() {
   }
 
   const openEndTask = (item) => {
+    if (!requireAssignedDeveloper(item)) return
     setEndTaskWork(item)
     setTaskDescription("")
     setModal("end-task")
@@ -574,6 +590,7 @@ export default function ResearchandDevelopement() {
   }
 
   const rejectTask = async (item) => {
+    if (item.assignedDeveloperId && !requireAssignedDeveloper(item)) return
     if (!window.confirm(`Reject the Coding & QC task for lead ${item.id}?`)) return
 
     try {
@@ -594,11 +611,28 @@ export default function ResearchandDevelopement() {
       <div className="mx-auto flex h-full min-h-0 max-w-7xl flex-col">
         <AnnouncementBanner announcementlist={announcement} setopenannoucementpopup={setOpenAnnouncementPopup} />
 
-        <header className="mb-3 shrink-0 border-l-2 border-blue-500 pl-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-600 sm:text-xs">Research & Development</p>
-          <div className="mt-0.5 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2.5">
-            <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">My Work Summary</h1>
-            <p className="text-xs text-slate-500 sm:text-sm">A quick view of your current work status.</p>
+        <header className="mb-3 flex shrink-0 flex-col gap-3 border-l-2 border-blue-500 pl-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-600 sm:text-xs">Research & Development</p>
+            <div className="mt-0.5 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2.5">
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">My Work Summary</h1>
+              <p className="text-xs text-slate-500 sm:text-sm">A quick view of your current work status.</p>
+            </div>
+          </div>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-600 text-white shadow-sm"><CalendarDays size={16} /></span>
+            <div className="relative min-w-0 flex-1 sm:w-36 sm:flex-none">
+              <button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "report-month" ? null : "report-month")} className="flex h-9 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                <span><span className="mr-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Month</span>{month}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "report-month" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} />
+              </button>
+              {completedFilterMenu === "report-month" && <div className="absolute right-0 top-11 z-40 grid w-64 grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><p className="col-span-3 px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Select reporting month</p>{months.map((item) => <button type="button" key={item} onClick={() => { setMonth(item); setCompletedFilterMenu(null) }} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${month === item ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>{item.slice(0, 3)}</button>)}</div>}
+            </div>
+            <div className="relative w-28 shrink-0">
+              <button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "report-year" ? null : "report-year")} className="flex h-9 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 text-left text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                <span><span className="mr-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">Year</span>{year}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "report-year" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} />
+              </button>
+              {completedFilterMenu === "report-year" && <div className="absolute right-0 top-11 z-40 w-28 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">{[2025, 2026, 2027, 2028].map((item) => <button type="button" key={item} onClick={() => { setYear(String(item)); setCompletedFilterMenu(null) }} className={`w-full rounded-lg px-2 py-2 text-left text-xs font-semibold transition ${year === String(item) ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>{item}</button>)}</div>}
+            </div>
           </div>
         </header>
 
@@ -621,7 +655,7 @@ export default function ResearchandDevelopement() {
             </div>
             <div className="flex w-full items-center gap-2 sm:w-auto">
               <div className="relative min-w-0 flex-1 sm:w-28 sm:flex-none"><button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "scope" ? null : "scope")} className="flex h-8 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"><span className="inline-flex items-center gap-1.5"><SlidersHorizontal size={13} className="text-blue-600" />{leadScope}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "scope" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} /></button>{completedFilterMenu === "scope" && <div className="absolute right-0 top-10 z-30 w-44 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"><p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Lead visibility</p>{["All", "Owned"].map((scope) => <button type="button" key={scope} onClick={() => { setLeadScope(scope); setCompletedFilterMenu(null) }} className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition ${leadScope === scope ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}><span>{scope === "All" ? "All leads" : "Assigned to me"}</span>{leadScope === scope && <CheckCircle2 size={13} />}</button>)}</div>}</div>
-            {activeStatusFilter === "Completed" && leadScope === "All" && <div className="flex items-center gap-2">
+            {false && activeStatusFilter === "Completed" && leadScope === "All" && <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-50 text-slate-500"><CalendarDays size={15} /></span>
               <div className="relative min-w-0 flex-1 sm:w-32 sm:flex-none"><button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "month" ? null : "month")} className="flex h-8 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"><span>{month}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "month" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} /></button>{completedFilterMenu === "month" && <div className="absolute right-0 top-10 z-30 grid w-64 grid-cols-3 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><p className="col-span-3 px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Select month</p>{months.map((item) => <button type="button" key={item} onClick={() => { setMonth(item); setCompletedFilterMenu(null) }} className={`rounded-lg px-2 py-2 text-xs font-semibold transition ${month === item ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>{item.slice(0, 3)}</button>)}</div>}</div>
               <div className="relative w-24 shrink-0"><button type="button" onClick={() => setCompletedFilterMenu(completedFilterMenu === "year" ? null : "year")} className="flex h-8 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"><span>{year}</span><ChevronRight size={14} className={`transition ${completedFilterMenu === "year" ? "-rotate-90 text-blue-600" : "rotate-90 text-slate-400"}`} /></button>{completedFilterMenu === "year" && <div className="absolute right-0 top-10 z-30 w-28 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">{[2025, 2026, 2027, 2028].map((item) => <button type="button" key={item} onClick={() => { setYear(String(item)); setCompletedFilterMenu(null) }} className={`w-full rounded-lg px-2 py-2 text-left text-xs font-semibold transition ${year === String(item) ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>{item}</button>)}</div>}</div>
@@ -669,32 +703,38 @@ function CellTooltip({ value, className = "" }) {
 function WorkRow({ item, showAllocationColumns, canOperate, isActive, onAllocate, onUpdate, onStart, onEnd, onReject, onDescription, onTimeline }) {
   const isAllocated = Boolean(item.assignedDeveloper) && item.status !== "New"
   const isStartEndBlocked = ["Hold", "Completed"].includes(item.status)
+  const isCompleted = item.status === "Completed"
   const disabledClass = "cursor-not-allowed bg-slate-100 text-slate-300"
   const remainingDays = getRemainingDays(item.status, item.expectedCompletionDate)
   const startedAt = formatTime(item.taskStartedAt)
   const workedDuration = getWorkedDuration(item.taskSessions, item.taskStartedAt)
   const startDisabled = !isAllocated || !canOperate || isActive || isStartEndBlocked
   const endDisabled = !isAllocated || !canOperate || !isActive || isStartEndBlocked
-  const startClass = startedAt && startDisabled
+  const startClass = isCompleted
+    ? "cursor-not-allowed bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+    : startedAt && startDisabled
     ? "cursor-not-allowed bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200"
     : startDisabled
       ? disabledClass
       : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
   const blockedTitle = isStartEndBlocked ? "Tasks on hold or completed cannot be started or ended" : !isAllocated ? "Allocate a developer first" : "Only the assigned developer can start or end this task"
   const title = item.taskTitle || item.work
-  return <tr className="text-slate-600 transition hover:bg-slate-50/80"><td className="whitespace-nowrap px-3 py-2 font-semibold text-blue-600">{item.id}</td><td className="px-3 py-2"><CellTooltip value={item.customer} className="font-medium uppercase text-slate-700" /></td>{showAllocationColumns && <><td className="px-3 py-2">{isAllocated && <span className="group relative block min-w-0"><button type="button" onClick={() => onDescription(item)} className="block w-full truncate text-left font-semibold text-blue-600 transition hover:text-blue-800 hover:underline" title="View task description">{title}</button><span role="tooltip" className="pointer-events-none invisible absolute left-0 top-[calc(100%+6px)] z-30 max-w-64 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">{title}</span></span>}</td><td className="hidden px-3 py-2 lg:table-cell">{isAllocated && <CellTooltip value={item.assignedDeveloper || "-"} className="font-medium text-slate-700" />}</td><td className="hidden px-3 py-2 xl:table-cell">{isAllocated && <Badge className={priorityStyles[item.priority]}>{item.priority}</Badge>}</td><td className="hidden whitespace-nowrap px-3 py-2 font-semibold text-slate-600 xl:table-cell">{isAllocated && remainingDays}</td></>}<td className="px-3 py-2"><Badge className={statusStyles[item.status]}>{item.status}</Badge></td><td className="px-3 py-2 text-center"><button type="button" disabled={startDisabled} onClick={() => onStart(item)} title={startDisabled ? blockedTitle : "Start task"} className={`inline-flex h-8 max-w-full items-center gap-1 truncate rounded-md px-2 text-xs font-bold transition ${startClass}`}><Play size={13} strokeWidth={2.5} /><span className="truncate">{startedAt ? `Running · ${workedDuration}` : "Start"}</span></button></td><td className="px-3 py-2 text-center"><button type="button" disabled={endDisabled} onClick={() => onEnd(item)} title={endDisabled ? blockedTitle : "End task"} className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold transition ${endDisabled ? disabledClass : "bg-rose-50 text-rose-600 hover:bg-rose-100"}`}><Square size={12} />End</button></td><td className="hidden px-3 py-2 text-center xl:table-cell"><button type="button" disabled={!isAllocated} onClick={() => onTimeline(item)} title={isAllocated ? "View Coding & QC timeline" : "Allocate a developer first"} className={`inline-grid h-8 w-8 place-items-center rounded-md transition ${isAllocated ? "bg-violet-50 text-violet-600 hover:bg-violet-100" : disabledClass}`}><Clock3 size={14} /></button></td><td className="px-2 py-2 text-center"><div className="flex justify-center gap-1.5"><button type="button" onClick={() => isAllocated ? onUpdate(item) : onAllocate(item)} title={isAllocated ? "Task status" : "Allocate work"} className="inline-grid h-9 w-9 place-items-center rounded-lg bg-blue-50 text-blue-600 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300">{isAllocated ? <Pencil size={17} /> : <UserRoundCheck size={18} />}</button>{(isAllocated || item.status === "New") && <button type="button" onClick={() => onReject(item)} title="Reject Coding & QC task" className="inline-grid h-9 w-9 place-items-center rounded-lg bg-rose-50 text-rose-600 transition hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-200"><X size={17} strokeWidth={2.5} /></button>}</div></td></tr>
+  return <tr className="text-slate-600 transition hover:bg-slate-50/80"><td className="whitespace-nowrap px-3 py-2 font-semibold text-blue-600">{item.id}</td><td className="px-3 py-2"><CellTooltip value={item.customer} className="font-medium uppercase text-slate-700" /></td>{showAllocationColumns && <><td className="px-3 py-2">{isAllocated && <span className="group relative block min-w-0"><button type="button" onClick={() => onDescription(item)} className="block w-full truncate text-left font-semibold text-blue-600 transition hover:text-blue-800 hover:underline" title="View task description">{title}</button><span role="tooltip" className="pointer-events-none invisible absolute left-0 top-[calc(100%+6px)] z-30 max-w-64 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100">{title}</span></span>}</td><td className="hidden px-3 py-2 lg:table-cell">{isAllocated && <CellTooltip value={item.assignedDeveloper || "-"} className="font-medium text-slate-700" />}</td><td className="hidden px-3 py-2 xl:table-cell">{isAllocated && <Badge className={priorityStyles[item.priority]}>{item.priority}</Badge>}</td><td className="hidden whitespace-nowrap px-3 py-2 font-semibold text-slate-600 xl:table-cell">{isAllocated && remainingDays}</td></>}<td className="px-3 py-2"><Badge className={statusStyles[item.status]}>{item.status}</Badge></td><td className="px-3 py-2 text-center"><button type="button" disabled={startDisabled} onClick={() => onStart(item)} title={startDisabled ? blockedTitle : "Start task"} className={`inline-flex h-8 max-w-full items-center gap-1 truncate rounded-md px-2 text-xs font-bold transition ${startClass}`}><Play size={13} strokeWidth={2.5} /><span className="truncate">{isCompleted ? "Completed" : startedAt ? `Running · ${workedDuration}` : "Start"}</span></button></td><td className="px-3 py-2 text-center"><button type="button" disabled={endDisabled} onClick={() => onEnd(item)} title={endDisabled ? blockedTitle : "End task"} className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold transition ${endDisabled ? disabledClass : "bg-rose-50 text-rose-600 hover:bg-rose-100"}`}><Square size={12} />End</button></td><td className="hidden px-3 py-2 text-center xl:table-cell"><button type="button" disabled={!isAllocated} onClick={() => onTimeline(item)} title={isAllocated ? "View Coding & QC timeline" : "Allocate a developer first"} className={`inline-grid h-8 w-8 place-items-center rounded-md transition ${isAllocated ? "bg-violet-50 text-violet-600 hover:bg-violet-100" : disabledClass}`}><Clock3 size={14} /></button></td><td className="px-2 py-2 text-center"><div className="flex justify-center gap-1.5"><button type="button" onClick={() => isAllocated ? onUpdate(item) : onAllocate(item)} title={isAllocated ? "Task status" : "Allocate work"} className="inline-grid h-9 w-9 place-items-center rounded-lg bg-blue-50 text-blue-600 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300">{isAllocated ? <Pencil size={17} /> : <UserRoundCheck size={18} />}</button>{(isAllocated || item.status === "New") && <button type="button" onClick={() => onReject(item)} title="Reject Coding & QC task" className="inline-grid h-9 w-9 place-items-center rounded-lg bg-rose-50 text-rose-600 transition hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-200"><X size={17} strokeWidth={2.5} /></button>}</div></td></tr>
 }
 
 function WorkCard({ item, canOperate, isActive, onAllocate, onUpdate, onStart, onEnd, onReject, onDescription, onTimeline }) {
   const isAllocated = Boolean(item.assignedDeveloper) && item.status !== "New"
   const isStartEndBlocked = ["Hold", "Completed"].includes(item.status)
+  const isCompleted = item.status === "Completed"
   const startedAt = formatTime(item.taskStartedAt)
   const workedDuration = getWorkedDuration(item.taskSessions, item.taskStartedAt)
   const startDisabled = !isAllocated || !canOperate || isActive || isStartEndBlocked
-  const startClass = startedAt && startDisabled
+  const startClass = isCompleted
+    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 disabled:cursor-not-allowed"
+    : startedAt && startDisabled
     ? "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200 disabled:cursor-not-allowed"
     : "bg-emerald-50 text-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
-  return <article className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-semibold text-blue-600">{item.id}</p><button type="button" onClick={() => onDescription(item)} className="mt-1 text-left text-sm font-semibold text-blue-600 hover:underline">{item.taskTitle || item.work}</button><p className="mt-1 text-xs text-slate-500">{item.customer}{item.assignedDeveloper ? ` · ${item.assignedDeveloper}` : ""}</p></div><Badge className={priorityStyles[item.priority]}>{item.priority}</Badge></div><div className="mt-3 flex items-center justify-between gap-3 text-xs"><span className="text-slate-500">Due: <strong className="font-medium text-slate-700">{item.due}</strong></span><Badge className={statusStyles[item.status]}>{item.status}</Badge></div><div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={startDisabled} onClick={() => onStart(item)} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-bold ${startClass}`}><Play size={13} strokeWidth={2.5} />{startedAt ? `Running · ${workedDuration}` : "Start"}</button><button type="button" disabled={!isAllocated || !canOperate || !isActive || isStartEndBlocked} onClick={() => onEnd(item)} className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"><Square size={12} />End</button>{isAllocated && <button type="button" onClick={() => onTimeline(item)} className="inline-flex items-center gap-1.5 rounded-md bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-600"><Clock3 size={13} />Timeline</button>}<button type="button" onClick={() => isAllocated ? onUpdate(item) : onAllocate(item)} className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-100">{isAllocated ? <Pencil size={13} /> : <UserRoundCheck size={13} />}{isAllocated ? "Task acceptance" : "Allocate work"}</button>{(isAllocated || item.status === "New") && <button type="button" onClick={() => onReject(item)} className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"><X size={13} />Reject</button>}</div></article>
+  return <article className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-semibold text-blue-600">{item.id}</p><button type="button" onClick={() => onDescription(item)} className="mt-1 text-left text-sm font-semibold text-blue-600 hover:underline">{item.taskTitle || item.work}</button><p className="mt-1 text-xs text-slate-500">{item.customer}{item.assignedDeveloper ? ` · ${item.assignedDeveloper}` : ""}</p></div><Badge className={priorityStyles[item.priority]}>{item.priority}</Badge></div><div className="mt-3 flex items-center justify-between gap-3 text-xs"><span className="text-slate-500">Due: <strong className="font-medium text-slate-700">{item.due}</strong></span><Badge className={statusStyles[item.status]}>{item.status}</Badge></div><div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={startDisabled} onClick={() => onStart(item)} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-bold ${startClass}`}><Play size={13} strokeWidth={2.5} />{isCompleted ? "Completed" : startedAt ? `Running · ${workedDuration}` : "Start"}</button><button type="button" disabled={!isAllocated || !canOperate || !isActive || isStartEndBlocked} onClick={() => onEnd(item)} className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"><Square size={12} />End</button>{isAllocated && <button type="button" onClick={() => onTimeline(item)} className="inline-flex items-center gap-1.5 rounded-md bg-violet-50 px-2.5 py-1.5 text-xs font-semibold text-violet-600"><Clock3 size={13} />Timeline</button>}<button type="button" onClick={() => isAllocated ? onUpdate(item) : onAllocate(item)} className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-100">{isAllocated ? <Pencil size={13} /> : <UserRoundCheck size={13} />}{isAllocated ? "Task acceptance" : "Allocate work"}</button>{(isAllocated || item.status === "New") && <button type="button" onClick={() => onReject(item)} className="inline-flex items-center gap-1.5 rounded-md bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"><X size={13} /></button>}</div></article>
 }
 
 function ModalShell({ title, subtitle, children, onClose, scrollable = true }) {

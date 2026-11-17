@@ -6496,12 +6496,7 @@ const recomputeDayFromCoverage = (day, user, dateKey, arr) => {
   day.present = present;
   // coveredTotal represents the uncovered portion of the day: 0, 0.5, or 1.
   day.notMarked = coveredTotal;
-  if (user.name === "Abhishek EV") {
-    console.log("arr,date,converted", arr, dateKey, coveredTotal)
-    //     console.log("coveredmorning", coveredMorning)
-    //  console.log("coveredafter", coveredAfternoon)
-    console.log("workedmorining", workedMorning)
-  }
+
   if (coveredMorning && coveredAfternoon) {
     day.notMarked = 0;
   }
@@ -6580,14 +6575,13 @@ const applyOnsiteToDay = (day, onsiteDoc, user, dateKey) => {
     });
   }
 
+  const period = onsiteDoc.halfDayPeriod === "Morning" ? "Morning" : "Afternoon";
+
   if (onsiteDoc.onsiteType === "Full Day") {
     day.coverage.onsite.morning = true;
     day.coverage.onsite.afternoon = true;
   } else {
-    const period = onsiteDoc.halfDayPeriod || "Afternoon";
-    if (user.name === "") {
-      console.log("datekeyyyyyy", dateKey, period)
-    }
+   
     if (period === "Morning") {
       day.coverage.onsite.morning = true;
     }
@@ -6702,12 +6696,7 @@ const classifyAttendanceDay = ({
       }
     }
   }
-  // if (user.name === "Abhishek EV") {
-  //   console.log("datekyyy", dateKey)
-  //   if (dateKey === "2026-07-20") {
-  //     console.log("07-20 punchIn/punchOut/lateLimit/minOutTime:", { punchIn, punchOut, lateLimit, minOutTime });
-  //   }
-  // }
+
 
   const attendanceCoverage = getAttendanceCoverageByPunch({
     punchIn,
@@ -6919,25 +6908,44 @@ export const GetsomeAll = async (req, res, yearParam = {}, monthParam = {}) => {
       ])
     ];
 
+    // Fetch each collection once for the full staff set. The previous approach
+    // executed three queries per user, which became slow as the staff count grew.
+    const userIds = users.map((user) => user._id);
+    const [allAttendances, allOnsites, allLeaves] = await Promise.all([
+      Attendance.find({
+        userId: { $in: userIds },
+        attendanceDate: { $gte: startDate, $lte: endDate }
+      }).lean(),
+      Onsite.find({
+        userId: { $in: userIds },
+        onsiteDate: { $gte: startDate, $lte: endDate }
+      }).lean(),
+      LeaveRequest.find({
+        userId: { $in: userIds },
+        leaveDate: { $gte: startDate, $lte: endDate }
+      }).lean()
+    ]);
+
+    const groupByUser = (records) =>
+      records.reduce((groups, record) => {
+        const key = String(record.userId);
+        const current = groups.get(key) || [];
+        current.push(record);
+        groups.set(key, current);
+        return groups;
+      }, new Map());
+
+    const attendancesByUser = groupByUser(allAttendances);
+    const onsitesByUser = groupByUser(allOnsites);
+    const leavesByUser = groupByUser(allLeaves);
     const staffAttendanceStats = [];
 
     for (const user of users) {
       const userId = user._id;
-
-      const [attendances, onsites, leaves] = await Promise.all([
-        Attendance.find({
-          userId,
-          attendanceDate: { $gte: startDate, $lte: endDate }
-        }),
-        Onsite.find({
-          userId,
-          onsiteDate: { $gte: startDate, $lte: endDate }
-        }),
-        LeaveRequest.find({
-          userId,
-          leaveDate: { $gte: startDate, $lte: endDate }
-        })
-      ]);
+      const userKey = String(userId);
+      const attendances = attendancesByUser.get(userKey) || [];
+      const onsites = onsitesByUser.get(userKey) || [];
+      const leaves = leavesByUser.get(userKey) || [];
 
       const attendanceMap = new Map(
         attendances.map((a) => [toYMD(a.attendanceDate), a])
@@ -7010,15 +7018,7 @@ export const GetsomeAll = async (req, res, yearParam = {}, monthParam = {}) => {
           if (onsite.onsiteType === "Full Day") stats.onsite += 1;
           else if (onsite.onsiteType === "Half Day") stats.onsite += 0.5;
         }
-        // if (user.name === "Abhishek EV") {
-        //   // ADD THIS BLOCK HERE
-        //   if (dateKey === "2026-07-20") {
-        //     console.log("07-20 onsite records:", JSON.stringify(dayOnsites));
-        //     console.log("07-20 coverage after onsite:", JSON.stringify(day.coverage));
-        //   }
-        // }
-
-
+   
         for (const leave of dayLeaves) {
           applyLeaveToDay(day, leave, user, dateKey);
         }
@@ -7273,7 +7273,8 @@ export const StaffRegister = async (req, res) => {
       role,
       department,
       assignedto,
-      attendanceId
+      attendanceId,
+      canSelfAllocateLeads = false
     } = userData
     const { profileUrl, documentUrl } = image
 
@@ -7290,6 +7291,7 @@ export const StaffRegister = async (req, res) => {
         isVerified,
         role,
         activeRole: role,
+        canSelfAllocateLeads: Boolean(canSelfAllocateLeads),
         dateofbirth,
         bloodgroup,
         gender,
@@ -12626,6 +12628,15 @@ export const GetStaffCallList = async (req, res) => {
                       attendee?.callerId?.toString() === completedByCallerId
                   ) !== -1
 
+                const callStart = new Date(calls?.timedata?.startTime).getTime()
+                const callEnd = new Date(calls?.timedata?.endTime).getTime()
+                const totalDurationSeconds =
+                  !Number.isNaN(callStart) &&
+                  !Number.isNaN(callEnd) &&
+                  callEnd >= callStart
+                    ? Math.floor((callEnd - callStart) / 1000)
+                    : 0
+
                 return {
                   callDate: call.calldate,
                   callerId: callerIdString || null,
@@ -12645,6 +12656,7 @@ export const GetStaffCallList = async (req, res) => {
                         : 1,
                   solvedCalls: isColleagueSolved ? 1 : 0,
                   datecalls: 1,
+                  totalDurationSeconds,
                   pendingCalls: calls.formdata.completedBy?.[0] ? 0 : 1,
                   todaysCalls: callDate === today ? 1 : 0,
                   selected: matchedUser ? matchedUser.selected : false

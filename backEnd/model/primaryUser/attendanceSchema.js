@@ -70,6 +70,10 @@ const attendanceSchema = new Schema(
   },
   { timestamps: true } // Enables createdAt and updatedAt fields)
 )
+
+// Supports the monthly Leave Summary lookup for all staff in a branch.
+attendanceSchema.index({ userId: 1, attendanceDate: 1 })
+
 const Attendance = mongoose.model("Attendance", attendanceSchema)
 
 export default Attendance

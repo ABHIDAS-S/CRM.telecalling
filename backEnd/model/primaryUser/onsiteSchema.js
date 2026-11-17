@@ -59,6 +59,10 @@ const onsiteSchema = new Schema(
   },
   { timestamps: true } // Enables createdAt and updatedAt fields)
 )
+
+// Supports the monthly Leave Summary lookup for all staff in a branch.
+onsiteSchema.index({ userId: 1, onsiteDate: 1 })
+
 const Onsite = mongoose.model("Onsite", onsiteSchema)
 
 export default Onsite

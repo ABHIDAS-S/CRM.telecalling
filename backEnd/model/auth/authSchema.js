@@ -35,6 +35,8 @@ const staffSchema = new Schema(
       type: String
     },
     activeRole: { type: String },
+    // Explicit permission for non-marketing staff to self-allocate their leads.
+    canSelfAllocateLeads: { type: Boolean, default: false },
     privilegeleavestartsfrom: {
       type: String
     },
@@ -220,6 +222,7 @@ const adminSchema = new Schema(
       enum: ["Staff", "Admin"]
     },
     activeRole: { type: String },
+    canSelfAllocateLeads: { type: Boolean, default: false },
     verified: {
       type: Boolean,
       default: false
@@ -235,6 +238,9 @@ const adminSchema = new Schema(
   },
   { timestamps: true }
 )
+
+// Supports Leave Summary's active staff lookup, including branch selection.
+staffSchema.index({ isVerified: 1, role: 1, "selected.branch_id": 1 })
 
 // Pre-save hook for password hashing
 staffSchema.pre("save", async function (next) {

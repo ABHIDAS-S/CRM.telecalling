@@ -24,7 +24,7 @@ const getAllocationGroup = (allocation = {}) => {
 
 const getGroupMetrics = (allocations = [], groupKey) =>
   allocations.reduce((metrics, allocation) => {
-    if (getAllocationGroup(allocation) !== groupKey) return metrics
+    if (allocation?.isDiscounted || getAllocationGroup(allocation) !== groupKey) return metrics
     metrics.count += Number(allocation?.count || 1)
     metrics.amount += Number(allocation?.percentageBaseAmount || 0)
     metrics.incentive += Number(allocation?.amount || 0)
@@ -33,6 +33,15 @@ const getGroupMetrics = (allocations = [], groupKey) =>
 
 const taskFieldsForView = (group, viewMode) =>
   viewMode === "products" ? group.fields : ["Incentive Amt"]
+
+const taskColumnWidth = (group, field, viewMode) => {
+  if (field === "Lead Nos") return "w-16"
+  if (viewMode !== "leads") return "w-[92px]"
+  if (group.key === "lead") return "w-20"
+  if (group.key === "coding") return "w-24"
+  if (group.key === "followup") return "w-28"
+  return "w-32"
+}
 
 const getLeadAmount = (lead = {}) => {
   const netAmount = Number(lead.netAmount)
@@ -160,18 +169,18 @@ export default function IncentiveLeadsModal({
       }
 
       const product = products.get(productName)
-      product.leadCount += 1
+      if (!lead.isDiscounted) product.leadCount += 1
       product.totalAmount += Number(lead.totalAmount || 0)
       ;(lead.allocations || []).forEach((allocation) => {
         const current = product.allocationMap.get(allocation.allocationId)
         if (current) {
-          current.count += 1
+          if (!allocation.isDiscounted) current.count += 1
           current.amount += Number(allocation.amount || 0)
           current.percentageBaseAmount += Number(allocation.percentageBaseAmount || 0)
         } else {
           product.allocationMap.set(allocation.allocationId, {
             ...allocation,
-            count: 1,
+            count: allocation.isDiscounted ? 0 : 1,
             amount: Number(allocation.amount || 0),
             percentageBaseAmount: Number(allocation.percentageBaseAmount || 0)
           })
@@ -198,7 +207,7 @@ export default function IncentiveLeadsModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900/70 p-1.5 backdrop-blur-sm sm:p-2">
-      <div className="flex max-h-[94vh] w-max max-w-[calc(100vw-0.75rem)] flex-col overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/10">
+      <div className="flex max-h-[94vh] w-full max-w-[1600px] flex-col overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/10">
         {/* Header */}
         <div className="flex-shrink-0 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4 sm:py-3">
           <div className="flex items-start justify-between gap-4">
@@ -236,6 +245,11 @@ export default function IncentiveLeadsModal({
               <div className="whitespace-nowrap rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">{formatAmount(total)} total</div>
             </div>
           </div>
+          {!loading && leads.some((lead) => lead.isDiscounted) && (
+            <p className="mt-2 text-xs font-medium text-amber-700">
+              Discounted leads are shown for reference and are excluded from incentive counts and amounts.
+            </p>
+          )}
           {success && (
             <p role="status" className="mt-2 text-sm text-green-700">
               {success}
@@ -285,11 +299,11 @@ export default function IncentiveLeadsModal({
                           {viewMode === "products" ? `${lead.leadCount} leads` : lead.leadId || "—"}
                         </p>
                         <div className="text-xs text-gray-700">
-                          <TruncatedTooltip value={viewMode === "products" ? lead.productName : lead.partyName} />
+                          <TruncatedTooltip value={viewMode === "products" ? lead.productName : lead.partyName} className={viewMode === "leads" ? "uppercase" : ""} />
                         </div>
                         {viewMode === "leads" && <><div className="text-[11px] text-gray-500"><TruncatedTooltip value={lead.productName} /></div><p className="mt-0.5 text-[11px] text-gray-400">{lead.date
                             ? new Date(lead.date).toLocaleDateString("en-GB")
-                            : "—"}</p><div className="mt-2 grid grid-cols-2 gap-2 text-[11px]"><span className="rounded bg-slate-50 px-2 py-1 text-slate-600">Lead amt <b className="float-right text-slate-900">{formatAmount(getLeadAmount(lead))}</b></span><span className="rounded bg-slate-50 px-2 py-1 text-slate-600">Discount <b className="float-right text-slate-900">{formatAmount(lead.discountAmount)}</b></span></div></>}
+                            : "—"}</p>{lead.isDiscounted && <p className="mt-1 text-[11px] font-semibold text-amber-700">Discounted — no incentive</p>}<div className="mt-2 grid grid-cols-2 gap-2 text-[11px]"><span className="rounded bg-slate-50 px-2 py-1 text-slate-600">Lead amt <b className="float-right text-slate-900">{formatAmount(getLeadAmount(lead))}</b></span><span className="rounded bg-slate-50 px-2 py-1 text-slate-600">Discount <b className="float-right text-slate-900">{formatAmount(lead.discountAmount)}</b></span></div></>}
                       </div>
                       <p className="shrink-0 text-sm font-bold text-gray-900">
                         {formatAmount(lead.totalAmount)}
@@ -327,8 +341,8 @@ export default function IncentiveLeadsModal({
                 <table className={`w-full table-fixed border-separate border-spacing-0 text-xs tabular-nums ${viewMode === "products" ? "min-w-[1600px]" : "min-w-[1250px]"}`}>
                   <colgroup>
                     {viewMode === "products" ? <col className="w-72" /> : <><col className="w-[72px]" /><col className="w-40" /><col className="w-32" /></>}
-                    {incentiveGroups.flatMap((group) => taskFieldsForView(group, viewMode).map((field) => <col key={`${group.key}-${field}`} className={field === "Lead Nos" ? "w-16" : "w-[92px]"} />))}
-                    <col className="w-28" />
+                    {incentiveGroups.flatMap((group) => taskFieldsForView(group, viewMode).map((field) => <col key={`${group.key}-${field}`} className={taskColumnWidth(group, field, viewMode)} />))}
+                    <col className="w-20" />
                     {viewMode === "leads" && <><col className="w-28" /><col className="w-20" /></>}
                     {viewMode === "leads" && <col className="w-16" />}
                   </colgroup>
@@ -344,7 +358,7 @@ export default function IncentiveLeadsModal({
                           {group.label}
                         </th>
                       ))}
-                      <th rowSpan="2" className={`sticky ${viewMode === "leads" ? "right-64" : "right-0"} top-0 z-30 h-12 whitespace-nowrap bg-indigo-100 px-1.5 py-0.5 text-right text-[8px] font-semibold uppercase tracking-wide text-slate-900 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)]`}>
+                      <th rowSpan="2" className={`sticky ${viewMode === "leads" ? "right-64" : "right-0"} top-0 z-30 h-12 w-20 whitespace-nowrap bg-indigo-100 px-1 py-0.5 text-right text-[7px] font-semibold uppercase tracking-normal text-slate-900 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)]`}>
                         Total Incentive Amt
                       </th>
                       {viewMode === "leads" && <><th rowSpan="2" className="sticky right-36 top-0 z-30 h-12 whitespace-nowrap border-r border-slate-300 bg-indigo-100 px-1.5 py-0.5 text-right text-[8px] font-semibold uppercase tracking-wide text-slate-900">Lead Amt</th><th rowSpan="2" className="sticky right-16 top-0 z-30 h-12 whitespace-nowrap border-r-2 border-slate-300 bg-indigo-100 px-1.5 py-0.5 text-right text-[8px] font-semibold uppercase tracking-wide text-slate-900">Discount</th></>}
@@ -360,14 +374,14 @@ export default function IncentiveLeadsModal({
                     {rows.map((lead) => (
                       <tr
                         key={viewMode === "products" ? lead.productName : lead.leadMongoId || lead.leadId}
-                        className="group relative z-0 border-t border-slate-200 bg-white transition-colors hover:z-40 hover:bg-blue-50/70"
+                        className={`group relative z-0 border-t border-slate-200 transition-colors hover:z-40 hover:bg-blue-50/70 ${lead.isDiscounted ? "bg-amber-50/50" : "bg-white"}`}
                       >
-                        {viewMode === "products" ? <td className="sticky left-0 z-10 border-r border-slate-200 bg-white px-2 py-2.5 text-xs font-medium text-slate-800 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors hover:z-50 focus-within:z-50 group-hover:bg-blue-50/70"><TruncatedTooltip value={lead.productName} /></td> : <><td className="sticky left-0 z-10 border-r border-slate-200 bg-white px-3 py-3.5 text-xs font-semibold text-blue-700 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors group-hover:bg-blue-50/70">{lead.leadId || "—"}</td><td className="sticky left-[72px] z-10 border-r border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-800 transition-colors hover:z-50 focus-within:z-50 group-hover:bg-blue-50/70"><TruncatedTooltip value={lead.partyName} className="font-medium" /></td><td className="sticky left-[232px] z-10 border-r border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-700 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors hover:z-50 focus-within:z-50 group-hover:bg-blue-50/70"><TruncatedTooltip value={lead.productName} /></td></>}
+                        {viewMode === "products" ? <td className="sticky left-0 z-10 border-r border-slate-200 bg-white px-2 py-2.5 text-xs font-medium text-slate-800 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors hover:z-50 focus-within:z-50 group-hover:bg-blue-50/70"><TruncatedTooltip value={lead.productName} /></td> : <><td className="sticky left-0 z-10 border-r border-slate-200 bg-white px-3 py-3.5 text-xs font-semibold text-blue-700 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors group-hover:bg-blue-50/70"><div>{lead.leadId || "—"}</div>{lead.isDiscounted && <span className="text-[9px] font-semibold text-amber-700">No incentive</span>}</td><td className="sticky left-[72px] z-10 border-r border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-800 transition-colors hover:z-50 focus-within:z-50 group-hover:bg-blue-50/70"><TruncatedTooltip value={lead.partyName} className="font-medium uppercase" /></td><td className="sticky left-[232px] z-10 border-r border-slate-200 bg-white px-2 py-2.5 text-xs text-slate-700 shadow-[4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors hover:z-50 focus-within:z-50 group-hover:bg-blue-50/70"><TruncatedTooltip value={lead.productName} /></td></>}
                         {incentiveGroups.flatMap((group) => {
                           const metrics = getGroupMetrics(lead.allocations, group.key)
                           return taskFieldsForView(group, viewMode).map((field, fieldIndex, fields) => <td key={`${group.key}-${field}`} className={`whitespace-nowrap border-r border-slate-200 px-1.5 py-3.5 text-right ${field === "Incentive Amt" || field === "Incentive" ? "font-semibold text-slate-900" : "font-medium text-slate-700"} ${fieldIndex === fields.length - 1 ? "border-r-2 border-slate-300" : ""}`}>{field === "Lead Nos" ? metrics.count : field === "Lead Amt" ? formatAmount(metrics.amount) : formatAmount(metrics.incentive)}</td>)
                         })}
-                        <td className={`sticky ${viewMode === "leads" ? "right-64" : "right-0"} z-10 whitespace-nowrap bg-white px-2 py-2.5 text-right text-xs font-bold text-slate-900 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors group-hover:bg-blue-50/70`}>
+                        <td className={`sticky ${viewMode === "leads" ? "right-64" : "right-0"} z-10 w-20 whitespace-nowrap bg-white px-1 py-2.5 text-right text-xs font-bold text-slate-900 shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)] transition-colors group-hover:bg-blue-50/70`}>
                           {formatAmount(lead.totalAmount)}
                         </td>
                         {viewMode === "leads" && <><td className="sticky right-36 z-10 whitespace-nowrap border-r border-slate-200 bg-white px-1.5 py-2.5 text-right text-xs font-medium text-slate-700 transition-colors group-hover:bg-blue-50/70">{formatAmount(getLeadAmount(lead))}</td><td className="sticky right-16 z-10 whitespace-nowrap border-r-2 border-slate-300 bg-white px-1.5 py-2.5 text-right text-xs font-medium text-slate-700 transition-colors group-hover:bg-blue-50/70">{formatAmount(lead.discountAmount)}</td></>}
@@ -388,7 +402,7 @@ export default function IncentiveLeadsModal({
                         }, { count: 0, amount: 0, incentive: 0 })
                         return taskFieldsForView(group, viewMode).map((field, fieldIndex, fields) => <td key={`${group.key}-total-${field}`} className={`whitespace-nowrap border-r border-slate-200 px-1.5 py-3 text-right ${fieldIndex === fields.length - 1 ? "border-r-2 border-slate-300" : ""}`}>{field === "Lead Nos" ? metrics.count : field === "Lead Amt" ? formatAmount(metrics.amount) : formatAmount(metrics.incentive)}</td>)
                       })}
-                      <td className={`sticky ${viewMode === "leads" ? "right-64" : "right-0"} z-10 whitespace-nowrap bg-slate-50 px-2 py-2.5 text-right shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)]`}>{formatAmount(total)}</td>
+                      <td className={`sticky ${viewMode === "leads" ? "right-64" : "right-0"} z-10 w-20 whitespace-nowrap bg-slate-50 px-1 py-2.5 text-right shadow-[-4px_0_8px_-6px_rgba(15,23,42,0.45)]`}>{formatAmount(total)}</td>
                       {viewMode === "leads" && <><td className="sticky right-36 z-10 whitespace-nowrap border-r border-slate-200 bg-slate-50 px-1.5 py-3 text-right">{formatAmount(rows.reduce((sum, lead) => sum + getLeadAmount(lead), 0))}</td><td className="sticky right-16 z-10 whitespace-nowrap border-r-2 border-slate-300 bg-slate-50 px-1.5 py-3 text-right">{formatAmount(rows.reduce((sum, lead) => sum + Number(lead.discountAmount || 0), 0))}</td></>}
                       {viewMode === "leads" && <td className="sticky right-0 z-10 bg-slate-50 px-2 py-3" />}
                     </tr>

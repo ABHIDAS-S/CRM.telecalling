@@ -214,11 +214,6 @@ export default function StaffHeader({
         control: permissions.CallRegistration ?? false
       },
       {
-        to: "/staff/support&department",
-        label: "Support Department",
-        control: permissions.SupportDepartment ?? false
-      },
-      {
         to: "/staff/transaction/leave-application",
         label: "Leave Application",
         control: permissions.LeaveApplication ?? false
@@ -448,7 +443,7 @@ console.log(user?.department?.code)
       ? [{ to: "/staff/reports/researchandDevelopment", label: "Research & Development Dashboard" }]
       : []),
     ...(permissions.SupportDashboard
-      ? [{ to: "/staff/support&department", label: "Support Department Dashboard" }]
+      ? [{ to: "/staff/support&department", label: "Support Department" }]
       : [])
   ].filter(
     (item, index, items) =>

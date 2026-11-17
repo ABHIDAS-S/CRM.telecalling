@@ -253,7 +253,9 @@ console.log(className)
                       : "text-slate-700 hover:bg-slate-50"
                   }`}
                 >
-                  <span>{optionLabel}</span>
+                  <span className="min-w-0 flex-1 truncate whitespace-nowrap text-left">
+                    {optionLabel}
+                  </span>
 
                   {selected && (
                     <svg

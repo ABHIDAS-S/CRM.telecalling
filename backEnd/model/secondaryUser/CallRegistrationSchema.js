@@ -56,5 +56,6 @@ CallRegistrationSchema.index({ "callregistration.branchName": 1 });
 CallRegistrationSchema.index({ "callregistration.formdata.status": 1 });
 CallRegistrationSchema.index({ "callregistration.formdata.attendedBy": 1 });
 CallRegistrationSchema.index({ "callregistration.formdata.completedBy": 1 });
+CallRegistrationSchema.index({ "callregistration.timedata.startTime": 1 });
 
 export default mongoose.model("CallRegistration", CallRegistrationSchema)

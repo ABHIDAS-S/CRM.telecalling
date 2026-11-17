@@ -80,12 +80,13 @@ const Tiles = ({
   style,
   onClick,
   active = false,
+  compact = false,
 }) => {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group relative min-h-[86px] w-full overflow-hidden rounded-xl border text-left transition-all duration-200 ${
+      className={`group relative ${compact ? "min-h-[62px] rounded-lg" : "min-h-[86px] rounded-xl"} w-full overflow-hidden border text-left transition-all duration-200 ${
         active
           ? "border-slate-900 shadow-[0_10px_24px_rgba(15,23,42,0.20)] ring-1 ring-white/20"
           : "border-white/20 shadow-[0_6px_14px_rgba(15,23,42,0.10)] hover:-translate-y-0.5 hover:shadow-[0_10px_20px_rgba(15,23,42,0.16)]"
@@ -96,24 +97,24 @@ const Tiles = ({
       <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-white/10 blur-2xl" />
       <div className="absolute bottom-0 left-0 h-px w-full bg-white/20" />
 
-      <div className="relative flex items-start justify-between px-3 py-2.5">
+      <div className={`relative flex items-start justify-between ${compact ? "px-2.5 py-2" : "px-3 py-2.5"}`}>
         <div className="min-w-0 pr-2">
           <p className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-white/85">
             {title}
           </p>
 
-          <p className="mt-1 text-2xl font-bold leading-none text-white drop-shadow-sm">
+          <p className={`${compact ? "mt-0.5 text-xl" : "mt-1 text-2xl"} font-bold leading-none text-white drop-shadow-sm`}>
             {count}
           </p>
 
           {subtitle ? (
-            <p className="mt-1 line-clamp-1 text-[11px] text-white/80">
+            <p className={`${compact ? "mt-0.5 text-[10px]" : "mt-1 text-[11px]"} line-clamp-1 text-white/80`}>
               {subtitle}
             </p>
           ) : null}
         </div>
 
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15 text-white shadow-inner ring-1 ring-white/15 backdrop-blur-sm">
+        <div className={`${compact ? "h-7 w-7" : "h-8 w-8"} flex shrink-0 items-center justify-center rounded-lg bg-white/15 text-white shadow-inner ring-1 ring-white/15 backdrop-blur-sm`}>
           {icon}
         </div>
       </div>

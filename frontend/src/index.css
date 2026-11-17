@@ -173,3 +173,20 @@ button:focus-visible {
   color: #111827;
   font-weight: 600;
 }
+
+/*
+ * React Select renders a real search input beside its placeholder. Reset every
+ * form-level input rule here so the search field cannot consume the placeholder
+ * width or increase the dropdown's height.
+ */
+.user-add-select-root input.user-add-select__input,
+.user-add-select-root .user-add-select__input > input {
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
