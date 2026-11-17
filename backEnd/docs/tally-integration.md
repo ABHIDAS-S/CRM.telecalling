@@ -35,11 +35,23 @@ X-Content-SHA256: <sha256-of-exact-body-bytes>
 
 Only `X-Tally-API-Key` is required as a custom header. Content-Type still describes the body. If retry headers are omitted, the server generates an import ID and calculates the checksum; repeated uploads still upsert by the three matching fields, but create separate import jobs. If supplying `Idempotency-Key`, also supply `X-Content-SHA256` to bind retries to content.
 
-The body may be one customer JSON object or a standard JSON array of customer objects. Large arrays are parsed incrementally and split into batches without buffering the entire array. NDJSON is also supported for existing senders using Content-Type: application/x-ndjson. The following example shows individual customer objects; for application/json, wrap multiple objects in an array with commas:
+The recommended body is a data wrapper: {"data": [customer objects]}. A single object in {"data": {...}} is also accepted. Only the data property is allowed at the wrapper level. Direct customer objects and direct arrays remain supported. Large arrays are parsed incrementally and split into batches without buffering the entire array. NDJSON is also supported for existing senders using Content-Type: application/x-ndjson. Example application/json payload for the Tally team:
 
 ```json
-{"Customer":"ABC Traders","Address":"Kochi","Contactperson":"Ravi","ContactNumber":"0484000123","Mobilenumber":"+919876543210","Emailid":"accounts@example.com","Tallyserialno":"00001","Gstno":"32ABCDE1234F1Z5"}
-{"Customer":"ABC Traders","Address":"Kochi","Contactperson":"Ravi","ContactNumber":"0484000123","Mobilenumber":"+919876543210","Emailid":"accounts@example.com","Tallyserialno":"00002","Gstno":"32ABCDE1234F1Z5"}
+{
+  "data": [
+    {
+      "Customer": "ABC Traders",
+      "Address": "Kochi, Kerala",
+      "Contactperson": "Ravi Kumar",
+      "ContactNumber": "04840001234",
+      "Mobilenumber": "9876543210",
+      "Emailid": "accounts@example.com",
+      "Tallyserialno": "000123456",
+      "Gstno": "32ABCDE1234F1Z5"
+    }
+  ]
+}
 ```
 
 All fields must be strings. `Customer`, `Tallyserialno` and `Mobilenumber` must be non-empty. Other fields may be omitted and become empty strings: each line replaces the complete business-field values, not a partial patch. An empty string clears a field. Unknown fields, including company overrides, are rejected. Email receives basic structural validation if present. Phone numbers are preserved without assuming one country's format.
