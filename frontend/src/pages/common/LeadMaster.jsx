@@ -77,7 +77,7 @@ const customerModalSelectStyles = {
     backgroundColor: "transparent",
     "&:hover": { border: 0 }
   }),
-  valueContainer: (base) => ({ ...base, padding: 0 }),
+  valueContainer: (base) => ({ ...base, padding: "0 8px" }),
   indicatorsContainer: (base) => ({ ...base, height: 20 }),
   dropdownIndicator: (base) => ({ ...base, padding: 0, color: "#64748b" }),
   indicatorSeparator: () => ({ display: "none" }),
@@ -105,7 +105,7 @@ const customerModalSelectStyles = {
 }
 
 const customerModalFieldGridClass =
-  "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4 [&>div]:relative [&>div]:rounded-xl [&>div]:border [&>div]:border-[#edf1f7] [&>div]:bg-white [&>div]:px-2.5 [&>div]:py-1.5 [&>div]:pl-10 [&>div]:transition [&>div]:hover:border-[#dbe6ff] [&>div>input]:border-0 [&>div>input]:bg-transparent [&>div>input]:p-0 [&>div>textarea]:border-0 [&>div>textarea]:bg-transparent [&>div>textarea]:p-0"
+  "grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4 [&>div]:relative [&>div]:rounded-xl [&>div]:border [&>div]:border-[#edf1f7] [&>div]:bg-white [&>div]:px-3 [&>div]:py-1.5 [&>div]:pl-10 [&>div]:transition [&>div]:hover:border-[#dbe6ff] [&>div>input]:border-0 [&>div>input]:bg-transparent [&>div>input]:px-2 [&>div>textarea]:border-0 [&>div>textarea]:bg-transparent [&>div>textarea]:px-2"
 
 function CustomerFieldLabel({ icon, iconBg = "bg-[#edf6ff]", iconColor = "text-[#5aa2ff]", children }) {
   return (
@@ -1798,6 +1798,13 @@ console.log(originalCustomerTableData)
   const dropdownLeadforRef = useRef(null)
   const registrationType = watchModal("registrationType")
   const selectedCountrymodal = watchModal("country")
+  const selectedCountryCode =
+    typeof selectedCountrymodal === "string"
+      ? selectedCountrymodal.trim().toUpperCase()
+      : selectedCountrymodal?.value?.trim()?.toUpperCase() ||
+        selectedCountrymodal?.code?.trim()?.toUpperCase() ||
+        ""
+  const isIndiaCustomer = selectedCountryCode === "IN"
   const isPartnerModal = watchModal("isPartner") === true
   const isZeroAmountLead = watchMain("isZeroAmountLead") === true
   const navigate = useNavigate()
@@ -3159,8 +3166,8 @@ console.log(licenses)
       setlicenseloading(false)
     }
   }
-  const stateOptions = selectedCountry
-    ? State.getStatesOfCountry(selectedCountry.value).map((state) => ({
+  const stateOptions = selectedCountryCode
+    ? State.getStatesOfCountry(selectedCountryCode).map((state) => ({
         label: state.name,
         value: state.isoCode
       }))
@@ -3192,12 +3199,12 @@ console.log(licenses)
     console.log("defaultState:", defaultState)
     console.log("currentState:", currentState)
     console.log("condition:", defaultState && !currentState)
-    if (defaultState && !currentState) {
+    if (selectedCountryCode === "IN" && defaultState && !currentState) {
       console.log("jjjj")
       setSelectedState(defaultState)
       setValueModal("state", defaultState.value)
     }
-  }, [defaultState, getValuesModal, setValueModal])
+  }, [defaultState, getValuesModal, selectedCountryCode, setValueModal])
 
   const handleOpenmodal = (text = null) => {
     console.log(selectedCustomer)
@@ -3240,6 +3247,23 @@ console.log(licenses)
       setValueModal("city", selectedCustomer?.city)
       setValueModal("country", selectedCustomer?.country)
       setValueModal("state", selectedCustomer?.state)
+      setSelectedCountry(
+        countryOptions.find(
+          (country) => country.value === selectedCustomer?.country
+        ) || null
+      )
+      setSelectedState(
+        State.getStatesOfCountry(selectedCustomer?.country || "").find(
+          (state) => state.isoCode === selectedCustomer?.state
+        )
+          ? {
+              value: selectedCustomer?.state,
+              label: State.getStatesOfCountry(selectedCustomer?.country || "").find(
+                (state) => state.isoCode === selectedCustomer?.state
+              )?.name
+            }
+          : null
+      )
       setValueModal("isActive", selectedCustomer?.isActive || "Running")
       console.log("hhh")
     }
@@ -4854,7 +4878,13 @@ console.log(licenses)
   }
   console.log(duplicateWarning)
   const onmodalsubmit = async (data) => {
-    console.log(data)
+    const customerData = {
+      ...data,
+      // State is an India-only field in this customer workflow. Clear a
+      // previously selected Indian state when saving an overseas customer.
+      state: String(data?.country || "").toUpperCase() === "IN" ? data?.state || "" : ""
+    }
+    console.log(customerData)
     console.log("hhhh")
     console.log(duplicateWarning)
     if (duplicateWarning) return
@@ -4862,23 +4892,23 @@ console.log(licenses)
 
     if (modalloader) return
     console.log(checknewcustomer)
-    console.log(data?.customerid)
-    console.log(data)
-    console.log(data?.customerid && !checknewcustomer)
-    if (data?.customerid) {
+    console.log(customerData?.customerid)
+    console.log(customerData)
+    console.log(customerData?.customerid && !checknewcustomer)
+    if (customerData?.customerid) {
       console.log("hhhhh")
     }
 
     try {
       setModalLoader(true)
-      console.log(data)
+      console.log(customerData)
       let response
       console.log(checknewcustomer)
-      if (data?.customerid) {
+      if (customerData?.customerid) {
         if (checknewcustomer) return
         console.log("hhh")
         response = await api.post("/customer/customereditonlead", {
-          customerData: data
+          customerData
         })
       } else {
         const createdFrom = "lead"
@@ -4886,11 +4916,11 @@ console.log(licenses)
         response = await api.post(
           `/customer/customerRegistration?createdfrom=${createdFrom}`,
           {
-            customerData: data
+            customerData
           }
         )
       }
-      if (data?.customerid && response.status === 200) {
+      if (customerData?.customerid && response.status === 200) {
         console.log("hhhh")
         setcustomerapichange(true)
         refreshHook()
@@ -7371,7 +7401,7 @@ convertexcel
 
                         <div>
                           <CustomerFieldLabel icon={<FaPhone size={12} />} iconBg="bg-[#eafaf5]" iconColor="text-[#36b882]">
-                            Mobile <span className="text-red-500">*</span>
+                            Mobile {isIndiaCustomer && <span className="text-red-500">*</span>}
                           </CustomerFieldLabel>
                           {/* <input
                             type="tel"
@@ -7396,65 +7426,42 @@ convertexcel
                           <input
                             type="tel"
                             {...registerModal("mobile", {
-                              required: "Mobile is Required",
-
                               validate: (value) => {
                                 const phone = String(value ?? "").trim()
 
-                                if (!phone) {
-                                  return "Mobile number is required"
-                                }
-
-                                const country =
-                                  typeof selectedCountrymodal === "string"
-                                    ? selectedCountrymodal.trim().toUpperCase()
-                                    : selectedCountrymodal?.value
-                                        ?.trim()
-                                        ?.toUpperCase() ||
-                                      selectedCountrymodal?.code
-                                        ?.trim()
-                                        ?.toUpperCase() ||
-                                      ""
-
-                                // Country selection is required for every number.
-                                if (!country) {
-                                  return "Select a country before entering a mobile number"
-                                }
+                                if (selectedCountryCode !== "IN") return true
+                                if (!phone) return "Mobile number is required for India"
 
                                 try {
                                   const parsed = phone.startsWith("+")
                                     ? parsePhoneNumberFromString(phone)
-                                    : parsePhoneNumberFromString(phone, country)
+                                    : parsePhoneNumberFromString(phone, "IN")
 
                                   if (!parsed) {
-                                    return `Enter a valid mobile number for ${country}`
+                                    return "Enter a valid Indian mobile number"
                                   }
 
                                   if (!parsed.isPossible()) {
-                                    return `Mobile number is too short or too long for ${country}`
+                                    return "Indian mobile number must have 10 digits"
                                   }
 
                                   if (!parsed.isValid()) {
-                                    return `Enter a valid mobile number for ${country}`
+                                    return "Enter a valid Indian mobile number"
                                   }
 
-                                  // Ensures +91... cannot be accepted when user selected AE, US, etc.
-                                  if (
-                                    parsed.country &&
-                                    parsed.country !== country
-                                  ) {
-                                    return `Mobile number does not match the selected country (${country})`
+                                  if (parsed.country && parsed.country !== "IN") {
+                                    return "Mobile number must match India (+91)"
                                   }
 
                                   return true
                                 } catch (error) {
                                   console.error("Mobile validation failed:", {
                                     phone,
-                                    country,
+                                    country: "IN",
                                     error: error?.message
                                   })
 
-                                  return `Unable to validate the mobile number for ${country}`
+                                  return "Unable to validate the Indian mobile number"
                                 }
                               }
                             })}
@@ -7560,9 +7567,13 @@ convertexcel
                                     (opt) => opt.value === field.value
                                   ) || null
                                 }
-                                onChange={(option) =>
+                                onChange={(option) => {
                                   field.onChange(option?.value || "")
-                                }
+                                  setSelectedCountry(option || null)
+                                  setSelectedState(null)
+                                  setValueModal("state", "")
+                                  clearmodalErros("state")
+                                }}
                                 menuPortalTarget={
                                   typeof document === "undefined"
                                     ? null
@@ -7575,6 +7586,7 @@ convertexcel
                           />
                         </div>
 
+                        {isIndiaCustomer && (
                         <div>
                           <CustomerFieldLabel icon={<FaMapMarkerAlt size={12} />} iconBg="bg-[#f1edff]" iconColor="text-[#8769eb]">
                             State
@@ -7600,11 +7612,12 @@ convertexcel
                                     ? null
                                     : document.body
                                 }
-                                isDisabled={!selectedCountry}
+                                isDisabled={!isIndiaCustomer}
                               />
                             )}
                           />
                         </div>
+                        )}
 
                         <div>
                           <CustomerFieldLabel icon={<FaBuilding size={12} />} iconBg="bg-[#fff4ea]" iconColor="text-[#f0a24d]">
