@@ -71,6 +71,29 @@ export function createAccuanetComplaintController({ mail = sendComplaintMail } =
     if (doc.count > max) throw fail(429, "Too many OTP requests. Please wait before trying again.");
   }
 
+  // This intake path identifies a registered customer but does not verify phone ownership.
+  // Do not return customer contact details or email through this endpoint.
+  const startWithoutLicense = wrap(async (req, res) => {
+    const phone = clean(req.body.registeredPhone);
+    if (!/^[+\d\s()-]{7,20}$/.test(phone) || phone.replace(/\D/g, "").length < 7) throw fail(400, "Enter your registered phone number.");
+    const digits = phone.replace(/\D/g, "");
+    await limit(`phone-intake:${hash(digits)}`, 5, 3600);
+    const pattern = new RegExp(`^[+\\s()-]*${digits.split("").join("[\\s()-]*")}[\\s()-]*$`);
+    const matches = await Customer.find({ $or: [{ incomingNumber: pattern }, { mobile: pattern }, { landline: pattern }] }).limit(2).lean();
+    if (!matches.length) throw fail(404, "No customer found with this registered phone number. Please contact Accuanet support.");
+    if (matches.length > 1) throw fail(409, "This phone number matches multiple customers. Please use your licence number or contact Accuanet support.");
+    const customer = matches[0];
+    const challengeId = crypto.randomBytes(32).toString("hex");
+    const token = crypto.randomBytes(32).toString("hex");
+    await ComplaintVerification.create({
+      challengeId, customerid: customer._id, email: customer.email,
+      verifiedAt: new Date(), verifiedUntil: new Date(Date.now() + 15 * 60 * 1000),
+      verificationHash: hash(token), deleteAfter: new Date(Date.now() + 24 * 60 * 60 * 1000)
+    });
+    const notes = await CallNote.find().select("callNotes").sort({ callNotes: 1 }).lean();
+    res.json({ success: true, challengeId, verificationToken: token, callNotes: notes });
+  });
+
   const checkLicense = wrap(async (req, res) => {
     const { customer } = await findCustomer(req.body.licenceNumber);
     res.json({ success: true, exists: true, canSendOtp: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email || ""), message: "Customer found." });
@@ -126,7 +149,7 @@ export function createAccuanetComplaintController({ mail = sendComplaintMail } =
     if (!lease) return challenge.notificationStatus === "sent";
     try {
       const note = await CallNote.findById(body.callNoteId).lean();
-      await mail({ to: process.env.ACCUANET_COMPLAINT_NOTIFY_EMAIL || "marge.kerala2017@gmail.com", subject: `Website complaint raised - ${reference}`, text: `A complaint was raised on the Accuanet website.\n\nReference: ${reference}\nCustomer: ${String(customer.customerName || "Customer")}\nLicence: ${challenge.licenceNumber}\nRegistered email: ${challenge.email}\nContact number: ${body.contactNumber}\nCall note: ${note?.callNotes || ""}\nDescription: ${body.description}\n\nThe complaint is saved in CRM call registration with pending status.` });
+      await mail({ to: process.env.ACCUANET_COMPLAINT_NOTIFY_EMAIL || "marge.kerala2017@gmail.com", subject: `Website complaint raised - ${reference}`, text: `A complaint was raised on the Accuanet website.\n\nReference: ${reference}\nCustomer: ${String(customer.customerName || "Customer")}\nLicence: ${challenge.licenceNumber ?? "Not provided (phone intake, no OTP)"}\nRegistered email: ${challenge.email}\nCompany name: ${body.companyName || "Not provided"}\nContact number: ${body.contactNumber}\nCall note: ${note?.callNotes || ""}\nDescription: ${body.description}\n\n${challenge.licenceNumber == null ? "Please follow up with this customer. This email-only complaint has not created a CRM call registration." : "The complaint is saved in CRM call registration with pending status."}` });
       await ComplaintVerification.updateOne({ _id: challenge._id }, { $set: { notificationStatus: "sent" } });
       return true;
     } catch (error) {
@@ -143,6 +166,8 @@ export function createAccuanetComplaintController({ mail = sendComplaintMail } =
     if (!customer || customer.email !== challenge.email) throw fail(401, "Customer details changed. Please start again.");
     let payload = challenge.submission;
     if (!payload) {
+      const companyName = clean(req.body.companyName);
+      if (companyName.length > 200) throw fail(400, "Company name must be 200 characters or fewer.");
       const contactNumber = clean(req.body.contactNumber);
       const description = clean(req.body.description);
       const callNoteId = clean(req.body.callNoteId);
@@ -151,9 +176,15 @@ export function createAccuanetComplaintController({ mail = sendComplaintMail } =
       if (!/^[a-f0-9]{24}$/i.test(callNoteId) || !await CallNote.exists({ _id: callNoteId })) throw fail(400, "Select a valid call note.");
       // Persist the first submitted payload. A retry cannot change a saved complaint.
       const locked = await ComplaintVerification.findOneAndUpdate({ _id: challenge._id, submission: null }, {
-        $set: { submission: { contactNumber, description, callNoteId } }
+        $set: { submission: { companyName, contactNumber, description, callNoteId } }
       }, { new: true });
       payload = locked?.submission || (await ComplaintVerification.findById(challenge._id).lean()).submission;
+    }
+    // Phone intake is email-only; never create or link a CRM call for this path.
+    if (challenge.licenceNumber == null) {
+      await ComplaintVerification.updateOne({ _id: challenge._id }, { $set: { submittedAt: challenge.submittedAt || new Date() } });
+      const notificationSent = await notify(challenge, reference, customer, payload);
+      return res.status(challenge.submittedAt ? 200 : 201).json({ success: true, reference, notificationSent, emailOnly: true, message: notificationSent ? "Your complaint has been emailed to Accuanet support." : "Your complaint email could not be confirmed. Please retry." });
     }
     const branch = await Branch.findOne({ branchName: process.env.ACCUANET_COMPLAINT_BRANCH_NAME || "ACCUANET" }).select("branchName").lean();
     if (!branch) throw fail(503, "Complaint routing is not configured. Please contact Accuanet support.");
@@ -167,7 +198,7 @@ export function createAccuanetComplaintController({ mail = sendComplaintMail } =
       // Website complaints deliberately omit product. It is already optional in the schema.
       license: challenge.licenceNumber, branchName: [branch.branchName],
       timedata: { startTime, token: reference, duration: "0", time: "00:00:00" },
-      formdata: { incomingNumber: payload.contactNumber, token: reference, description: payload.description, callnote: payload.callNoteId, solution: "", status: "pending", attendedBy: [], completedBy: [] }
+      formdata: { incomingNumber: payload.contactNumber, token: reference, description: `[Accuanet website complaint]\n${payload.companyName ? `Company: ${payload.companyName}\n` : ""}${payload.description}`, callnote: payload.callNoteId, solution: "", status: "pending", attendedBy: [], completedBy: [] }
     } } }, { runValidators: true });
     await Customer.updateOne({ _id: customer._id, callregistration: null }, { $set: { callregistration: parentId } });
     await ComplaintVerification.updateOne({ _id: challenge._id }, { $set: { submittedAt: challenge.submittedAt || new Date() } });
@@ -175,5 +206,5 @@ export function createAccuanetComplaintController({ mail = sendComplaintMail } =
     res.status(challenge.submittedAt ? 200 : 201).json({ success: true, reference, notificationSent, message: "Your complaint has been registered successfully." });
   });
 
-  return { checkLicense, sendOtp, verifyOtp, submitComplaint };
+  return { startWithoutLicense, checkLicense, sendOtp, verifyOtp, submitComplaint };
 }
