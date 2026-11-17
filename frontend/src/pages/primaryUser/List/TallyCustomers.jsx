@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import api from "../../../api/api"
 
 const columns = [
-  ["Customer", "Customer"], ["Address", "Address"], ["Contactperson", "Contact person"],
+  ["Customer", "Customer"], ["Address", "Address"], ["State", "State"], ["Country", "Country"], ["Contactperson", "Contact person"],
   ["ContactNumber", "Contact number"], ["Mobilenumber", "Mobile number"],
   ["Emailid", "Email ID"], ["Tallyserialno", "Tally serial no."], ["Gstno", "GST no."],
 ]
@@ -64,7 +64,7 @@ export default function TallyCustomers() {
       {error && <p role="alert" className="mb-3 text-red-700">{error}</p>}
       <div className="max-h-[65vh] overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm" aria-busy={loading} tabIndex={0} role="region" aria-label="Tally customer details table">
         <table className="w-full min-w-[1500px] text-left text-sm">
-          <caption className="sr-only">Customer, address, contact person, contact number, mobile number, email ID, Tally serial number and GST number</caption>
+          <caption className="sr-only">Customer, address, state, country, contact person, contact number, mobile number, email ID, Tally serial number and GST number</caption>
           <thead className="sticky top-0 z-10 bg-slate-100 text-xs uppercase tracking-wide text-slate-600"><tr><th scope="col" className="p-4">Sl. No.</th>{columns.map(([key, label]) => <th scope="col" key={key} className="p-4 whitespace-nowrap">{label}</th>)}</tr></thead>
           <tbody>
             {loading ? <tr><td colSpan={columns.length + 1} className="p-10 text-center text-slate-500">Loading customer details…</td></tr> : rows.length ? rows.map((row, index) => (

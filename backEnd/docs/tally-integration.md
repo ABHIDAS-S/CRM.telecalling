@@ -13,9 +13,9 @@ Start the existing API normally. In a separate process, from `backEnd`, run `npm
 
 ## 2. Customer matching
 
-Only the eight agreed fields are accepted: `Customer`, `Address`, `Contactperson`, `ContactNumber`, `Mobilenumber`, `Emailid`, `Tallyserialno`, and `Gstno`. No externalCustomerId is required or accepted.
+Only the ten agreed fields are accepted: `Customer`, `Address`, `State`, `Country`, `Contactperson`, `ContactNumber`, `Mobilenumber`, `Emailid`, `Tallyserialno`, and `Gstno`. No externalCustomerId is required or accepted.
 
-Match on the exact combination of `Customer` + `Tallyserialno` + `Mobilenumber`, after trimming leading/trailing whitespace. All three must be non-empty strings. A matching combination updates address, email, contact person, contact number and GST. Changing any matching field creates a new record and retains the old one, as agreed. Case, internal whitespace and phone formatting are preserved and therefore significant; no automatic fuzzy merging occurs.
+Match on the exact combination of `Customer` + `Tallyserialno` + `Mobilenumber`, after trimming leading/trailing whitespace. All three must be non-empty strings. A matching combination updates address, state, country, email, contact person, contact number and GST. Changing any matching field creates a new record and retains the old one, as agreed. Case, internal whitespace and phone formatting are preserved and therefore significant; no automatic fuzzy merging occurs.
 
 Many customers can share a Tally serial number. A unique compound database index on the internal company namespace and all three matching fields prevents duplicate matches. The company namespace is fixed internally; no company header/environment setting is required. If pre-existing data has duplicate matching combinations, index creation fails safely; reconcile those records before rollout instead of silently deleting data. This implementation does not automatically migrate or delete existing duplicates. Old externalCustomerId metadata/indexes can remain in MongoDB but are no longer used by this importer.
 
@@ -43,6 +43,8 @@ The recommended body is a data wrapper: {"data": [customer objects]}. A single o
     {
       "Customer": "ABC Traders",
       "Address": "Kochi, Kerala",
+      "State": "Kerala",
+      "Country": "India",
       "Contactperson": "Ravi Kumar",
       "ContactNumber": "04840001234",
       "Mobilenumber": "9876543210",
@@ -84,7 +86,7 @@ Abandoned uploads fail after 30 minutes without a staged-batch heartbeat. Worker
 
 ## 5. Customer report
 
-Open `/admin/reports/customer-contacts`: eight business columns including GST number, pages of 50, exact serial filtering, latest ten imports in expandable sync activity, and five-second progress polling. Refresh customer rows after completion. API access requires a valid CRM JWT and an existing account in the Admin or Staff collection with database role `Admin`. This version exposes the single configured source to CRM administrators; it does not grant staff or multi-tenant access.
+Open `/admin/reports/customer-contacts`: ten business columns including GST number, pages of 50, exact serial filtering, latest ten imports in expandable sync activity, and five-second progress polling. Refresh customer rows after completion. API access requires a valid CRM JWT and an existing account in the Admin or Staff collection with database role `Admin`. This version exposes the single configured source to CRM administrators; it does not grant staff or multi-tenant access.
 
 Endpoints: `GET /api/reports/tally-customers?limit=50&after=<cursor>&serial=<exact-serial>` and `GET /api/reports/tally-customers/imports`.
 
@@ -95,3 +97,5 @@ This is upsert sync, not snapshot replacement: customers absent from later uploa
 From `backEnd`: `npm run test:tally`. Tests use a separate temporary MongoDB instance, not `MONGO_URI`. Set `MONGOD_BINARY` for installations outside the default Windows path. Coverage includes batches, repeated syncs, validation, checksums, idempotency, access control, cursors, partial-write recovery, and stale writes. From `frontend`: `npm run build`.
 
 Before production, obtain source samples using the agreed three-field matching rule, configure credentials, start the worker, and test representative lakh-scale imports on staging while measuring memory, throughput, database latency, and CRM response times. The automated test uses 1,001 rows to cross batch boundaries; it is not a production capacity benchmark.
+
+State and Country are optional strings of up to 150 characters. Use the exact capitalized keys. They do not affect customer matching.

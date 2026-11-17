@@ -132,7 +132,7 @@ test("normal JSON objects and arrays stream into batches and reject malformed ar
 
 test("data wrappers accept single and bulk customers without buffering the whole array", async () => {
   const payloads = [
-    { data: record("wrapped-one") },
+    { data: record("wrapped-one", { State: " Kerala ", Country: " India " }) },
     { data: Array.from({ length: 1001 }, (_, i) => record(`wrapped-${i}`)) },
   ]
   for (const payload of payloads) {
@@ -146,13 +146,17 @@ test("data wrappers accept single and bulk customers without buffering the whole
     await processNextTallyImport()
   }
   assert.equal(await Customer.countDocuments(), 1002)
+  const located = await Customer.findOne({ Tallyserialno: "wrapped-one" }).lean()
+  assert.equal(located.State, "Kerala")
+  assert.equal(located.Country, "India")
   const repeat = await fetch(`${base}/integration/imports`, { method: "POST", headers: {
     "Content-Type": "application/json", "X-Tally-API-Key": key,
-  }, body: JSON.stringify({ data: { ...record("wrapped-one"), Address: "Updated through wrapper" } }) })
+  }, body: JSON.stringify({ data: { ...record("wrapped-one"), Address: "Updated through wrapper", State: "Tamil Nadu", Country: "India" } }) })
   assert.equal(repeat.status, 202)
   await processNextTallyImport()
   assert.equal(await Customer.countDocuments(), 1002)
   assert.equal((await Customer.findOne({ Tallyserialno: "wrapped-one" }).lean()).Address, "Updated through wrapper")
+  assert.equal((await Customer.findById(located._id).lean()).State, "Tamil Nadu")
   const received = []
   const reader = createTallyJsonReader(async value => received.push(value))
   for (const byte of Buffer.from(JSON.stringify({ data: [record("split")] }))) await reader.write(Buffer.from([byte]))
@@ -230,6 +234,8 @@ test("invalid records and checksum failures never become eligible for processing
   assert.throws(() => normalizeTallyRecord(record("x", { sourceCompanyId: "spoof" }), 1), /unsupported field/)
   assert.throws(() => normalizeTallyRecord(record("", {}), 1), /Tallyserialno/)
   assert.throws(() => normalizeTallyRecord(record("bad-gst", { Gstno: 123 }), 1), /Gstno must be a string/)
+  assert.throws(() => normalizeTallyRecord(record("bad-state", { State: 123 }), 1), /State must be a string/)
+  assert.throws(() => normalizeTallyRecord(record("bad-country", { Country: "x".repeat(151) }), 1), /Country exceeds 150/)
 })
 
 test("authentication, idempotency conflicts and source-level backpressure", async () => {
@@ -267,7 +273,7 @@ test("stale generations and batches cannot overwrite newer writes; dollar values
 })
 
 test("admin report uses scoped cursors, serial filter and denies ordinary users", async () => {
-  await upload([record("one", { Tallyserialno: "shared", Gstno: "32ABCDE1234F1Z5" }), record("two", { Customer: "Different customer", Tallyserialno: "shared", Gstno: "32ABCDE1234F1Z5" }), record("three")])
+  await upload([record("one", { Tallyserialno: "shared", Gstno: "32ABCDE1234F1Z5", State: "Kerala", Country: "India" }), record("two", { Customer: "Different customer", Tallyserialno: "shared", Gstno: "32ABCDE1234F1Z5", State: "Kerala", Country: "India" }), record("three")])
   await processNextTallyImport()
   const headers = { Authorization: `Bearer ${adminToken}` }
   assert.equal((await fetch(`${base}/report`)).status, 401)
@@ -289,6 +295,8 @@ test("admin report uses scoped cursors, serial filter and denies ordinary users"
   const first = await response.json()
   assert.equal(first.data.length, 1)
   assert.equal(first.data[0].Gstno, "32ABCDE1234F1Z5")
+  assert.equal(first.data[0].State, "Kerala")
+  assert.equal(first.data[0].Country, "India")
   assert.ok(first.nextCursor)
   response = await fetch(`${base}/report?serial=shared&limit=1&after=${first.nextCursor}`, { headers })
   const second = await response.json()
