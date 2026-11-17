@@ -5503,6 +5503,19 @@ export const Leadclosing = async (req, res) => {
   const normalizeString = (value) =>
     value === null || value === undefined ? "" : String(value).trim();
 
+  // Lead Closing can be resumed from older browser state where a task value
+  // was serialized as an object. Only persist a real Task ObjectId.
+  const normalizeTaskId = (value) => {
+    const candidate =
+      value && typeof value === "object"
+        ? value._id ?? value.value ?? null
+        : value;
+
+    return mongoose.Types.ObjectId.isValid(candidate)
+      ? new mongoose.Types.ObjectId(candidate)
+      : null;
+  };
+
   const isAdditionalService = (item) =>
     String(item?.productorservicetype || "").toLowerCase() ===
     "additionalservice";
@@ -5700,6 +5713,27 @@ export const Leadclosing = async (req, res) => {
         throw Object.assign(new Error("This lead is already closed"), {
           statusCode: 409
         });
+      }
+
+      const {
+        zeroAmountTask: incomingZeroAmountTask,
+        isZeroAmountLead: incomingZeroAmountLead,
+        ...safeLeadData
+      } = data;
+      const isZeroAmountLead =
+        matchedDoc.isZeroAmountLead === true ||
+        incomingZeroAmountLead === true ||
+        incomingZeroAmountLead === "true";
+      const zeroAmountTask = isZeroAmountLead
+        ? normalizeTaskId(incomingZeroAmountTask) ||
+          normalizeTaskId(matchedDoc.zeroAmountTask)
+        : null;
+
+      if (isZeroAmountLead && !zeroAmountTask) {
+        throw Object.assign(
+          new Error("The zero amount lead does not have a valid task assigned"),
+          { statusCode: 400 }
+        );
       }
 
       const hasPrimaryProduct = leadData.some(isPrimaryProduct);
@@ -6093,7 +6127,7 @@ export const Leadclosing = async (req, res) => {
       };
 
       const leadUpdatePayload = {
-        ...data,
+        ...safeLeadData,
         leadClosedDate: isNonEmpty(data?.leadClosedDate)
           ? data.leadClosedDate
           : new Date(),
@@ -6109,6 +6143,8 @@ export const Leadclosing = async (req, res) => {
         excessPaidAmount,
         leadFor: mappedleadData,
         paymentHistory: updatedPaymentHistory,
+        isZeroAmountLead,
+        zeroAmountTask,
       };
 
       if (closeActiveFollowup) {
@@ -12009,7 +12045,7 @@ export const RejectTask = async (req, res) => {
 
 export const GetclosedLeads = async (req, res) => {
   try {
-    const { selectedBranch, startDate, endDate } = req.query;
+    const { selectedBranch, startDate, endDate, page = 1, limit = 50 } = req.query;
 
     if (!selectedBranch) {
       return res.status(400).json({
@@ -12030,6 +12066,12 @@ export const GetclosedLeads = async (req, res) => {
       leadConfirmed: true,
       leadClosed: true,
     };
+    const pageNumber = Math.max(Number.parseInt(page, 10) || 1, 1);
+    const limitNumber = Math.min(
+      Math.max(Number.parseInt(limit, 10) || 50, 1),
+      100
+    );
+    const skip = (pageNumber - 1) * limitNumber;
 
     if (startDate || endDate) {
       const closedDateRange = {};
@@ -12072,7 +12114,7 @@ export const GetclosedLeads = async (req, res) => {
       query.leadClosedDate = closedDateRange;
     }
 
-    const closedLeads = await LeadMaster.find(query)
+    const closedLeadsQuery = LeadMaster.find(query)
       .select(`
         leadId
         leadDate
@@ -12136,7 +12178,13 @@ export const GetclosedLeads = async (req, res) => {
         leadConvertedDate: -1,
         leadDate: -1,
       })
+      .skip(skip)
+      .limit(limitNumber)
       .lean();
+    const [closedLeads, totalRecords] = await Promise.all([
+      closedLeadsQuery,
+      LeadMaster.countDocuments(query)
+    ]);
 
     const activityUserFields = [
       { path: "submittedUser", modelPath: "submissiondoneByModel" },
@@ -12209,7 +12257,14 @@ export const GetclosedLeads = async (req, res) => {
       message: "Closed leads fetched successfully",
       data: {
         closedLeads,
-        totalRecords: closedLeads.length,
+        totalRecords,
+        pagination: {
+          currentPage: pageNumber,
+          totalPages: Math.ceil(totalRecords / limitNumber),
+          totalRecords,
+          limit: limitNumber,
+          hasNextPage: skip + closedLeads.length < totalRecords
+        }
       },
     });
   } catch (error) {
