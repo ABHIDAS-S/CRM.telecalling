@@ -388,7 +388,7 @@ const handleMetricTab = (tab) => {
       setHistoryDialog((current) => current && ({ ...current, loading: false, error: "Unable to load event log." }))
     }
   }
-
+console.log("hh")
   const closeAchievedLeadHistory = () => {
     const drilldown = historyDialog?.drilldown || null
     setHistoryDialog(null)
