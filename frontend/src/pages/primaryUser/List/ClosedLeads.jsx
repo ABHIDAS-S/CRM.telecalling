@@ -1,4 +1,6 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from "react"
+import React, { forwardRef, useEffect, useState, useMemo, useCallback, useRef } from "react"
+import DatePicker from "react-datepicker"
+import "react-datepicker/dist/react-datepicker.css"
 import UseFetch from "../../../hooks/useFetch"
 import { useNavigate } from "react-router-dom"
 import { PaymentHistoryModal } from "../../../components/primaryUser/PaymentHistoryModal"
@@ -43,6 +45,21 @@ const formatDateForInput = (date) => {
   return `${year}-${month}-${day}`
 }
 
+const CalendarDateInput = forwardRef(({ value, onClick, ariaLabel }, ref) => (
+  <button
+    ref={ref}
+    type="button"
+    onClick={onClick}
+    aria-label={ariaLabel}
+    className="flex min-w-0 w-full items-center gap-2 rounded-md bg-transparent text-left text-xs font-medium text-slate-700 outline-none transition hover:text-blue-700 focus:ring-2 focus:ring-blue-100"
+  >
+    <Calendar className="h-3.5 w-3.5 shrink-0 text-blue-600" aria-hidden="true" />
+    <span className="min-w-0 flex-1 truncate">{value}</span>
+  </button>
+))
+
+CalendarDateInput.displayName = "CalendarDateInput"
+
 const getLeadProductNames = (lead) =>
   (Array.isArray(lead?.leadFor) ? lead.leadFor : [])
     .map((leadForItem) => {
@@ -74,6 +91,9 @@ export default function ClosedLeads() {
   const [selectedProduct, setSelectedProduct] = useState("all")
   const [isProductFilterOpen, setIsProductFilterOpen] = useState(false)
   const productFilterRef = useRef(null)
+  const loadMoreSentinelRef = useRef(null)
+  const tableScrollRef = useRef(null)
+  const loadingNextPageRef = useRef(false)
   console.log(tableData)
   console.log(tableData)
   const [forcefullyclosedLeads, setforcefullyClosedLeads] = useState([])
@@ -104,6 +124,7 @@ export default function ClosedLeads() {
       endDate: formatDateForInput(today)
     }
   })
+  const [closedLeadsPage, setClosedLeadsPage] = useState(1)
 
   console.log(selectedData)
   const [selectedLeadId, setselectedLeadId] = useState(null)
@@ -132,21 +153,10 @@ export default function ClosedLeads() {
   const [achievedproducts, setacheivedProducts] = useState([])
   const [selectedPeriod, setselectedPeriod] = useState("")
   const navigate = useNavigate()
-  const { data: companybranches } = UseFetch("/branch/getBranch")
-  // const {data}=UseFetch("/lead/fix-leadverified")
   const selectedreduxbranch = useSelector(
     (branch) => branch.companyBranch.selectedBranch
   )
   console.log(selectedreduxbranch)
-  const {
-    data: collectionlead,
-    loading,
-    refreshHook
-  } = UseFetch(
-    selectedreduxbranch &&
-      loggedUser &&
-      `/lead/collectionLeads?selectedBranch=${selectedreduxbranch}&verified=${verifiedLead}&isAccountant=${isdepartmentisAccountant}&loggeduserby=${loggedUser._id}`
-  )
   const closedLeadsUrl = useMemo(() => {
     if (
       !selectedreduxbranch ||
@@ -159,64 +169,96 @@ export default function ClosedLeads() {
     const params = new URLSearchParams({
       selectedBranch: selectedreduxbranch,
       startDate: closedDateRange.startDate,
-      endDate: closedDateRange.endDate
+      endDate: closedDateRange.endDate,
+      page: String(closedLeadsPage),
+      limit: "50"
     })
 
     return `/lead/closedleads?${params.toString()}`
-  }, [selectedreduxbranch, closedDateRange.startDate, closedDateRange.endDate])
-  const { data: closedleads, loading: closedLeadsLoading } =
-    UseFetch(closedLeadsUrl)
-  const pageLoading = loading || closedLeadsLoading
+  }, [
+    selectedreduxbranch,
+    closedDateRange.startDate,
+    closedDateRange.endDate,
+    closedLeadsPage
+  ])
+  const {
+    data: closedleads,
+    loading: closedLeadsLoading,
+    refreshHook: refreshClosedLeads
+  } = UseFetch(closedLeadsUrl, { cacheTime: 30_000 })
+  const pageLoading = closedLeadsLoading && closedLeadsPage === 1
+  // Product data is only used by the inactive performance drill-down handlers;
+  // do not fetch an entire branch catalogue when opening Closed Leads.
+  const branchProduct = useMemo(() => [], [])
   console.log(closedleads)
 
-  const a = collectionlead?.filter((item) => item.null)
-  console.log(a)
-  const { data: branchProduct } = UseFetch(
-    selectedreduxbranch &&
-      `/product/getallbranchProduct?branch=${selectedreduxbranch}`
+  useEffect(() => {
+    const userData = getLocalStorageItem("user")
+    if (!userData) return
+
+    setisdepartmentAccountant(userData.department?.code === "DEPARTMENT2")
+    setLoggedUser(userData)
+    setloggedUserBranches(
+      (userData.selected || []).map((branch) => ({
+        value: branch.branch_id,
+        label: branch.branchName
+      }))
+    )
+  }, [])
+  useEffect(() => {
+    setClosedLeadsPage(1)
+    loadingNextPageRef.current = false
+    setTableData([])
+    setFilteredLeads([])
+    setSearchInitialized(false)
+  }, [
+    selectedreduxbranch,
+    closedDateRange.startDate,
+    closedDateRange.endDate
+  ])
+  const hasNextClosedLeadsPage = Boolean(closedleads?.pagination?.hasNextPage)
+  const loadNextClosedLeadsPage = useCallback(() => {
+    if (
+      !hasNextClosedLeadsPage ||
+      closedLeadsLoading ||
+      loadingNextPageRef.current
+    ) {
+      return
+    }
+
+    loadingNextPageRef.current = true
+    setClosedLeadsPage((page) => page + 1)
+  }, [hasNextClosedLeadsPage, closedLeadsLoading])
+  const handleClosedLeadsScroll = useCallback(
+    (event) => {
+      const { scrollTop, clientHeight, scrollHeight } = event.currentTarget
+      if (scrollTop + clientHeight >= scrollHeight - 300) {
+        loadNextClosedLeadsPage()
+      }
+    },
+    [loadNextClosedLeadsPage]
   )
 
-  const { data: partners } = UseFetch("/customer/getallpartners")
+  useEffect(() => {
+    if (!closedLeadsLoading) {
+      loadingNextPageRef.current = false
+    }
+  }, [closedLeadsLoading])
 
   useEffect(() => {
-    if (companybranches && companybranches.length > 0) {
-      const userData = getLocalStorageItem("user")
-      console.log(userData.department?.department)
-      if (userData.department?.code === "DEPARTMENT2") {
-        setisdepartmentAccountant(true)
-      }
+    const sentinel = loadMoreSentinelRef.current
+    if (!sentinel || !hasNextClosedLeadsPage) return
 
-      setLoggedUser(userData)
-      if (userData.role === "Admin") {
-        if (userData?.selected) {
-          const branches = userData.selected.map((branch) => {
-            return {
-              value: branch.branch_id,
-              label: branch.branchName
-            }
-          })
-          setloggedUserBranches(branches)
-        } else {
-          const staffbranches = companybranches.map((branch) => {
-            return {
-              value: branch._id,
-              label: branch.branchName
-            }
-          })
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadNextClosedLeadsPage()
+      },
+      { rootMargin: "300px 0px" }
+    )
 
-          setloggedUserBranches(staffbranches)
-        }
-      } else {
-        const branches = userData.selected.map((branch) => {
-          return {
-            value: branch.branch_id,
-            label: branch.branchName
-          }
-        })
-        setloggedUserBranches(branches)
-      }
-    }
-  }, [companybranches])
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasNextClosedLeadsPage, loadNextClosedLeadsPage])
   useEffect(() => {
     if (selectedCategory) {
       console.log("jj")
@@ -277,20 +319,17 @@ export default function ClosedLeads() {
     }
   }, [targetData])
   useEffect(() => {
-    if (paymenthistoryModal && collectionlead && selectedLeadId) {
-      console.log("hh")
-      const updatedhistorylist = collectionlead.filter(
-        (item) => item.leadId === selectedLeadId
-      )
+    if (!paymenthistoryModal || !selectedLeadId) return
 
-      console.log(updatedhistorylist)
-      console.log(updatedhistorylist[0]?.paymentHistory)
-      setselectedCollection(updatedhistorylist[0])
-      setpaymentHistoryList(updatedhistorylist[0]?.paymentHistory)
-      console.log(updatedhistorylist[0])
-      setBalanceAmount(updatedhistorylist[0].balanceAmount)
-    }
-  })
+    const selectedLead = closedleads?.closedLeads?.find(
+      (item) => item.leadId === selectedLeadId
+    )
+    if (!selectedLead) return
+
+    setselectedCollection(selectedLead)
+    setpaymentHistoryList(selectedLead.paymentHistory || [])
+    setBalanceAmount(selectedLead.balanceAmount)
+  }, [paymenthistoryModal, closedleads, selectedLeadId])
   console.log(paymentHistoryList)
   useEffect(() => {
     if (loggedUserBranches && loggedUserBranches.length > 0) {
@@ -301,14 +340,26 @@ export default function ClosedLeads() {
   console.log("Hh")
   useEffect(() => {
     console.log(closedleads)
-    if (closedleads?.closedLeads && closedleads?.closedLeads?.length > 0) {
-      setTableData(normalizeTableData(closedleads?.closedLeads))
+    if (!closedleads?.closedLeads) return
 
-      setPartner(partners)
-    } else {
-      setTableData([])
-    }
-  }, [closedleads])
+    setTableData((currentGroups) => {
+      const currentLeads = currentGroups.flatMap((group) => group?.leads || [])
+      const nextLeads =
+        closedLeadsPage === 1
+          ? closedleads.closedLeads
+          : [
+              ...currentLeads,
+              ...closedleads.closedLeads.filter(
+                (lead) =>
+                  !currentLeads.some(
+                    (currentLead) => String(currentLead._id) === String(lead._id)
+                  )
+              )
+            ]
+
+      return normalizeTableData(nextLeads)
+    })
+  }, [closedleads, closedLeadsPage])
   const normalizeTableData = (data) => {
     if (Array.isArray(data)) {
       return [{ staffName: null, leads: data }]
@@ -419,7 +470,7 @@ export default function ClosedLeads() {
       if (response.status === 200) {
         setsubmitLoader(false)
         toast.success("payment updated successfully")
-        refreshHook()
+        refreshClosedLeads()
         return response
       }
     } catch (error) {
@@ -586,23 +637,15 @@ export default function ClosedLeads() {
   console.log(forcefullyclosedLeads)
   const renderTable = (data) => {
     const LeadRow = ({ item, index }) => {
-      console.log(item)
-      if (item?.leadId === "00017") {
-        console.log(item)
-      }
       const [open, setOpen] = useState(false)
       const isAdditionalService = item?.leadFor?.filter(
         (item) => item.productorservicetype === "Additionalservice"
       )
       let taggedlicense = null
       if (isAdditionalService && isAdditionalService.length) {
-        console.log("h")
-        console.log(isAdditionalService)
-
         taggedlicense = (isAdditionalService || []).flatMap((item) =>
           (item.taggeddata || []).map((tag) => tag.licensenumber)
         )
-        console.log(taggedlicense)
       }
       const lastLog = item.activityLog[item.activityLog.length - 1]
       const followupDate = lastLog?.nextFollowUpDate
@@ -611,7 +654,6 @@ export default function ClosedLeads() {
             .split("/")
             .join("-")
         : "-"
-      console.log(item?.customerName)
       const customerName = item?.customerName?.customerName.toUpperCase()
       const shouldShowTooltipCustomer = customerName?.length > 20
       const shouldShowTooltipEmail = item?.email.length > 5
@@ -1030,19 +1072,25 @@ export default function ClosedLeads() {
                   Start date
                 </span>
                 <span className="flex items-center gap-2">
-                  <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                  <input
-                    type="date"
-                    aria-label="Closed from date"
-                    value={closedDateRange.startDate}
-                    max={closedDateRange.endDate || undefined}
-                    onChange={(event) =>
+                  <DatePicker
+                    selected={new Date(`${closedDateRange.startDate}T00:00:00`)}
+                    maxDate={
+                      closedDateRange.endDate
+                        ? new Date(`${closedDateRange.endDate}T00:00:00`)
+                        : undefined
+                    }
+                    onChange={(date) =>
+                      date &&
                       setClosedDateRange((previous) => ({
                         ...previous,
-                        startDate: event.target.value
+                        startDate: formatDateForInput(date)
                       }))
                     }
-                    className="min-w-0 flex-1 bg-transparent text-xs text-slate-700 outline-none"
+                    dateFormat="dd MMM yyyy"
+                    ariaLabel="Closed from date"
+                    customInput={<CalendarDateInput ariaLabel="Open closed from date calendar" />}
+                    calendarClassName="!rounded-xl !border-slate-200 !font-sans !shadow-xl"
+                    popperPlacement="bottom-start"
                   />
                 </span>
               </label>
@@ -1051,19 +1099,26 @@ export default function ClosedLeads() {
                   End date
                 </span>
                 <span className="flex items-center gap-2">
-                  <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-500" />
-                  <input
-                    type="date"
-                    aria-label="Closed to date"
-                    value={closedDateRange.endDate}
-                    min={closedDateRange.startDate || undefined}
-                    onChange={(event) =>
+                  <DatePicker
+                    selected={new Date(`${closedDateRange.endDate}T00:00:00`)}
+                    minDate={
+                      closedDateRange.startDate
+                        ? new Date(`${closedDateRange.startDate}T00:00:00`)
+                        : undefined
+                    }
+                    maxDate={new Date()}
+                    onChange={(date) =>
+                      date &&
                       setClosedDateRange((previous) => ({
                         ...previous,
-                        endDate: event.target.value
+                        endDate: formatDateForInput(date)
                       }))
                     }
-                    className="min-w-0 flex-1 bg-transparent text-xs text-slate-700 outline-none"
+                    dateFormat="dd MMM yyyy"
+                    ariaLabel="Closed to date"
+                    customInput={<CalendarDateInput ariaLabel="Open closed to date calendar" />}
+                    calendarClassName="!rounded-xl !border-slate-200 !font-sans !shadow-xl"
+                    popperPlacement="bottom-start"
                   />
                 </span>
               </label>
@@ -1096,7 +1151,11 @@ export default function ClosedLeads() {
             </div>
 
             {/* Table takes all remaining page height and scrolls internally */}
-            <div className="relative min-h-0 flex-1 overflow-auto bg-slate-100/70">
+            <div
+              ref={tableScrollRef}
+              onScroll={handleClosedLeadsScroll}
+              className="relative min-h-0 flex-1 overflow-auto bg-slate-100/70"
+            >
               <div className="min-h-full bg-white">
                 {(() => {
                   const sourceData = sourceGroupedData
@@ -1168,8 +1227,24 @@ export default function ClosedLeads() {
                         </div>
                       ))}
 
-                      {/* Shows only when rows do not fill the full available height */}
-                      <div className="min-h-[110px] border-t border-slate-100 bg-slate-50/60" />
+                      {closedleads?.pagination?.hasNextPage && (
+                        <div
+                          ref={loadMoreSentinelRef}
+                          className="flex justify-center border-t border-slate-100 bg-slate-50/60 p-3"
+                        >
+                          <button
+                            type="button"
+                            disabled={closedLeadsLoading}
+                            onClick={loadNextClosedLeadsPage}
+                            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {closedLeadsLoading
+                              ? "Loading more…"
+                              : `Scroll to load more (${leadsForSearch.length} of ${closedleads.pagination.totalRecords})`}
+                          </button>
+                        </div>
+                      )}
+                      <div className="min-h-[40px] border-t border-slate-100 bg-slate-50/60" />
                     </>
                   )
                 })()}
@@ -1199,7 +1274,7 @@ export default function ClosedLeads() {
           setselectedLeadId={setselectedLeadId}
           leadDocId={leadDocId}
           loggedUser={loggedUser}
-          refresh={refreshHook}
+          refresh={refreshClosedLeads}
           setdata={setTableData}
           verifiedLead={verifiedLead}
           isdepartmentisAccountant={isdepartmentisAccountant}

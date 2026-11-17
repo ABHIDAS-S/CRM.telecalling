@@ -93,6 +93,7 @@
 // };
 import React, { useState, useEffect } from "react";
 import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
+import { FancySelect } from "../common/FancySelect";
 
 export const MonthRangePicker = ({ onChange,range }) => {
 console.log(range)
@@ -103,6 +104,10 @@ console.log(startMonth)
   const months = Array.from({ length: 24 }, (_, i) =>
     addMonths(new Date(), i - 12)
   );
+  const monthOptions = months.map((month) => ({
+    value: format(month, "yyyy-MM"),
+    label: format(month, "MMM yyyy")
+  }));
 
   const handleRangeChange = () => {
     const startDate = startOfMonth(startMonth);
@@ -128,46 +133,31 @@ console.log(startMonth)
   return (
     <div className="flex flex-grow items-center gap-3 px-4 bg-blue-50 ">
       {/* Start Month */}
-      <div className="flex-1">
-        <label className="block text-xs font-medium text-gray-500 mb-1">
-          Start
-        </label>
-        <select
+      <div className="min-w-[150px] flex-1">
+        <FancySelect
+          label="Start"
           value={format(startMonth, "yyyy-MM")}
-          onChange={(e) => {
-            console.log("h");
-            setStartMonth(new Date(e.target.value + "-01"));
+          options={monthOptions}
+          onChange={(value) => {
+            setStartMonth(new Date(value + "-01"));
           }}
-          className="w-full p-1 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-gray-50"
-        >
-          {months.map((month) => (
-            <option key={month.toISOString()} value={format(month, "yyyy-MM")}>
-              {format(month, "MMM yyyy")}
-            </option>
-          ))}
-        </select>
+          width="w-full"
+        />
       </div>
 
       <div className="text-lg font-bold text-gray-400">→</div>
 
       {/* End Month */}
-      <div className="flex-1">
-        <label className="block text-xs font-medium text-gray-500 mb-1">
-          End
-        </label>
-        <select
+      <div className="min-w-[150px] flex-1">
+        <FancySelect
+          label="End"
           value={format(endMonth, "yyyy-MM")}
-          onChange={(e) => {
-            setEndMonth(new Date(e.target.value + "-01"));
+          options={monthOptions}
+          onChange={(value) => {
+            setEndMonth(new Date(value + "-01"));
           }}
-          className="w-full p-1 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-gray-50"
-        >
-          {months.map((month) => (
-            <option key={month.toISOString()} value={format(month, "yyyy-MM")}>
-              {format(month, "MMM yyyy")}
-            </option>
-          ))}
-        </select>
+          width="w-full"
+        />
       </div>
 
       {/* Display Range */}

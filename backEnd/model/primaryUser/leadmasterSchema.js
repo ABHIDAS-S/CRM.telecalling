@@ -447,6 +447,15 @@ const rejectUnsafeActivityLogUpdate = function (next) {
 
 leadSchema.index({ leadBranch: 1, leadLost: 1, createdAt: -1 });
 leadSchema.index({ leadBranch: 1, leadConvertedDate: 1 });
+// Matches Closed Leads' branch/status/date-range lookup and newest-first sort.
+leadSchema.index({
+  leadBranch: 1,
+  leadConfirmed: 1,
+  leadClosed: 1,
+  leadClosedDate: -1,
+  leadConvertedDate: -1,
+  leadDate: -1
+});
 leadSchema.index({ leadBranch: 1, leadBy: 1, leadDate: -1 });
 leadSchema.index({ leadBranch: 1, leadDate: -1 });
 leadSchema.index({ leadBranch: 1, reallocatedTo: 1, leadLost: 1, leadClosed: 1 });

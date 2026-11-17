@@ -4564,6 +4564,10 @@ console.log(licenses)
     setsubmitLoading(true)
     if (duplicateWarning) return
     const submitData = { ...data }
+    if (submitData.zeroAmountTask && typeof submitData.zeroAmountTask === "object") {
+      submitData.zeroAmountTask =
+        submitData.zeroAmountTask._id || submitData.zeroAmountTask.value || ""
+    }
     const synchronizedLeadData = buildDiscountSynchronizedLeadData(
       selectedleadlist,
       submitData.discamnt
