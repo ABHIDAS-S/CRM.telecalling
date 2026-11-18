@@ -341,7 +341,6 @@ const MarketingDashboard = () => {
   const salesFunnelEndDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(
     new Date(year, month + 1, 0).getDate()
   ).padStart(2, "0")}`
-
   console.log(defaultEndDate) // e.g. "2026-07-25"
   console.log(date)
 
@@ -455,6 +454,10 @@ const MarketingDashboard = () => {
             }, emptySummary)
           : ownedSummary
 
+      const funnelConverted = Array.isArray(salesFunnelData)
+        ? salesFunnelData.find((stage) => stage?.stage === "Converted")
+        : null
+
       if (item) {
         setNewLeadFunnelMetric({
           count: Number(item.neverFollowup || 0),
@@ -505,8 +508,8 @@ const MarketingDashboard = () => {
           {
             title: "Converted",
             detail: "Leads successfully converted",
-            value: item.converted,
-            right: formatAmount(item.convertedAmount),
+            value: Number(funnelConverted?.count || 0),
+            right: formatAmount(funnelConverted?.value || 0),
             icon: (
               <TrendingUp
                 size={15}
@@ -556,8 +559,8 @@ const MarketingDashboard = () => {
 
           {
             title: "Converted",
-            value: 0,
-            right: 0,
+            value: Number(funnelConverted?.count || 0),
+            right: formatAmount(funnelConverted?.value || 0),
             icon: (
               <TrendingUp
                 size={15}
@@ -569,7 +572,7 @@ const MarketingDashboard = () => {
         ])
       }
     }
-  }, [followup, user, leadCountScope])
+  }, [followup, salesFunnelData, user, leadCountScope])
 
   useEffect(() => {
     if (data?.userWiseResults && data?.userWiseResults.length) {
@@ -826,7 +829,11 @@ const MarketingDashboard = () => {
             header: "Converted",
             pending: false,
             istotal: true,
-            filterRange: dashboardSummaryRange,
+            from: "salesFunnel",
+            filterRange: {
+              startDate: defaultStartDate,
+              endDate: salesFunnelEndDate
+            },
             breadcrumb,
             isReadOnly: false
           }

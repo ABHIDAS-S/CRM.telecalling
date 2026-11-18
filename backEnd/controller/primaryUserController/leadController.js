@@ -78,6 +78,7 @@ export const GetallfollowupList = async (req, res) => {
       endDate,
       header,
       from = null,
+      ownLead = "false",
     } = req.query;
     // await Customer.updateMany(
     //   {
@@ -145,6 +146,7 @@ export const GetallfollowupList = async (req, res) => {
     console.log("hasvalidates", hasValidDates)
     const hasFrom = Boolean(from && from !== "null" && from !== "undefined");
     const isSalesFunnelConverted = from === "salesFunnel" && header === "Converted";
+    const isSalesFunnelOwnLead = ownLead === "true";
     const isDashboardAll = from === "dashboardAll";
     const isNewMode = isViewMode || hasValidHeader
     const isClosedFollowupMode = pendingfollowup === "false" && !isViewMode;
@@ -152,19 +154,41 @@ export const GetallfollowupList = async (req, res) => {
     let query = {};
 
     if (isSalesFunnelConverted) {
-      // The dashboard funnel is branch-wide. A conversion requires both a
-      // closed follow-up and a leadConvertedDate in the selected range.
-      // Keep the drill-down identical without restricting it to one staff
-      // member.
+      // Match the Sales Funnel Converted stage exactly. It is based on a
+      // qualifying closed follow-up in the selected period, with the same
+      // own-lead scope as the dashboard; it is not merely leadConvertedDate.
+      const buildFunnelClosedFollowupMatch = (taskDescription) => ({
+        submissionDate: { $gte: start, $lte: end },
+        followupClosed: true,
+        ...(taskDescription ? { taskDescription } : {}),
+        ...(isSalesFunnelOwnLead
+          ? {
+              $or: [
+                { submittedUser: userObjectId },
+                { taskallocatedTo: userObjectId },
+              ],
+            }
+          : {}),
+      });
+
       query = {
         leadBranch: branchObjectId,
-        leadLost: false,
-        leadConvertedDate: { $gte: start, $lte: end },
-        activityLog: {
-          $elemMatch: {
-            followupClosed: true,
+        leadLost: { $ne: true },
+        $or: [
+          {
+            leadConfirmed: false,
+            activityLog: {
+              $elemMatch: buildFunnelClosedFollowupMatch(),
+            },
           },
-        },
+          {
+            leadClosed: true,
+            leadConfirmed: true,
+            activityLog: {
+              $elemMatch: buildFunnelClosedFollowupMatch("Follow-Up Closed"),
+            },
+          },
+        ],
       };
     } else if (isViewMode) {
       const baseElemMatch = {
@@ -2551,7 +2575,7 @@ export const Checkexistinglead = async (req, res) => {
       .map(item => item.productorServiceId);
 
 
-    const [customerLeads, anyLeads] = await Promise.all([
+    const [customerLeads, anyLeads, openLeads] = await Promise.all([
       LeadMaster.find(
         {
           customerName: leadData.customerName,
@@ -2561,7 +2585,30 @@ export const Checkexistinglead = async (req, res) => {
       ).populate({ path: "customerName", select: "customerName" }),
 
       LeadMaster.exists({ customerName: leadData.customerName }),
+
+      LeadMaster.find(
+        { customerName: leadData.customerName, leadConfirmed: false },
+        { leadId: 1, leadFor: 1, netAmount: 1 }
+      )
+        .populate({
+          path: "leadFor.productorServiceId",
+          select: "productName shortName"
+        })
+        .lean()
     ]);
+
+    const openLeadDetails = openLeads.map((lead) => ({
+      leadId: lead.leadId,
+      amount: lead.netAmount || 0,
+      products: (lead.leadFor || [])
+        .map((item) =>
+          item.productorServiceName ||
+          item.productorServiceId?.shortName ||
+          item.productorServiceId?.productName ||
+          "Product"
+        )
+        .filter(Boolean)
+    }));
 
     const existingProductIds = customerLeads.flatMap((lead) =>
       lead.leadFor.map((item) => item.productorServiceId.toString())
@@ -2576,6 +2623,7 @@ export const Checkexistinglead = async (req, res) => {
         message: "This customer already has a lead with the same product.",
         exists: true,
         eligible: false,
+        existingLeads: openLeadDetails,
       });
     } else if (anyLeads) {
       // Same customer + different products
@@ -2583,12 +2631,14 @@ export const Checkexistinglead = async (req, res) => {
         message:
           "This customer already has a lead, but with different product(s).",
         exists: false,
+        existingLeads: openLeadDetails,
       });
     } else {
       // No lead at all for this customer
       return res.status(200).json({
         message: "No existing lead for this customer. Safe to create new lead.",
         exists: false,
+        existingLeads: openLeadDetails,
       });
     }
     // return res.status(2001).json({ message: "Already a lead with same product" })

@@ -74,6 +74,9 @@ export const GetscrollCustomer = async (req, res) => {
     let baseMatch = {};
 
     if (customerType === "ProductMissing") {
+      // A customer with no product has no selected.branch_id to filter on.
+      // Product-missing records are therefore intentionally included here,
+      // including older records created before a product was assigned.
       baseMatch = {
         $or: [{ selected: { $exists: false } }, { selected: { $size: 0 } }]
       };
@@ -87,15 +90,27 @@ export const GetscrollCustomer = async (req, res) => {
           }
         }
       };
+    } else if (customerType === "Allcustomers") {
+      // Branch information is stored inside selected[] only. Customers with no
+      // selected product do not have a branch value, but must still be shown
+      // in the All Customers view.
+      baseMatch = {
+        $or: [
+          { "selected.branch_id": branchId },
+          { selected: { $exists: false } },
+          { selected: { $size: 0 } }
+        ]
+      };
+      if (hasProductFilter) {
+        baseMatch["selected.product_id"] = productId;
+      }
     } else {
       baseMatch = {
         "selected.branch_id": branchId,
         selected: { $exists: true, $ne: [] }
       };
 
-      if (customerType !== "Allcustomers") {
-        baseMatch.isActive = customerType;
-      }
+      baseMatch.isActive = customerType;
       if (hasProductFilter) {
         baseMatch["selected.product_id"] = productId
       }
@@ -160,11 +175,11 @@ export const GetscrollCustomer = async (req, res) => {
                     }
                   }
                 },
-                {
+                ...(customerType !== "Allcustomers" ? [{
                   $match: {
                     selected: { $exists: true, $ne: [] }
                   }
-                },
+                }] : []),
                 {
                   $unwind: {
                     path: "$selected",
@@ -197,11 +212,11 @@ export const GetscrollCustomer = async (req, res) => {
                     }
                   }
                 },
-                {
+                ...(customerType !== "Allcustomers" ? [{
                   $match: {
                     selected: { $exists: true, $ne: [] }
                   }
-                },
+                }] : []),
                 {
                   $unwind: {
                     path: "$selected",
@@ -315,8 +330,27 @@ export const GetscrollCustomer = async (req, res) => {
                     gstNo: { $first: "$gstNo" },
                     email: { $first: "$email" },
                     mobile: { $first: "$mobile" },
+                    isActive: { $first: "$isActive" },
                     selected: {
                       $push: "$selected"
+                    }
+                  }
+                },
+                {
+                  $addFields: {
+                    selected: {
+                      $filter: {
+                        input: "$selected",
+                        as: "item",
+                        // $unwind preserves an empty selected array as null.
+                        // Do not turn that placeholder into a fake product row.
+                        cond: {
+                          $and: [
+                            { $ne: ["$$item", null] },
+                            { $ne: ["$$item.branch_id", null] }
+                          ]
+                        }
+                      }
                     }
                   }
                 }
@@ -343,7 +377,48 @@ export const GetscrollCustomer = async (req, res) => {
                 }
               ]),
 
-            { $sort: { customerName: 1 } },
+            ...(customerType === "Allcustomers"
+              ? [
+                {
+                  $addFields: {
+                    customerListOrder: {
+                      $cond: [
+                        { $eq: ["$isActive", "Deactive"] },
+                        4,
+                        {
+                          $cond: [
+                            { $eq: [{ $size: "$selected" }, 0] },
+                            3,
+                            {
+                              $cond: [
+                                {
+                                  $gt: [
+                                    {
+                                      $size: {
+                                        $filter: {
+                                          input: "$selected",
+                                          as: "item",
+                                          cond: { $eq: ["$$item.product_id", null] }
+                                        }
+                                      }
+                                    },
+                                    0
+                                  ]
+                                },
+                                2,
+                                1
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                { $sort: { customerListOrder: 1, customerName: 1 } },
+                { $unset: "customerListOrder" }
+              ]
+              : [{ $sort: { customerName: 1 } }]),
             { $skip: skip },
             { $limit: pageSize }
           ]

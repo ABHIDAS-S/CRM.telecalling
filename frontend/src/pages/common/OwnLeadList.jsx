@@ -727,6 +727,10 @@ console.log(item?.leadBy?._id)
     (total, group) => total + getNetAmountTotal(group?.leads),
     0
   )
+  const totalLeadCount = visibleTableData.reduce(
+    (total, group) => total + (Array.isArray(group?.leads) ? group.leads.length : 0),
+    0
+  )
 
   const renderTable = (groups) => (
     <table className="w-full border-collapse border border-gray-200 text-sm">
@@ -972,12 +976,23 @@ console.log(item?.leadBy?._id)
                 )}
 
                 {hasLeads && (
-                  <div className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
-                    <span>Total Net Amount</span>
-                    <span className="flex items-center gap-0.5 rounded-md bg-white/15 px-2 py-0.5 text-sm">
-                      <IndianRupee className="h-3.5 w-3.5" />
-                      {totalNetAmount.toLocaleString("en-IN")}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <div className="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-800 shadow-sm">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-100 text-blue-700">
+                        <Users className="h-3.5 w-3.5" />
+                      </span>
+                      <span>Total Leads</span>
+                      <span className="rounded-md bg-white px-2 py-0.5 text-sm font-bold text-blue-700 shadow-sm">
+                        {totalLeadCount.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
+                      <span>Total Net Amount</span>
+                      <span className="flex items-center gap-0.5 rounded-md bg-white/15 px-2 py-0.5 text-sm">
+                        <IndianRupee className="h-3.5 w-3.5" />
+                        {totalNetAmount.toLocaleString("en-IN")}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>

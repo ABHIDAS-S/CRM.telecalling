@@ -1007,10 +1007,10 @@ console.log("h")
       </div>
     </div>
 
-    <div className="overflow-y-auto overflow-x-hidden p-3 sm:p-4">
+    <div className="overflow-y-auto overflow-x-auto p-3 sm:p-4">
       {uniqueLeads.length ? (
-        <div className="overflow-hidden border border-slate-300">
-          <table className="w-full table-fixed border-collapse text-xs">
+        <div className="min-w-[1300px] overflow-hidden border border-slate-300">
+          <table className="min-w-[1300px] w-full table-auto whitespace-nowrap border-collapse text-xs">
             <thead className="bg-blue-600 text-[11px] uppercase tracking-wide text-white">
               <tr>
                 <th className="w-[17%] border-r border-blue-400 px-2 py-2 text-left">Name</th>
@@ -1020,7 +1020,7 @@ console.log("h")
                 <th className="w-[10%] border-r border-blue-400 px-2 py-2 text-center">Product Name</th>
                 <th className="w-[8%] border-r border-blue-400 px-2 py-2 text-center">Event Log</th>
                 <th className="w-[8%] border-r border-blue-400 px-2 py-2 text-center">View</th>
-                <th className="w-[11%] break-words border-r border-blue-400 px-1 py-2 text-right leading-tight">₹ Achv. Amt. (Before Tax)</th>
+                <th className="w-[11%] border-r border-blue-400 px-1 py-2 text-right">₹ Achv. Amt. (Before Tax)</th>
                 <th className="w-[14%] px-2 py-2 text-right">₹ Collection Amount</th>
               </tr>
             </thead>
@@ -1029,6 +1029,12 @@ console.log("h")
 console.log(lead?.categoryItems)
                 const displayName = lead.customerName || lead.leadId || "—";
                 const showTooltip = displayName !== "—" && displayName.length > 20; // adjust threshold as needed
+                const isAmountTarget = String(lead.measurementType || "")
+                  .trim()
+                  .toLowerCase() === "amount";
+                const collectionAmount = isAmountTarget
+                  ? lead.targetCollectionAmount ?? lead.verifiedCategoryAmount ?? lead.achievedValue ?? 0
+                  : lead.totalPaidAmount || 0;
 
                 return (
                   <tr key={lead.leadMongoId} className="hover:bg-slate-50">
@@ -1098,7 +1104,7 @@ console.log(lead?.categoryItems)
                       ).toLocaleString("en-IN")}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right font-semibold text-slate-700">
-                      ₹ {Number(lead.totalPaidAmount || 0).toLocaleString("en-IN")}
+                      ₹ {Number(collectionAmount).toLocaleString("en-IN")}
                     </td>
                   </tr>
                 );
