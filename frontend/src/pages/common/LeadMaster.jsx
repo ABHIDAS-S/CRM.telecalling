@@ -1708,6 +1708,7 @@ const LeadMaster = ({
   const [openLicenseDropdown, setOpenLicenseDropdown] = useState(null)
   const [openProductDropdown, setOpenProductDropdown] = useState(null)
   const [popupMessage, setPopupMessage] = useState("")
+  const [existingOpenLeads, setExistingOpenLeads] = useState([])
   const [warningMessage, setwarningMessage] = useState("")
   console.log(warningErrors)
   const [showdetailsopen, setdetailsopen] = useState(false)
@@ -3981,6 +3982,7 @@ console.log(licenses)
     const result = await api.get("/lead/checkexistinglead", {
       params: { leadData, selectedleadlist, role }
     })
+    setExistingOpenLeads(result.data.existingLeads || [])
     // if (
     //   result.data.message ===
     //     "This customer already has a lead with the same product."
@@ -4054,6 +4056,7 @@ console.log(licenses)
     setlicenseWithoutProductSelection([])
     setselfAllocation(false)
     setPopupMessage("")
+    setExistingOpenLeads([])
     setPopupOpen(false)
     setIseligible(false)
 
@@ -6546,7 +6549,7 @@ convertexcel
 
           {popupOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-4">
-              <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 <div className="p-6">
                   <div className="flex items-start gap-4">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-600 shadow-sm">
@@ -6568,11 +6571,41 @@ convertexcel
 
                     <div className="flex-1">
                       <h2 className="text-lg font-semibold text-slate-800">
-                        Confirmation
+                        {existingOpenLeads.length > 0
+                          ? "Existing open leads"
+                          : "Confirmation"}
                       </h2>
                       <p className="mt-2 text-sm leading-6 text-slate-500">
                         {popupMessage}
                       </p>
+
+                      {existingOpenLeads.length > 0 && (
+                        <div className="mt-4 overflow-hidden rounded-xl border border-amber-100 bg-amber-50/50">
+                          <div className="grid grid-cols-[110px_minmax(0,1fr)_auto] gap-3 border-b border-amber-100 bg-amber-100/70 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+                            <span>Lead ID</span>
+                            <span>Product</span>
+                            <span>Amount</span>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto divide-y divide-amber-100">
+                            {existingOpenLeads.map((lead, index) => (
+                              <div
+                                key={`${lead.leadId || "lead"}-${index}`}
+                                className="grid grid-cols-[110px_minmax(0,1fr)_auto] gap-3 px-3 py-2.5 text-sm text-slate-700"
+                              >
+                                <span className="font-semibold text-slate-900">
+                                  {lead.leadId || "-"}
+                                </span>
+                                <span className="truncate" title={(lead.products || []).join(", ")}>
+                                  {(lead.products || []).join(", ") || "-"}
+                                </span>
+                                <span className="whitespace-nowrap font-semibold text-emerald-700">
+                                  ₹ {Number(lead.amount || 0).toLocaleString("en-IN")}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

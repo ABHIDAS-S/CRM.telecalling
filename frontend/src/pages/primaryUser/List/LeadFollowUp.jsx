@@ -1383,7 +1383,8 @@ const LeadFollowUp = () => {
       `&startDate=${safeState?.viewMode || pending === false ? dates.startDate : null}` +
       `&endDate=${safeState?.viewMode || pending === false ? dates.endDate : null}` +
       `${safeState?.header ? `&header=${safeState.header}` : ""}` +
-      `${safeState?.from ? `&from=${safeState.from}` : ""}`
+      `${safeState?.from ? `&from=${safeState.from}` : ""}` +
+      `${safeState?.from === "salesFunnel" ? `&ownLead=${safeState?.ownlead === true}` : ""}`
     : null
   console.log(dates)
   console.log(safeState)
@@ -1895,28 +1896,10 @@ const LeadFollowUp = () => {
           setnetTotalAmount(TotalAmount(futureLeads))
           setTableData(groupedData)
         } else if (safeState?.viewMode === "converted") {
-          const convertedLeads = leads.filter((lead) => {
-            if (safeState?.from === "salesFunnel") {
-              const start = new Date(dates.startDate)
-              start.setHours(0, 0, 0, 0)
-              const end = new Date(dates.endDate)
-              end.setHours(23, 59, 59, 999)
-
-              const convertedAt = new Date(lead.leadConvertedDate)
-              const isConvertedInRange =
-                !Number.isNaN(convertedAt.getTime()) &&
-                convertedAt >= start &&
-                convertedAt <= end
-
-              return (
-                !lead.leadLost &&
-                isConvertedInRange &&
-                (lead.activityLog || []).some((log) => log?.followupClosed)
-              )
-            }
-
-            return lead.leadConvertedDate && !lead.leadLost
-          })
+          const convertedLeads = safeState?.from === "salesFunnel"
+            // The API has already applied the exact funnel conversion rule.
+            ? leads
+            : leads.filter((lead) => lead.leadConvertedDate && !lead.leadLost)
 
           const groupedLeads = {}
           let grandTotal = 0

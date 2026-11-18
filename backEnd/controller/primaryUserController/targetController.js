@@ -3183,6 +3183,16 @@ export const gettargetResult = async (req, res) => {
                     configCategoryId
                   ),
 
+                // Keep the collection shown in the achieved-record drilldown
+                // scoped to this target category and target month.  The lead's
+                // totalPaidAmount includes collections for other categories.
+                targetCollectionAmount:
+                  getVerifiedAmountForCategoryInMonth(
+                    lead,
+                    configCategoryId,
+                    targetMonth
+                  ),
+
                 categoryItems: categoryItems.map((item) => ({
                   id: item.id,
                   model: item.model,
