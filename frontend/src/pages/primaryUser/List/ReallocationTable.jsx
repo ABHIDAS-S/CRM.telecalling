@@ -5,11 +5,12 @@ import { toast } from "react-toastify"
 import { PropagateLoader } from "react-spinners"
 import { FaSpinner } from "react-icons/fa"
 import SkeletonTable from "../../../components/loader/SkeletonTable"
+import NoDataAvailable from "../../../components/NodataAvailable"
 import { useNavigate, useParams } from "react-router-dom"
 import BarLoader from "react-spinners/BarLoader"
 import { useSelector } from "react-redux"
 import api from "../../../api/api"
-import Select from "react-select"
+import Select, { components } from "react-select"
 import { CollectionupdateModal } from "../../../components/primaryUser/CollectionupdateModal"
 import UseFetch from "../../../hooks/useFetch"
 import { PerformanceModal } from "../../../components/primaryUser/PerformanceModal"
@@ -28,6 +29,7 @@ import {
   IndianRupee,
   BellRing,
   History,
+  ClipboardCheck,
   ChevronDown,
   ChevronRight,
   X
@@ -38,6 +40,16 @@ import { getLocalStorageItem } from "../../../helper/localstorage"
 
 const CODING_AND_QC_TASK_ID = "689c23493e94902039b97743"
 
+const CloseOnMouseLeaveMenu = (props) => (
+  <components.Menu
+    {...props}
+    innerProps={{
+      ...props.innerProps,
+      onMouseLeave: () => props.selectProps.onMenuMouseLeave?.()
+    }}
+  />
+)
+
 const ReallocationTable = () => {
   const reduxselectedBranch = useSelector(
     (branch) => branch.companyBranch.selectedBranch
@@ -46,7 +58,10 @@ const ReallocationTable = () => {
   console.log("hd")
   const { label } = useParams()
   console.log(label)
-  const [status, setStatus] = useState("Pending")
+  // A lead is completed only when its current Reallocation task has a completed
+  // activity-log entry. A missing task entry is deliberately treated as pending.
+  const [status, setStatus] = useState("completed")
+  const [openSelectId, setOpenSelectId] = useState(null)
 
   const [toggleLoading, setToggleLoading] = useState(false)
   const [isClosed, setIsclosed] = useState(false)
@@ -247,20 +262,47 @@ const ReallocationTable = () => {
   useEffect(() => {
     if (!leadreallocation) return
 
-    const filteredLeads = filterLeadsByLastTaskLabel(leadreallocation, label)
+    const filteredLeads = filterLeadsByLastTaskLabel(
+      leadreallocation,
+      label,
+      status
+    )
     setTableData(filteredLeads)
     setpartner(partners || [])
-  }, [leadreallocation, partners, label])
-  const filterLeadsByLastTaskLabel = (leads, label) => {
-    console.log(label)
-    return leads.filter((lead) => {
-      const logs = lead.activityLog
-      if (!logs || logs.length === 0) return false
+  }, [leadreallocation, partners, label, status])
 
-      const lastLog = lead?.lasttask?.taskName
-      console.log(lastLog)
-      console.log(label)
-      return lastLog?.toLowerCase() === label.toLowerCase()
+  const isDesiredTaskCompleted = (lead) => {
+    const desiredTaskId = lead?.isZeroAmountLead
+      ? lead?.allocationType
+      : lead?.lasttask?._id
+
+    if (!desiredTaskId) return false
+
+    return (lead?.activityLog || []).some((activity) => {
+      const isDesiredTask =
+        String(activity?.taskId || "") === String(desiredTaskId) ||
+        String(activity?.taskBy || "") === String(desiredTaskId)
+
+      return (
+        isDesiredTask &&
+        (activity?.taskClosed === true ||
+          activity?.taskStatus === "Completed" ||
+          Boolean(activity?.taskCompletedAt))
+      )
+    })
+  }
+
+  const filterLeadsByLastTaskLabel = (leads, label, selectedStatus) => {
+    return leads.filter((lead) => {
+      const taskName = lead?.lasttask?.taskName
+      const isMatchingCategory =
+        taskName?.toLowerCase() === String(label || "").toLowerCase()
+      const completed = isDesiredTaskCompleted(lead)
+
+      return (
+        isMatchingCategory &&
+        (selectedStatus === "completed" ? completed : !completed)
+      )
     })
   }
 
@@ -712,7 +754,7 @@ const ReallocationTable = () => {
               color="#4A90E2" // Change color as needed
             />
           )}
-          <div className="flex min-h-0 flex-1 flex-col bg-slate-50">
+          <div className="flex min-h-0 flex-1 flex-col bg-[#ADD8E6]">
             <div className="mx-3 mb-4 mt-3 flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm md:mx-5">
               <div>
                 <div className="flex items-center gap-3">
@@ -726,6 +768,41 @@ const ReallocationTable = () => {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <div className="w-36">
+                  <Select
+                    value={[
+                      { value: "completed", label: "Completed" },
+                      { value: "pending", label: "Pending" }
+                    ].find((option) => option.value === status)}
+                    onChange={(option) => setStatus(option?.value || "completed")}
+                    options={[
+                      { value: "completed", label: "Completed" },
+                      { value: "pending", label: "Pending" }
+                    ]}
+                    isSearchable={false}
+                    aria-label="Reallocation task status"
+                    components={{ Menu: CloseOnMouseLeaveMenu }}
+                    menuIsOpen={openSelectId === "status"}
+                    onMenuOpen={() => setOpenSelectId("status")}
+                    onMenuClose={() => setOpenSelectId(null)}
+                    onMenuMouseLeave={() => setOpenSelectId(null)}
+                    className="text-xs"
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        minHeight: "32px",
+                        borderColor: "#cbd5e1",
+                        borderRadius: "8px",
+                        boxShadow: "none",
+                        cursor: "pointer"
+                      }),
+                      valueContainer: (base) => ({ ...base, padding: "0 8px" }),
+                      indicatorsContainer: (base) => ({ ...base, height: "32px" }),
+                      menuPortal: (base) => ({ ...base, zIndex: 120 })
+                    }}
+                    menuPortalTarget={document.body}
+                  />
+                </div>
                 <span className="hidden rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 sm:inline-flex">
                   {tableData.length} lead{tableData.length === 1 ? "" : "s"}
                 </span>
@@ -744,6 +821,7 @@ const ReallocationTable = () => {
 
             {/* Responsive Table Container */}
             <div className="mx-3 mb-3 overflow-auto rounded-2xl border border-slate-200 bg-white text-center shadow-sm md:mx-5">
+              {tableData?.length > 0 ? (
               <table className="w-full min-w-[1320px] text-sm">
                 <thead className="sticky top-0 z-30 whitespace-nowrap bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600 text-white shadow-sm">
                   <tr>
@@ -783,8 +861,7 @@ const ReallocationTable = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {tableData && tableData.length > 0 ? (
-                    tableData.map((item, index) => (
+                  {tableData.map((item, index) => (
                       <React.Fragment key={item._id}>
                         <tr className="group border-b border-slate-100 bg-white transition-colors hover:bg-blue-50/40">
                           <td className="px-3 py-3 text-xs font-semibold text-slate-400">
@@ -836,8 +913,13 @@ const ReallocationTable = () => {
                                 setValidateError((prev) => ({ ...prev, [item._id]: "" }))
                               }}
                               placeholder="Select staff"
+                              components={{ Menu: CloseOnMouseLeaveMenu }}
+                              menuIsOpen={openSelectId === `staff-${item._id}`}
+                              onMenuOpen={() => setOpenSelectId(`staff-${item._id}`)}
+                              onMenuClose={() => setOpenSelectId(null)}
+                              onMenuMouseLeave={() => setOpenSelectId(null)}
                               className="w-40 text-xs"
-                              styles={{ control: (base) => ({ ...base, minHeight: "30px", borderColor: validateError[item._id] ? "#f87171" : "#cbd5e1", boxShadow: "none", cursor: "pointer" }), valueContainer: (base) => ({ ...base, padding: "0 7px" }), indicatorsContainer: (base) => ({ ...base, height: "30px" }), menuPortal: (base) => ({ ...base, zIndex: 120 }) }}
+                              styles={{ control: (base, state) => ({ ...base, minHeight: "34px", borderColor: validateError[item._id] ? "#f87171" : state.isFocused ? "#2563eb" : "#cbd5e1", borderRadius: "8px", boxShadow: state.isFocused ? "0 0 0 2px rgba(37, 99, 235, 0.12)" : "none", cursor: "pointer" }), valueContainer: (base) => ({ ...base, padding: "0 8px" }), indicatorsContainer: (base) => ({ ...base, height: "34px" }), menu: (base) => ({ ...base, overflow: "hidden", borderRadius: "10px", border: "1px solid #dbeafe", boxShadow: "0 12px 28px rgba(15, 23, 42, 0.16)" }), menuList: (base) => ({ ...base, padding: "4px" }), option: (base, state) => ({ ...base, borderRadius: "6px", cursor: "pointer", fontSize: "12px", backgroundColor: state.isSelected ? "#2563eb" : state.isFocused ? "#eff6ff" : "white", color: state.isSelected ? "white" : "#334155" }), menuPortal: (base) => ({ ...base, zIndex: 120 }) }}
                               menuPlacement="auto"
                               menuPortalTarget={document.body}
                               menuShouldScrollIntoView={false}
@@ -849,23 +931,35 @@ const ReallocationTable = () => {
                             <p className="max-w-24 truncate text-[10px] text-slate-500" title={item?.lasttask?.taskName || ""}>{item?.lasttask?.taskName || "-"}</p>
                           </td>
                           <td className="px-3 py-2">
-                            <select
-                              value={selectedAllocationType[item._id] || ""}
-                              disabled={Boolean(item.firstStageFollowupReallocation)}
-                              onChange={(e) => {
-                                const selectedtask = tasks.find((task) => task._id === e.target.value)
-                                setselectedAllocationType((prev) => ({ ...prev, [item._id]: e.target.value }))
+                            <Select
+                              options={(tasks || []).map((task) => ({
+                                value: task._id,
+                                label: task.taskName
+                              }))}
+                              value={(tasks || [])
+                                .map((task) => ({ value: task._id, label: task.taskName }))
+                                .find((option) => option.value === selectedAllocationType[item._id]) || null}
+                              isDisabled={Boolean(item.firstStageFollowupReallocation)}
+                              onChange={(selectedOption) => {
+                                const selectedtask = tasks?.find((task) => task._id === selectedOption?.value)
+                                setselectedAllocationType((prev) => ({ ...prev, [item._id]: selectedOption?.value || "" }))
                                 setselectedallocatiotypeNames((prev) => ({ ...prev, [item._id]: selectedtask }))
                                 setselectedType(selectedtask?.taskName)
                                 setValidatetypeError((prev) => ({ ...prev, [item._id]: "" }))
                               }}
-                              className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700 outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-slate-100"
-                            >
-                              <option value="">Select type</option>
-                              {tasks?.filter((task) => String(task.taskName || "").trim().toLowerCase() !== "followup").map((task) => (
-                                <option key={task._id} value={task._id}>{task?.taskName}</option>
-                              ))}
-                            </select>
+                              placeholder="Select type"
+                              isSearchable
+                              components={{ Menu: CloseOnMouseLeaveMenu }}
+                              menuIsOpen={openSelectId === `type-${item._id}`}
+                              onMenuOpen={() => setOpenSelectId(`type-${item._id}`)}
+                              onMenuClose={() => setOpenSelectId(null)}
+                              onMenuMouseLeave={() => setOpenSelectId(null)}
+                              className="min-w-40 text-xs"
+                              styles={{ control: (base, state) => ({ ...base, minHeight: "34px", borderColor: validatetypeError[item._id] ? "#f87171" : state.isFocused ? "#2563eb" : "#cbd5e1", borderRadius: "8px", boxShadow: state.isFocused ? "0 0 0 2px rgba(37, 99, 235, 0.12)" : "none", cursor: "pointer" }), valueContainer: (base) => ({ ...base, padding: "0 8px" }), indicatorsContainer: (base) => ({ ...base, height: "34px" }), menu: (base) => ({ ...base, overflow: "hidden", borderRadius: "10px", border: "1px solid #dbeafe", boxShadow: "0 12px 28px rgba(15, 23, 42, 0.16)" }), menuList: (base) => ({ ...base, padding: "4px" }), option: (base, state) => ({ ...base, borderRadius: "6px", cursor: "pointer", fontSize: "12px", backgroundColor: state.isSelected ? "#2563eb" : state.isFocused ? "#eff6ff" : "white", color: state.isSelected ? "white" : "#334155" }), menuPortal: (base) => ({ ...base, zIndex: 120 }) }}
+                              menuPlacement="auto"
+                              menuPortalTarget={document.body}
+                              menuShouldScrollIntoView={false}
+                            />
                             {validatetypeError[item._id] && <p className="mt-1 text-[10px] text-red-500">{validatetypeError[item._id]}</p>}
                           </td>
 
@@ -1321,52 +1415,26 @@ const ReallocationTable = () => {
                           </td>
                         </tr>
                       </React.Fragment>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={10}
-                        className="text-center text-gray-500 py-4"
-                      >
-                        {approvedToggleStatus ? (
-                          toggleLoading ? (
-                            <div className="flex justify-center">
-                              <SkeletonTable color="#3b82f6" size={10} />
-                            </div>
-                          ) : (
-                            <div>No Allocated Leads</div>
-                          )
-                        ) : loading ? (
-                          <div className="flex justify-center">
-                            <SkeletonTable color="#3b82f6" size={10} />
-                          </div>
-                        ) : toggleLoading ? (
-                          <div className="flex justify-center">
-                            <SkeletonTable color="#3b82f6" size={10} />
-                          </div>
-                        ) : (
-                          <div>No Reallocation Leads</div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
+                    ))}
                 </tbody>
               </table>
+              ) : loading || toggleLoading ? (
+                <div className="flex min-h-48 items-center justify-center">
+                  <SkeletonTable color="#3b82f6" size={10} />
+                </div>
+              ) : (
+                <NoDataAvailable
+                  title={`No ${status} reallocation leads`}
+                  message="There are no leads matching this task category and status."
+                />
+              )}
               {showModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-4">
-                  <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-6">
+                  <div className={`relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/20 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.35)] ${isCodingAndQcModal ? "max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-3rem)]" : ""}`}>
                     {submitLoading && <BarLoader cssOverride={{ width: "100%", height: "4px" }} color="#2563eb" />}
-                    <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
-                      <div>
-                        <h1 className="text-lg font-bold text-slate-900">
-                          {isCodingAndQcModal ? "Allocate development work" : `Lead Reallocation · ${selectedType || "Task"}`}
-                        </h1>
-                        <p className="mt-0.5 text-xs text-slate-500">{selectedLeadId} · {selectedItem?.customerName?.customerName || "Lead reallocation"}</p>
-                      </div>
-                      <button type="button" onClick={() => { setShowmodal(false); setsubmitError({ submissionerror: "" }) }} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X size={18} /></button>
-                    </div>
+                    <button type="button" onClick={() => { setShowmodal(false); setsubmitError({ submissionerror: "" }) }} className="absolute right-4 top-4 z-20 grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white/95 text-slate-500 shadow-sm transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600" aria-label="Close task allocation dialog" title="Close"><X size={19} /></button>
 
-                    <div className="min-h-0 flex-1 overflow-y-auto">
+                    <div className={isCodingAndQcModal ? "min-h-0 flex-1 overflow-y-auto overscroll-contain" : "flex-1 overflow-visible"}>
                     {isCodingAndQcModal ? (
                       <div className="space-y-5 p-5">
                         <div className="grid gap-3 rounded-xl bg-slate-50 p-4 text-xs text-slate-600 sm:grid-cols-3">
@@ -1389,17 +1457,37 @@ const ReallocationTable = () => {
                         <label className="!text-left block text-xs font-semibold text-slate-700">Task description<textarea required rows="5" value={formData.allocationDescription || ""} onChange={(e) => setFormData((prev) => ({ ...prev, allocationDescription: e.target.value }))} placeholder="Describe the work to be completed..." className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal" /></label>
                       </div>
                     ) : (
-                      <div className="space-y-4 p-5">
-                        <label className="!text-left block text-sm font-semibold text-slate-700">Completion date<input value={formData.allocationDate || ""} type="date" onChange={(e) => setFormData((prev) => ({ ...prev, allocationDate: e.target.value }))} className="mt-1.5 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-normal" /></label>
-                        <label className="!text-left block text-sm font-semibold text-slate-700">Description<textarea value={formData.allocationDescription || ""} onChange={(e) => setFormData((prev) => ({ ...prev, allocationDescription: e.target.value }))} placeholder="Type here..." className="mt-1.5 min-h-28 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-normal" /></label>
+                      <div className="bg-slate-50/70 p-4 sm:p-5">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4">
+                          <div className="mb-3 flex items-center gap-2 pr-10">
+                            <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600"><ClipboardCheck size={16} /></div>
+                            <div>
+                              <h2 className="text-sm font-bold text-slate-800">Allocation details</h2>
+                              <p className="text-[11px] text-slate-500">Set a date and concise work instructions.</p>
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            <label className="!text-left flex flex-col gap-2 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50/70 p-3 transition focus-within:border-blue-400 sm:flex-row sm:items-center sm:justify-between">
+                              <span className="flex items-center gap-2">
+                                <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white"><Calendar size={15} /></span>
+                                <span><span className="block text-xs font-bold text-slate-700">Expected completion</span><span className="block text-[10px] text-slate-500">Promised delivery date</span></span>
+                              </span>
+                              <input value={formData.allocationDate || ""} type="date" onChange={(e) => setFormData((prev) => ({ ...prev, allocationDate: e.target.value }))} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-500 sm:w-48" />
+                            </label>
+                            <label className="!text-left block">
+                              <span className="flex items-center gap-1.5 text-xs font-bold text-slate-700"><MessageSquareText size={14} className="text-blue-600" /> Task description</span>
+                              <textarea value={formData.allocationDescription || ""} onChange={(e) => setFormData((prev) => ({ ...prev, allocationDescription: e.target.value }))} placeholder="Describe the work to be completed..." className="mt-2 min-h-24 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" />
+                            </label>
+                          </div>
+                        </div>
                       </div>
                     )}
                     </div>
 
-                    {submiterror.submissionerror && <p className="px-5 text-sm text-rose-600">{submiterror.submissionerror}</p>}
-                    <div className="sticky bottom-0 z-10 flex shrink-0 justify-end gap-3 border-t border-slate-100 bg-white px-5 py-4">
-                      <button type="button" onClick={() => { setShowmodal(false); setsubmitError({ submissionerror: "" }) }} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
-                      <button type="button" disabled={submitLoading} onClick={handleSubmit} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">{isCodingAndQcModal ? "Allocate task" : "Submit"}</button>
+                    {submiterror.submissionerror && <p className="px-4 pb-2 text-sm text-rose-600 sm:px-6">{submiterror.submissionerror}</p>}
+                    <div className="sticky bottom-0 z-10 flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur sm:flex-row sm:justify-end sm:gap-3 sm:px-6 sm:py-4">
+                      <button type="button" onClick={() => { setShowmodal(false); setsubmitError({ submissionerror: "" }) }} className="h-11 rounded-xl px-5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100">Cancel</button>
+                      <button type="button" disabled={submitLoading} onClick={handleSubmit} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:from-blue-700 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">{submitLoading && <FaSpinner className="h-4 w-4 animate-spin" />}{isCodingAndQcModal ? "Allocate task" : "Submit allocation"}</button>
                     </div>
                   </div>
                 </div>

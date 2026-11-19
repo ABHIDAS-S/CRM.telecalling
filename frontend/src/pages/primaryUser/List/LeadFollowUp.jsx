@@ -220,7 +220,8 @@ const LeadFollowUp = () => {
       safeState?.pending,
       dates.startDate,
       dates.endDate,
-      safeState?.header
+      safeState?.header,
+      safeState?.viewMode
     ],
     enabled:
       safeState?.viewMode === "product" &&
@@ -1255,7 +1256,8 @@ const LeadFollowUp = () => {
       }
     }
     console.log("hhh")
-    fetchFollowups()
+    // Product-wise data is fetched and cached by the React Query request above.
+    // Calling this legacy request as well duplicated the same API work.
   }, [safeState?.state, selectedCompanyBranch, loggedUser])
 
   console.log(pending)
@@ -1409,7 +1411,12 @@ const LeadFollowUp = () => {
       dates.startDate || "",
       dates.endDate || "",
       safeState?.header || "",
-      safeState?.from || ""
+      safeState?.from || "",
+      safeState?.viewMode || "",
+      safeState?.ownlead === true,
+      safeState?.istotal === true,
+      safeState?.staffRole || "",
+      loggedUser?.role || ""
     ],
     queryFn: async () => {
       const res = await api.get(followupUrl)
@@ -3129,7 +3136,7 @@ console.log("hhh")
     <div className="h-full  bg-[#ADD8E6] overflow-hidden">
       <div className="flex h-full  flex-row">
         <div className="flex flex-1 flex-col overflow-hidden min-h-0">
-          {(loading || productwiseloader) && (
+          {(loading || productloader || productwiseloader) && (
             <BarLoader
               cssOverride={{ width: "100%", height: "4px" }}
               color="#4A90E2"
