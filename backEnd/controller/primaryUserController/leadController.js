@@ -80,47 +80,6 @@ export const GetallfollowupList = async (req, res) => {
       from = null,
       ownLead = "false",
     } = req.query;
-    // await Customer.updateMany(
-    //   {
-    //     "selected.product_id": ObjectId("66fbcf92461da9401f1cb821")
-    //   },
-    //   {
-    //     $set: {
-    //       "selected.$[product].product_id": ObjectId(67777960368e039b61196ef2)
-    //     }
-    //   },
-    //   {
-    //     arrayFilters: [
-    //       {
-    //         "product.product_id": ObjectId("66fbcf92461da9401f1cb821")
-    //       }
-    //     ]
-    //   }
-    // )
-    await Customer.updateMany(
-      {
-        "selected.product_id": new mongoose.Types.ObjectId(
-          "66fbcfb7461da9401f1cb836"
-        ),
-      },
-      {
-        $set: {
-          "selected.$[product].product_id": new mongoose.Types.ObjectId(
-            "67777960368e039b61196ef2"
-          ),
-        },
-      },
-      {
-        arrayFilters: [
-          {
-            "product.product_id": new mongoose.Types.ObjectId(
-              "66fbcfb7461da9401f1cb836"
-            ),
-          },
-        ],
-      }
-    );
-
     if (!isValidObjectId(loggeduserid) || !isValidObjectId(branchSelected)) {
       return res.status(400).json({
         message: "Invalid loggeduserid or branchSelected",
@@ -163,11 +122,11 @@ export const GetallfollowupList = async (req, res) => {
         ...(taskDescription ? { taskDescription } : {}),
         ...(isSalesFunnelOwnLead
           ? {
-              $or: [
-                { submittedUser: userObjectId },
-                { taskallocatedTo: userObjectId },
-              ],
-            }
+            $or: [
+              { submittedUser: userObjectId },
+              { taskallocatedTo: userObjectId },
+            ],
+          }
           : {}),
       });
 
@@ -200,9 +159,9 @@ export const GetallfollowupList = async (req, res) => {
       query = isDashboardAll
         ? { leadBranch: branchObjectId }
         : {
-            activityLog: { $elemMatch: baseElemMatch },
-            leadBranch: branchObjectId,
-          };
+          activityLog: { $elemMatch: baseElemMatch },
+          leadBranch: branchObjectId,
+        };
 
       if (header === "Converted") {
         query.leadConvertedDate = hasValidDates
@@ -1792,6 +1751,10 @@ export const LeadRegister = async (req, res) => {
     const normalizedPartnerSelection = optionalObjectId(partnerSelection)
     const normalizedZeroAmountTask = optionalObjectId(zeroAmountTask)
     const isTargetOnlyLead = Boolean(isZeroAmountLead)
+    const isAllocateToOther =
+      selfAllocation === false || String(selfAllocation).toLowerCase() === "false"
+    const shouldCreateAllocationLog =
+      Boolean(allocationType) && !(isTargetOnlyLead && isAllocateToOther)
     if (isTargetOnlyLead && !normalizedZeroAmountTask) {
       await session.endSession()
       return res.status(400).json({ message: "Select a task for the zero amount lead" })
@@ -1843,11 +1806,20 @@ export const LeadRegister = async (req, res) => {
     }
 
     let allocationtask = null
-    if (allocationType) {
+    if (shouldCreateAllocationLog) {
       allocationtask = await Task.findOne({ taskName: "Allocation" }).session(session)
     }
+    const activityLog = [
+      {
+        submissionDate: leadDate,
+        submittedUser: leadBy,
+        submissiondoneByModel: leadByModel,
+        remarks: remark,
+        taskBy: leadtask?._id,
+      },
+    ]
 
-    if (isTargetOnlyLead) {
+    if (isTargetOnlyLead && !isAllocateToOther) {
       activityLog.push({
         submissionDate: leadDate,
         submittedUser: leadBy,
@@ -1866,21 +1838,21 @@ export const LeadRegister = async (req, res) => {
       })
     }
 
-    const activityLog = [
-      {
-        submissionDate: leadDate,
-        submittedUser: leadBy,
-        submissiondoneByModel: leadByModel,
-        remarks: remark,
-        taskBy: leadtask?._id,
-      },
-    ]
+
 
     const allocationName = await Task.findOne({
       taskName: { $regex: new RegExp(`^${allocationType}$`, "i") },
     }).session(session)
+    const isFollowupTask =
+      String(zeroAmountTaskRecord?.taskName || "")
+        .toLowerCase()
+        .replace(/[^a-z]/g, "") === "followup"
+    // A zero-amount lead allocated to another user must enter Reallocation for
+    // every task except Followup. Followup remains in its own workflow.
+    const shouldMarkZeroAmountLeadReallocated =
+      isTargetOnlyLead && isAllocateToOther && !isFollowupTask
 
-    if (allocationType) {
+    if (shouldCreateAllocationLog) {
       activityLog.push({
         submissionDate: leadDate,
         submittedUser: leadBy,
@@ -1923,6 +1895,7 @@ export const LeadRegister = async (req, res) => {
       balanceAmount: isTargetOnlyLead ? 0 : Number(netAmount),
       selfAllocation: isTargetOnlyLead ? false : selfAllocation,
       isZeroAmountLead: isTargetOnlyLead,
+      reallocatedTo: shouldMarkZeroAmountLeadReallocated,
       zeroAmountTask: normalizedZeroAmountTask,
       ...(allocationType && { allocationType: allocationName?._id }),
       ...(selfAllocation && {
@@ -2091,7 +2064,7 @@ export const BulkLeadRegister = async (req, res) => {
       reason
     })
 
-    for (let index = 0; index < leads.length; index += 1) {
+    for (let index = 0;index < leads.length;index += 1) {
       const row = leads[index] || {}
       const customer = customerById.get(String(row.customerId))
       const rowProducts = Array.isArray(row.products) ? row.products : []
@@ -2157,31 +2130,31 @@ export const BulkLeadRegister = async (req, res) => {
         const additionalServiceTaggedData =
           isAdditionalService && enteredLicense
             ? [
-                {
-                  licensenumber: enteredLicense,
-                  nextDue: "",
-                  productAmount: itemNetAmount,
-                  taxexclusiveAmount: amount,
-                  taxinclusiveamount: itemNetAmount,
-                  hsn: taxRate,
-                  originalHsn: taxRate,
-                  leadAmount: amount,
-                  totalleadAmount: itemNetAmount,
-                  leadTax: taxRate,
-                  nextDueTax: taxRate
-                }
-              ]
+              {
+                licensenumber: enteredLicense,
+                nextDue: "",
+                productAmount: itemNetAmount,
+                taxexclusiveAmount: amount,
+                taxinclusiveamount: itemNetAmount,
+                hsn: taxRate,
+                originalHsn: taxRate,
+                leadAmount: amount,
+                totalleadAmount: itemNetAmount,
+                leadTax: taxRate,
+                nextDueTax: taxRate
+              }
+            ]
             : []
         const additionalServiceLicenseNumbers =
           isAdditionalService && enteredLicense
             ? [
-                {
-                  licenseNumber: enteredLicense,
-                  productorServiceId: product._id,
-                  productorServiceName: product.shortName || product.productName || "",
-                  sourceIndex: 0
-                }
-              ]
+              {
+                licenseNumber: enteredLicense,
+                productorServiceId: product._id,
+                productorServiceName: product.shortName || product.productName || "",
+                sourceIndex: 0
+              }
+            ]
             : []
         taxableAmount += amount
         taxAmount += itemTaxAmount
@@ -2597,16 +2570,67 @@ export const Checkexistinglead = async (req, res) => {
         .lean()
     ]);
 
+    // Resolve labels from productorServiceId, which is the source of truth for
+    // both old and new leads. This avoids relying on a copied product name.
+    const productIdsForNames = new Set();
+    const serviceIdsForNames = new Set();
+
+    for (const lead of openLeads) {
+      for (const item of lead.leadFor || []) {
+        const itemId = item?.productorServiceId?._id || item?.productorServiceId;
+        if (!itemId) continue;
+
+        if (item.productorServicemodel === "Service") {
+          serviceIdsForNames.add(String(itemId));
+        } else {
+          productIdsForNames.add(String(itemId));
+        }
+      }
+    }
+
+    const [productsForNames, servicesForNames] = await Promise.all([
+      productIdsForNames.size
+        ? Product.find({ _id: { $in: [...productIdsForNames] } })
+          .select("productName shortName")
+          .lean()
+        : [],
+      serviceIdsForNames.size
+        ? Service.find({ _id: { $in: [...serviceIdsForNames] } })
+          .select("serviceName")
+          .lean()
+        : []
+    ]);
+
+    const productNameById = new Map(
+      productsForNames.map((product) => [
+        String(product._id),
+        product.shortName || product.productName
+      ])
+    );
+    const serviceNameById = new Map(
+      servicesForNames.map((service) => [
+        String(service._id),
+        service.serviceName
+      ])
+    );
+
     const openLeadDetails = openLeads.map((lead) => ({
       leadId: lead.leadId,
       amount: lead.netAmount || 0,
       products: (lead.leadFor || [])
-        .map((item) =>
-          item.productorServiceName ||
-          item.productorServiceId?.shortName ||
-          item.productorServiceId?.productName ||
-          "Product"
-        )
+        .map((item) => {
+          const itemId = item?.productorServiceId?._id || item?.productorServiceId;
+          const resolvedName = item.productorServicemodel === "Service"
+            ? serviceNameById.get(String(itemId))
+            : productNameById.get(String(itemId));
+
+          return (
+            item.productorServiceId?.shortName ||
+            item.productorServiceId?.productName ||
+            resolvedName ||
+            "Product"
+          );
+        })
         .filter(Boolean)
     }));
 
@@ -4288,11 +4312,13 @@ export const getTodayVerifiedCollectionDetails = async (req, res) => {
     const productNames = new Map(products.map((row) => [String(row._id), row.shortName || row.productName]));
     services.forEach((row) => productNames.set(String(row._id), row.serviceName));
     const asRows = (map, getLabel) => [...map.values()].map((row) => ({ label: getLabel(row), amount: Number(row.amount.toFixed(2)), count: row.count })).sort((a, b) => b.amount - a.amount);
-    return res.status(200).json({ success: true, data: {
-      dateWise: asRows(dateWise, (row) => row.label),
-      staffWise: asRows(staffWise, (row) => staffNames.get(row.staffId) || "Unassigned staff"),
-      productWise: asRows(productWise, (row) => productNames.get(row.productId) || "Unassigned product"),
-    } });
+    return res.status(200).json({
+      success: true, data: {
+        dateWise: asRows(dateWise, (row) => row.label),
+        staffWise: asRows(staffWise, (row) => staffNames.get(row.staffId) || "Unassigned staff"),
+        productWise: asRows(productWise, (row) => productNames.get(row.productId) || "Unassigned product"),
+      }
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Unable to load collection details" });
@@ -4321,11 +4347,11 @@ export const Getallsalesfunnels = async (req, res) => {
       ...(taskDescription ? { taskDescription } : {}),
       ...(ownLeadOnly
         ? {
-            $or: [
-              { submittedUser: staffObjectId },
-              { taskallocatedTo: staffObjectId },
-            ],
-          }
+          $or: [
+            { submittedUser: staffObjectId },
+            { taskallocatedTo: staffObjectId },
+          ],
+        }
         : {}),
     });
 
@@ -5776,7 +5802,7 @@ export const Leadclosing = async (req, res) => {
         incomingZeroAmountLead === "true";
       const zeroAmountTask = isZeroAmountLead
         ? normalizeTaskId(incomingZeroAmountTask) ||
-          normalizeTaskId(matchedDoc.zeroAmountTask)
+        normalizeTaskId(matchedDoc.zeroAmountTask)
         : null;
 
       if (isZeroAmountLead && !zeroAmountTask) {
@@ -6044,7 +6070,7 @@ export const Leadclosing = async (req, res) => {
       // the lead's payment summary remains unchanged.
       const pendingCollectionAmount =
         Number.isFinite(requestedCollectionAmount) &&
-        requestedCollectionAmount > 0
+          requestedCollectionAmount > 0
           ? requestedCollectionAmount
           : paymentEntriesTotal;
       const hasPendingCollection =
@@ -6057,7 +6083,7 @@ export const Leadclosing = async (req, res) => {
 
       const totalPaidAmount = round2(
         Number(matchedDoc.totalPaidAmount || 0) +
-          (hasPendingCollection ? safePendingCollectionAmount : 0)
+        (hasPendingCollection ? safePendingCollectionAmount : 0)
       );
       const rawBalanceAmount = round2(newNetAmount - totalPaidAmount);
       const newBalanceAmount = rawBalanceAmount < 0 ? 0 : rawBalanceAmount;
@@ -6155,17 +6181,17 @@ export const Leadclosing = async (req, res) => {
         : requestedFollowUpDate;
       const followupClosedEntry = closeActiveFollowup
         ? {
-            submissionDate: followupSubmissionDate,
-            submittedUser: userId,
-            submissiondoneByModel: role === "Admin" ? "Admin" : "Staff",
-            remarks: normalizeString(closingContext?.remark) || data?.remark || "",
-            taskBy: followupClosingTask?._id || null,
-            taskDescription: "Follow-Up Closed",
-            taskClosed: true,
-            followupClosed: true,
-            reallocatedTo: false,
-            taskfromFollowup: false,
-          }
+          submissionDate: followupSubmissionDate,
+          submittedUser: userId,
+          submissiondoneByModel: role === "Admin" ? "Admin" : "Staff",
+          remarks: normalizeString(closingContext?.remark) || data?.remark || "",
+          taskBy: followupClosingTask?._id || null,
+          taskDescription: "Follow-Up Closed",
+          taskClosed: true,
+          followupClosed: true,
+          reallocatedTo: false,
+          taskfromFollowup: false,
+        }
         : null;
 
       const activityLogEntry = {
@@ -7091,7 +7117,7 @@ export const UpdateLeadRegister = async (req, res) => {
         incomingZeroAmountLead === "true";
       const zeroAmountTask = isTargetOnlyLead
         ? toObjectIdOrNull(incomingZeroAmountTask) ||
-          toObjectIdOrNull(matchedDoc.zeroAmountTask)
+        toObjectIdOrNull(matchedDoc.zeroAmountTask)
         : null;
 
       if (isTargetOnlyLead && !zeroAmountTask) {
@@ -10506,6 +10532,8 @@ export const GetallReallocatedLead = async (req, res) => {
         remark: 1,
         reallocatedTo: 1,
         followupClosed: 1,
+        isZeroAmountLead: 1,
+        allocationType: 1,
         leadFor: 1,
         leadConfirmed: 1,
         leadBranch: 1,
@@ -10543,8 +10571,12 @@ export const GetallReallocatedLead = async (req, res) => {
         }
       }
 
-      if (lastActivity?.taskBy) {
-        taskIds.add(String(lastActivity.taskBy))
+      const reallocationTaskId = lead.isZeroAmountLead === true
+        ? lead.allocationType
+        : lastActivity?.taskBy
+
+      if (reallocationTaskId) {
+        taskIds.add(String(reallocationTaskId))
       }
     }
 
@@ -10592,6 +10624,12 @@ export const GetallReallocatedLead = async (req, res) => {
 
     const populatedreallocatedLeads = reallocatedLeads.map((lead) => {
       const lastActivity = lead?.activityLog?.[lead.activityLog.length - 1] || null
+      // Zero-amount leads do not receive a second allocation activity log
+      // when allocated to another user. Their configured allocation type is
+      // therefore the authoritative Reallocation tile category.
+      const reallocationTaskId = lead.isZeroAmountLead === true
+        ? lead.allocationType
+        : lastActivity?.taskBy
       const firstStage = (lead.leadFor || [])
         .filter((item) => item.productorServicemodel === "Product")
         .map((item) => productFirstStageMap.get(String(item.productorServiceId)))
@@ -10606,8 +10644,8 @@ export const GetallReallocatedLead = async (req, res) => {
       return {
         ...lead,
         leadBy: getUserByModel(lead?.leadBy, lead?.leadByModel),
-        lasttask: lastActivity?.taskBy
-          ? taskMap.get(String(lastActivity.taskBy)) || null
+        lasttask: reallocationTaskId
+          ? taskMap.get(String(reallocationTaskId)) || null
           : null,
         submittedUser: getUserByModel(
           lastActivity?.submittedUser,
@@ -12369,14 +12407,14 @@ export const UpdateLeadTask = async (req, res) => {
     if (!lead) {
       return res.status(404).json({ message: "Lead not found" });
     }
-    if (
-      lead.selfAllocation === true &&
-      String(lead.leadBy) !== String(req.owner?.userId || "")
-    ) {
-      return res.status(403).json({
-        message: "Only the lead creator can work on this self-allocated lead"
-      });
-    }
+    // if (
+    //   lead.selfAllocation === true &&
+    //   String(lead.leadBy) !== String(req.owner?.userId || "")
+    // ) {
+    //   return res.status(403).json({
+    //     message: "Only the lead creator can work on this self-allocated lead"
+    //   });
+    // }
     const activityLog = [...lead.activityLog];
     const Index = activityLog.length - 1;
     const updateFields = {
@@ -12507,10 +12545,10 @@ export const GetrespectedleadTask = async (req, res) => {
     const parsedEndDate = endDate ? new Date(endDate) : null;
     const hasClearedDateRange = Boolean(
       isClearedTask &&
-        parsedStartDate &&
-        parsedEndDate &&
-        !Number.isNaN(parsedStartDate.getTime()) &&
-        !Number.isNaN(parsedEndDate.getTime())
+      parsedStartDate &&
+      parsedEndDate &&
+      !Number.isNaN(parsedStartDate.getTime()) &&
+      !Number.isNaN(parsedEndDate.getTime())
     );
 
     if (hasClearedDateRange) {
@@ -12578,21 +12616,21 @@ export const GetrespectedleadTask = async (req, res) => {
       ...(isClearedTask ? { taskClosed: true } : {}),
       ...(hasClearedDateRange
         ? {
-            $or: [
-              {
-                taskCompletedAt: {
-                  $gte: parsedStartDate,
-                  $lte: parsedEndDate,
-                },
+          $or: [
+            {
+              taskCompletedAt: {
+                $gte: parsedStartDate,
+                $lte: parsedEndDate,
               },
-              {
-                taskSubmissionDate: {
-                  $gte: parsedStartDate,
-                  $lte: parsedEndDate,
-                },
+            },
+            {
+              taskSubmissionDate: {
+                $gte: parsedStartDate,
+                $lte: parsedEndDate,
               },
-            ],
-          }
+            },
+          ],
+        }
         : {}),
       ...(allowedUserIds
         ? {
@@ -14850,7 +14888,7 @@ export const getverifiedCollectionLeads = async (req, res) => {
           })
         );
 
-      
+
         let filteredPaymentHistory = paymentHistoryWithIndex;
         if (verifiedBool) {
           filteredPaymentHistory = filteredPaymentHistory.filter((history) => {
@@ -16341,11 +16379,11 @@ export const GetownLeadList = async (req, res) => {
                   followupClosed: true,
                   ...(ownlead === "true"
                     ? {
-                        $or: [
-                          { submittedUser: objectId },
-                          { taskallocatedTo: objectId },
-                        ],
-                      }
+                      $or: [
+                        { submittedUser: objectId },
+                        { taskallocatedTo: objectId },
+                      ],
+                    }
                     : {}),
                 },
               },
@@ -16360,11 +16398,11 @@ export const GetownLeadList = async (req, res) => {
                   taskDescription: "Follow-Up Closed",
                   ...(ownlead === "true"
                     ? {
-                        $or: [
-                          { submittedUser: objectId },
-                          { taskallocatedTo: objectId },
-                        ],
-                      }
+                      $or: [
+                        { submittedUser: objectId },
+                        { taskallocatedTo: objectId },
+                      ],
+                    }
                     : {}),
                 },
               },
@@ -16555,7 +16593,7 @@ export const GetResearchAndDevelopmentLeads = async (req, res) => {
     const codingAndQcTaskId = new mongoose.Types.ObjectId(
       "689c23493e94902039b97743"
     );
-   
+
 
     if (branchId && !isValidObjectId(branchId)) {
       return res.status(400).json({
@@ -16566,7 +16604,7 @@ export const GetResearchAndDevelopmentLeads = async (req, res) => {
 
     const match = {
       leadLost: { $ne: true },
-      activityLog: { $elemMatch: { followupClosed: true,taskTo:"followup" } }
+      activityLog: { $elemMatch: { followupClosed: true, taskTo: "followup" } }
     };
 
     if (branchId) {
