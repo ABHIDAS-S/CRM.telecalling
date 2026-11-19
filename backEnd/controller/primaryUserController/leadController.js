@@ -1843,6 +1843,14 @@ export const LeadRegister = async (req, res) => {
     const allocationName = await Task.findOne({
       taskName: { $regex: new RegExp(`^${allocationType}$`, "i") },
     }).session(session)
+    const isFollowupTask =
+      String(zeroAmountTaskRecord?.taskName || "")
+        .toLowerCase()
+        .replace(/[^a-z]/g, "") === "followup"
+    // A zero-amount lead allocated to another user must enter Reallocation for
+    // every task except Followup. Followup remains in its own workflow.
+    const shouldMarkZeroAmountLeadReallocated =
+      isTargetOnlyLead && isAllocateToOther && !isFollowupTask
 
     if (shouldCreateAllocationLog) {
       activityLog.push({
@@ -1887,6 +1895,7 @@ export const LeadRegister = async (req, res) => {
       balanceAmount: isTargetOnlyLead ? 0 : Number(netAmount),
       selfAllocation: isTargetOnlyLead ? false : selfAllocation,
       isZeroAmountLead: isTargetOnlyLead,
+      reallocatedTo: shouldMarkZeroAmountLeadReallocated,
       zeroAmountTask: normalizedZeroAmountTask,
       ...(allocationType && { allocationType: allocationName?._id }),
       ...(selfAllocation && {
