@@ -1,5 +1,5 @@
-export const tallyFields = ["Customer", "Address", "State", "Country", "Contactperson", "ContactNumber", "Mobilenumber", "Emailid", "Tallyserialno", "Gstno"]
-const limits = { Customer: 300, Address: 2000, State: 150, Country: 150, Contactperson: 300, ContactNumber: 100, Mobilenumber: 100, Emailid: 320, Tallyserialno: 200, Gstno: 30 }
+export const tallyFields = ["Customer", "Company", "Address", "State", "Country", "Pincode", "Contactperson", "ContactNumber", "Mobilenumber", "Emailid", "Tallyserialno", "Gstno"]
+const limits = { Customer: 300, Company: 300, Address: 2000, State: 150, Country: 150, Pincode: 30, Contactperson: 300, ContactNumber: 100, Mobilenumber: 100, Emailid: 320, Tallyserialno: 200, Gstno: 30 }
 
 export function normalizeTallyRecord(input, line) {
   const fail = message => { throw Object.assign(new Error(`Line ${line}: ${message}`), { status: 422 }) }
