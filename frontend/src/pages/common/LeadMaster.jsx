@@ -3210,14 +3210,24 @@ console.log(licenses)
   const handleOpenmodal = (text = null) => {
     console.log(selectedCustomer)
     console.log(text)
-    if (text) {
+    const isNewCustomer = Boolean(text) || (process === "Registration" && !Data)
+
+    if (isNewCustomer) {
+      // Lead registration must never copy the currently selected customer's
+      // data into a new-customer form. Editing an existing lead keeps the
+      // current customer details for the Update Customer workflow.
+      resetModal()
+      setSelectedCountry(null)
+      setSelectedState(null)
       setchecknewcustomer(true)
+    } else {
+      setchecknewcustomer(false)
     }
     console.log("h")
     setModalOpen(true)
     clearMainerrors()
     console.log(Data)
-    if (Data && Data.length && text === null) {
+    if (Data && Data.length && !isNewCustomer) {
       console.log("hhh")
       setValueModal("customerName", selectedCustomer?.customerName)
       setValueModal("customerid", selectedCustomer?._id)
@@ -4947,6 +4957,38 @@ console.log(licenses)
               }
             })
       } else if (response.status === 200) {
+        const createdCustomer = response.data?.customer
+
+        if (process === "Registration" && createdCustomer?._id) {
+          const createdCustomerOption = {
+            ...createdCustomer,
+            value: String(createdCustomer._id),
+            label: createdCustomer.customerName || "New customer",
+            optionId: `${createdCustomer._id}-new`,
+            mobile: createdCustomer.mobile || "",
+            email: createdCustomer.email || "",
+            license: "",
+            productName: "",
+            searchText: [createdCustomer.customerName, createdCustomer.mobile]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase()
+          }
+
+          // Keep the selection visible immediately, before the customer-list
+          // refresh completes, then use the normal selection path to fill the
+          // lead form's linked fields.
+          setCustomerOptions((current) => [
+            ...(current || []).filter(
+              (option) => String(option.value) !== String(createdCustomer._id)
+            ),
+            createdCustomerOption
+          ])
+          handleSelectedCustomer(createdCustomerOption)
+          setValueMain("customerName", String(createdCustomer._id), {
+            shouldValidate: true
+          })
+        }
         refreshHook()
         setModalLoader(false)
         resetModal()
