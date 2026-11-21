@@ -1669,7 +1669,8 @@ export const CustomerRegister = async (req, res) => {
 
     return res.status(200).json({
       status: true,
-      message: "Customer created successfully"
+      message: "Customer created successfully",
+      customer: customerdata
     })
   } catch (error) {
     console.log("error:", error)
