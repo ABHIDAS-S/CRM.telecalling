@@ -12,7 +12,10 @@ import mongoose from "mongoose"
 import jwt from "jsonwebtoken"
 import tallyRoutes from "../routes/tallyRoutes.js"
 import tallyReportRoutes from "../routes/tallyReportRoutes.js"
+import assignedCustomerRoutes from "../routes/assignedCustomerRoutes.js"
 import Customer from "../model/secondaryUser/tallyCustomerSchema.js"
+import AssignCustomer from "../model/secondaryUser/assignCustomerSchema.js"
+import CustomerCall from "../model/secondaryUser/customerCallSchema.js"
 import models from "../model/auth/authSchema.js"
 import { TallyImport, TallyBatch, TallySequence } from "../model/tallyImportSchema.js"
 import { ensureTallyIndexes } from "../services/tallyImportService.js"
@@ -60,7 +63,8 @@ before(async () => {
   process.env.JWT_SECRET_KEY = "test-only-jwt-secret"
   const app = express()
   app.use("/integration", tallyRoutes) // deliberately no JSON parser
-  app.use("/report", tallyReportRoutes)
+  app.use("/report", express.json(), tallyReportRoutes)
+  app.use("/assigned", express.json(), assignedCustomerRoutes)
   server = app.listen(0, "127.0.0.1"); await once(server, "listening")
   base = `http://127.0.0.1:${server.address().port}`
   const id = new mongoose.Types.ObjectId()
@@ -79,6 +83,133 @@ after(async () => {
     if (value === undefined) delete process.env[name]
     else process.env[name] = value
   }
+})
+
+test("report imports Excel rows and allocates the union of numeric range and checked customers", async () => {
+  const headers = { Authorization: `Bearer ${adminToken}`, "Content-Type": "application/json" }
+  const post = (path, body) => fetch(`${base}/report/${path}`, { method: "POST", headers, body: JSON.stringify(body) })
+  const { insertedId: staffId } = await models.Staff.collection.insertOne({ name: "Allocation staff", role: "Staff" })
+  const staff = await (await fetch(`${base}/report/staff`, { headers })).json()
+  assert.ok(staff.data.some(member => member._id === String(staffId)))
+  const imported = await post("imports", { data: ["2", "10", "11", "100", "3A"].map(serial =>
+    record(serial, { Pincode: "001234", Company: "Example Company" })
+  ) })
+  assert.equal(imported.status, 202)
+  await processNextTallyImport()
+  const rows = await Customer.find().lean()
+  assert.equal(rows.length, 5)
+  assert.equal(rows[0].Pincode, "001234")
+  assert.equal(rows[0].Company, "Example Company")
+  const checked = rows.filter(row => ["10", "100"].includes(row.Tallyserialno))
+  const selection = { staffId, start: "2", end: "11", customerIds: checked.map(row => row._id) }
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await post("assign", selection)
+    assert.equal(response.status, 200)
+    assert.equal((await response.json()).assigned, 4)
+  }
+  const allocations = await AssignCustomer.find({ staffId }).lean()
+  assert.deepEqual(
+    rows.filter(row => allocations.some(allocation => allocation._id.equals(row._id)))
+      .map(row => row.Tallyserialno).sort(),
+    ["10", "100", "11", "2"]
+  )
+  const staffToken = jwt.sign({ userId: String(staffId) }, process.env.JWT_SECRET_KEY)
+  const staffHeaders = { Authorization: `Bearer ${staffToken}`, "Content-Type": "application/json" }
+  const response = await fetch(`${base}/assigned`, { headers: staffHeaders })
+  assert.equal(response.status, 200)
+  const report = await response.json()
+  assert.equal(report.total, 4)
+  assert.deepEqual(report.data.map(row => row.Tallyserialno).sort(), ["10", "100", "11", "2"])
+  const logCall = (id, draft) => fetch(`${base}/assigned/${id}/calls`, {
+    method: "POST", headers: staffHeaders, body: JSON.stringify(draft),
+  })
+  assert.ok(report.outcomes.includes("Convert to Lead"))
+  const draft = { outcome: "Convert to Lead", followUpDate: "2026-12-01T10:30:00.000Z", primeAttention: true, remarks: "Requested pricing." }
+  assert.equal((await logCall(rows.find(row => row.Tallyserialno === "3A")._id, draft)).status, 404)
+  assert.equal((await logCall(report.data[0]._id, { ...draft, outcome: "Invalid" })).status, 400)
+  const saved = await logCall(report.data[0]._id, draft)
+  assert.equal(saved.status, 201)
+  const call = await CustomerCall.findById((await saved.json()).id).lean()
+  assert.equal(String(call.staffId), String(staffId))
+  assert.equal(String(call.customerId), report.data[0]._id)
+  assert.equal(call.outcome, draft.outcome)
+  assert.equal(call.followUpDate.toISOString(), draft.followUpDate)
+  assert.equal(call.primeAttention, true)
+  assert.equal(call.remarks, draft.remarks)
+  await CustomerCall.create({ customerId: call.customerId, staffId: new mongoose.Types.ObjectId(), outcome: draft.outcome })
+  const callsResponse = await fetch(`${base}/assigned/calls?outcome=Convert%20to%20Lead`, { headers: staffHeaders })
+  assert.equal(callsResponse.status, 200)
+  const history = await callsResponse.json()
+  assert.equal(history.counts[draft.outcome], 1)
+  assert.equal(history.data.length, 1)
+  assert.equal(history.data[0].customerName, "Same customer")
+  assert.equal(history.data[0].outcome, draft.outcome)
+  assert.equal(history.data[0].followUpDate, draft.followUpDate)
+  const { insertedId: idleStaffId } = await models.Staff.collection.insertOne({ name: "No calls", role: "Staff", email: "idle@example.test", attendanceId: 101 })
+  await CustomerCall.create({ customerId: call.customerId, staffId, outcome: "Wrong Number" })
+  const summaryUrl = `${base}/report/call-summary`
+  assert.equal((await fetch(summaryUrl, { headers: staffHeaders })).status, 403)
+  const summaryResponse = await fetch(summaryUrl, { headers })
+  assert.equal(summaryResponse.status, 200)
+  const summary = await summaryResponse.json()
+  assert.equal(summary.totals.total, 2)
+  assert.equal(summary.totals.outcomes[draft.outcome], 1)
+  assert.equal(summary.staff.find(member => member._id === String(staffId)).total, 2)
+  assert.equal(summary.staff.find(member => member._id === String(idleStaffId)).total, 0)
+})
+
+test("Tally push accepts the new customer fields without a serial or mobile", async () => {
+  const row = { name: "Example shop", address1: "Main Road", address2: "Floor 2", address3: "Market", pin: "001234", email: "shop@example.com", contact: "Asha", phone1: "0123456", mobile: "", tin: "00123", state: "Kerala", country: "India", location: "Kochi" }
+  assert.equal((await upload([row])).status, 202)
+  await processNextTallyImport()
+  const saved = await Customer.findOne({ name: row.name }).lean()
+  assert.equal(saved.Pincode, row.pin)
+  assert.equal(saved.address2, row.address2)
+  assert.equal(saved.address3, row.address3)
+  assert.equal(saved.location, row.location)
+  assert.equal(saved.tin, row.tin)
+  assert.equal(Object.hasOwn(saved, "Tallyserialno"), false)
+  assert.equal((await upload([{ ...row, location: "Updated location" }], "repeat-no-serial")).status, 202)
+  await processNextTallyImport()
+  assert.equal(await Customer.countDocuments({ name: row.name }), 1)
+  assert.equal((await Customer.findById(saved._id).lean()).location, "Updated location")
+  assert.equal((await upload([{ ...row, Tallyserialno: "000123" }], "push-with-serial")).status, 202)
+  await processNextTallyImport()
+  assert.ok(await Customer.exists({ Customer: row.name, Tallyserialno: "000123" }))
+  const excelUpload = await fetch(`${base}/report/imports`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${adminToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ data: [
+      { ...row, Tallyserialno: "000124", pin: "110001", state: "", country: "", location: "" },
+      { name: "Blank tax and PIN", Tallyserialno: "000125" },
+      { name: "Explicit location", Tallyserialno: "000126", pin: "110001", location: "Existing location" },
+      { name: "Unknown PIN", Tallyserialno: "000127", pin: "999999" },
+      { name: "TIN lookup", Tallyserialno: "000128", tin: "29123456789" },
+      { name: "GSTIN lookup", Tallyserialno: "000129", Gstno: "33ABCDE1234F1Z5" },
+      { name: "Explicit state and country", Tallyserialno: "000130", state: "Ontario", country: "Canada" },
+    ] }),
+  })
+  assert.equal(excelUpload.status, 202)
+  await processNextTallyImport()
+  assert.equal((await Customer.findOne({ Tallyserialno: "000124" }).lean()).location, "Central Delhi")
+  assert.equal((await Customer.findOne({ Tallyserialno: "000125" }).lean()).Country, "India")
+  assert.equal((await Customer.findOne({ Tallyserialno: "000126" }).lean()).location, "Existing location")
+  assert.equal((await Customer.findOne({ Tallyserialno: "000127" }).lean()).location, "")
+  for (const [serial, state, country] of [
+    ["000124", "Delhi", "India"],
+    ["000125", "Kerala", "India"],
+    ["000127", "", ""],
+    ["000128", "Karnataka", "India"],
+    ["000129", "Tamil Nadu", "India"],
+    ["000130", "Ontario", "Canada"],
+  ]) {
+    const customer = await Customer.findOne({ Tallyserialno: serial }).lean()
+    assert.equal(customer.State, state)
+    assert.equal(customer.Country, country)
+  }
+  assert.equal((await upload([{ name: "Tally push without country" }], "push-without-country")).status, 202)
+  await processNextTallyImport()
+  assert.equal((await Customer.findOne({ name: "Tally push without country" }).lean()).Country, "")
 })
 
 test("stream upload creates bounded durable batches, worker upserts and repeated sync updates", async () => {
@@ -266,9 +397,10 @@ test("stale generations and batches cannot overwrite newer writes; dollar values
   const _id = new mongoose.Types.ObjectId()
   const job = { _id, sourceCompanyId: "camet-tally", generation: 2, nextBatch: 1 }
   const newer = record("one", { Address: "$literal-address" })
-  await Customer.bulkWrite([tallyUpsert(normalizeTallyRecord(newer, 1), job)])
-  await Customer.bulkWrite([tallyUpsert(normalizeTallyRecord(record("one", { Address: "Old batch" }), 1), { ...job, nextBatch: 0 })])
-  await Customer.bulkWrite([tallyUpsert(normalizeTallyRecord(record("one", { Address: "Old import" }), 1), { ...job, generation: 1, nextBatch: 100 })])
+  const write = (row, importJob) => Customer.bulkWrite([tallyUpsert(normalizeTallyRecord(row, 1), importJob)], { strict: false })
+  await write(newer, job)
+  await write(record("one", { Address: "Old batch" }), { ...job, nextBatch: 0 })
+  await write(record("one", { Address: "Old import" }), { ...job, generation: 1, nextBatch: 100 })
   assert.equal((await Customer.findOne({ Tallyserialno: "one" }).lean()).Address, "$literal-address")
 })
 

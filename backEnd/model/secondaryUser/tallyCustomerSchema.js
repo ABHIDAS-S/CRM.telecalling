@@ -1,11 +1,13 @@
 import mongoose from "mongoose"
 
-// Keep source field names aligned with the agreed Tally payload.
-// The agreed match is Customer + Tallyserialno + Mobilenumber together.
 const TallyCustomerSchema = new mongoose.Schema(
   {
-    Customer: { type: String, trim: true, default: "" },
+    name: { type: String, trim: true, default: "" },
     Address: { type: String, trim: true, default: "" },
+    address2: { type: String, trim: true, default: "" },
+    address3: { type: String, trim: true, default: "" },
+    tin: { type: String, trim: true, default: "" },
+    location: { type: String, trim: true, default: "" },
     State: { type: String, trim: true, default: "" },
     Country: { type: String, trim: true, default: "" },
     Pincode: { type: String, trim: true, default: "" },
@@ -14,7 +16,7 @@ const TallyCustomerSchema = new mongoose.Schema(
     ContactNumber: { type: String, trim: true, default: "" },
     Mobilenumber: { type: String, trim: true, default: "" },
     Emailid: { type: String, trim: true, default: "" },
-    Tallyserialno: { type: String, trim: true, default: "" },
+    Tallyserialno: { type: String, trim: true },
     Gstno: { type: String, trim: true, default: "" },
 
     // Internal single-company namespace; not supplied in the request.
@@ -28,6 +30,12 @@ const TallyCustomerSchema = new mongoose.Schema(
 )
 
 TallyCustomerSchema.index({ sourceCompanyId: 1, _id: 1 })
+TallyCustomerSchema.index(
+  { sourceCompanyId: 1, name: 1, Mobilenumber: 1 },
+  { unique: true, name: "tally_customer_name_mobile", partialFilterExpression: { name: { $gt: "" } } }
+)
+
+// Retain the indexes for legacy serial-based imports.
 TallyCustomerSchema.index({ sourceCompanyId: 1, Tallyserialno: 1, _id: 1 })
 
 // Database enforcement keeps repeat and concurrent syncs duplicate-safe.
