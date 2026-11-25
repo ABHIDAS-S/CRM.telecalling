@@ -43,7 +43,11 @@ export function publicJob(job) {
   };
 }
 
-export async function receiveTallyImport(req, res) {
+export function receiveTallyImport(req, res) {
+  return stageTallyImport(req, res, req);
+}
+
+export async function stageTallyImport(req, res, bodyStream, enrichRecord) {
   let job;
   try {
     const isJson = Boolean(req.is("application/json"));
@@ -131,7 +135,8 @@ export async function receiveTallyImport(req, res) {
         );
     };
     const acceptRecord = async (value, position) => {
-      records.push(normalizeTallyRecord(value, position));
+      const record = normalizeTallyRecord(value, position);
+      records.push(enrichRecord ? enrichRecord(record) : record);
       if (++count > 1000000)
         throw httpError(413, "Upload exceeds 1,000,000 records.");
       if (records.length === BATCH_SIZE) await flush();
@@ -154,7 +159,7 @@ export async function receiveTallyImport(req, res) {
       await acceptRecord(value, line);
     };
     // This route is mounted before express.json: memory stays bounded by a batch.
-    for await (const chunk of req) {
+    for await (const chunk of bodyStream) {
       bytes += chunk.length;
       if (bytes > MAX_BYTES) throw httpError(413, "Upload exceeds 512 MiB.");
       hash.update(chunk);

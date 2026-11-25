@@ -551,6 +551,7 @@ import websiteComplaintRoutes from "./routes/websiteComplaintRoutes.js"
 import accuanetComplaintRoutes from "./routes/accuanetComplaintRoutes.js"
 import tallyRoutes from "./routes/tallyRoutes.js"
 import tallyReportRoutes from "./routes/tallyReportRoutes.js"
+import assignedCustomerRoutes from "./routes/assignedCustomerRoutes.js"
 /* SOCKET CONTROLLERS */
 import { ExceltoJson, ExceltoJsonProduct } from "./controller/primaryUserController/excelController.js"
 import { AttendanceExceltoJson } from "./controller/primaryUserController/attendanceExcelController.js"
@@ -622,6 +623,7 @@ app.use("/api/bugreport",bugroutes)
 app.use("/api/website-complaints", websiteComplaintRoutes)
 app.use("/api/accuanet-complaints", accuanetComplaintRoutes)
 app.use("/api/reports/tally-customers", tallyReportRoutes)
+app.use("/api/reports/assigned-customers", assignedCustomerRoutes)
 /* ===============================
    STATIC FILES
 ================================ */
