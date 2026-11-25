@@ -12416,7 +12416,18 @@ export const UpdateLeadTask = async (req, res) => {
     //   });
     // }
     const activityLog = [...lead.activityLog];
-    const Index = activityLog.length - 1;
+    const Index = activityLog.findIndex(
+      (log) =>
+        String(log._id) === String(taskDetails.activityLogId) &&
+        log.taskClosed === false &&
+        log.allocationChanged !== true
+    );
+
+    if (Index === -1) {
+      return res.status(409).json({
+        message: "This task is no longer pending or has been reassigned",
+      });
+    }
     const updateFields = {
       [`activityLog.${Index}.taskSubmissionDate`]: taskDetails.submissionDate,
       [`activityLog.${Index}.taskDescription`]: taskDetails.taskDescription,
