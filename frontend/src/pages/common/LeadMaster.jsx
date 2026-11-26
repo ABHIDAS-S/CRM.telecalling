@@ -6102,16 +6102,16 @@ convertexcel
                             itemType === "enhancedservice")
                         console.log("jjj")
                         console.log(showLicenseDropdown)
-                        // Amount and tax can be adjusted in editable lead flows.
-                        // Read-only views remain protected.
-                        const isAmountLocked = isReadOnly
-                        console.log(isAmountLocked)
-                        console.log(isReadOnly)
-                        const isTaxLocked = isReadOnly
-                        console.log(isReadOnly)
-                        console.log(isAmountLocked)
-                        const a = isRowPriceLocked(item)
-                        console.log(a)
+                        // In closing flow, an additional service inherits the
+                        // primary product's pricing. Its amount and tax must
+                        // not be edited independently.
+                        const isAdditionalService = itemType === "additionalservice"
+                        const lockAdditionalServicePricing =
+                          isClosingFlow &&
+                          hasPrimaryProductInLead &&
+                          isAdditionalService
+                        const isAmountLocked = isReadOnly || lockAdditionalServicePricing
+                        const isTaxLocked = isReadOnly || lockAdditionalServicePricing
                         const isPrimaryProduct =
                           String(
                             item?.productorservicetype || ""
