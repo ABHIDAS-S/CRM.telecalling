@@ -5,6 +5,7 @@ import "react-quill/dist/quill.snow.css" // Import Quill styles
 import ClipLoader from "react-spinners/ClipLoader"
 import io from "socket.io-client"
 import { formatDate } from "../../../utils/dateUtils"
+import { getCallDescription } from "../../../utils/callDescription"
 import CallDataExtendedTable from "../../../components/secondaryUser/callDataExtendedTable"
 // import { useForm } from "react-hook-form"
 import { parseISO, differenceInDays } from "date-fns"
@@ -483,7 +484,7 @@ console.log(matchingProducts)
           const editData = {
             incomingNumber: matchingRegistration?.formdata?.incomingNumber,
             token: matchingRegistration?.timedata?.token,
-            description: matchingRegistration?.formdata?.description,
+            description: getCallDescription(matchingRegistration?.formdata?.description),
             solution: matchingRegistration?.formdata?.solution,
             status: matchingRegistration?.formdata?.status,
             callnote: matchingRegistration?.formdata?.callnote
@@ -1082,7 +1083,7 @@ Problem:    \t${selectedText}
     // let whatsappWindow
     let whatsappUrl
     const phoneNumber = `+91${calldata.formdata.incomingNumber}`
-    const Description = `${calldata.formdata.description}`
+    const Description = getCallDescription(calldata.formdata.description)
     const textToShare = `${calldata.customerName} - ${phoneNumber}\nCallnote: ${callnote}\nDescription:${Description}`
 
     // if (calldata.formdata.status === "solved") {

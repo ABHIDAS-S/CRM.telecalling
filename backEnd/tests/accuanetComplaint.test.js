@@ -42,6 +42,7 @@ before(async () => {
   process.env.ACCUANET_COMPLAINT_NOTIFY_EMAIL = 'accuanet@example.test';
   const app = express(); app.use(express.json(), complaintServiceAuth);
   const controller = createAccuanetComplaintController({ mail: async mail => { if (failMail) throw new Error('Test SMTP unavailable'); messages.push(mail); } });
+  app.post('/start-without-license', controller.startWithoutLicense);
   app.post('/check-license', controller.checkLicense);
   app.post('/send-otp', controller.sendOtp);
   app.post('/verify-otp', controller.verifyOtp);
@@ -154,4 +155,50 @@ test('licence index and tagged customer licences are supported', async () => {
   assert.equal((await post('check-license', { licenceNumber: '555' })).data.exists, true);
   await License.create({ customerName: customer._id, licensenumber: 777 });
   assert.equal((await post('check-license', { licenceNumber: '777' })).data.exists, true);
+});
+
+
+test('registered customers without a licence can submit without OTP or profile disclosure', async () => {
+  await Customer.updateOne({ _id: customer._id }, { $set: { selected: [] } });
+  assert.equal((await post('start-without-license', { registeredPhone: '1111111111' })).status, 404);
+  assert.equal((await post('start-without-license', { registeredPhone: { $ne: null } })).status, 400);
+  const started = await post('start-without-license', { registeredPhone: '98765 43210' });
+  assert.equal(started.status, 200);
+  assert.equal(messages.length, 0);
+  assert.equal(started.data.contactNumber, undefined);
+  assert.equal(started.data.email, undefined);
+  const body = { challengeId: started.data.challengeId, verificationToken: started.data.verificationToken, ...details() };
+  const saved = await post('submit', body);
+  assert.equal(saved.status, 201);
+  assert.equal((await post('submit', body)).data.reference, saved.data.reference);
+  assert.equal(saved.data.emailOnly, true);
+  assert.equal(saved.data.notificationSent, true);
+  assert.equal(await CallRegistration.countDocuments(), 0);
+  assert.equal((await Customer.findById(customer._id)).callregistration, null);
+  assert.equal(messages.length, 1);
+  assert.match(messages[0].text, /Example Customer/);
+  assert.match(messages[0].text, /Software issue/);
+  assert.match(messages[0].text, /Application is not opening today/);
+  assert.match(messages[0].text, /has not created a CRM call registration/);
+});
+
+test('phone intake rejects ambiguous registered numbers', async () => {
+  await Customer.create({ customerName: 'Other Customer', mobile: '9876543210' });
+  assert.equal((await post('start-without-license', { registeredPhone: '9876543210' })).status, 409);
+  assert.equal(await ComplaintVerification.countDocuments(), 0);
+});
+
+test('email-only intake retries the original details without creating a CRM call', async () => {
+  const started = await post('start-without-license', { registeredPhone: '9876543210' });
+  const body = { challengeId: started.data.challengeId, verificationToken: started.data.verificationToken, ...details() };
+  failMail = true;
+  const first = await post('submit', body);
+  assert.equal(first.data.emailOnly, true);
+  assert.equal(first.data.notificationSent, false);
+  failMail = false;
+  const retry = await post('submit', { ...body, description: 'Changed retry description' });
+  assert.equal(retry.data.notificationSent, true);
+  assert.equal(retry.data.reference, first.data.reference);
+  assert.match(messages[0].text, /Application is not opening today/);
+  assert.equal(await CallRegistration.countDocuments(), 0);
 });

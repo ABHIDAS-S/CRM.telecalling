@@ -2,7 +2,8 @@
 import React, { useState, useMemo } from "react"
 import { FaPhone } from "react-icons/fa"
 import { PropagateLoader } from "react-spinners"
-import WebsiteComplaintBadge from "./WebsiteComplaintBadge"
+import { getCallDescription, isWebsiteComplaint } from "../../utils/callDescription"
+import "./WebsiteComplaintRow.css"
 
 // Production Reusable Cell Architecture for handling Truncation and Clean Tooltips
 const TruncatedTooltipCell = ({ value, className = "" }) => {
@@ -181,7 +182,7 @@ export default function CallDataExtendedTable({
 
                 return (
                   <React.Fragment key={rowKey}>
-                    <tr className={`transition-all duration-150 ${rowClass}`}>
+                    <tr className={`transition-all duration-150 ${rowClass} ${isWebsiteComplaint(call) ? "website-complaint-row" : ""}`}>
                       <td className="border-b border-slate-300 px-1 py-1 text-center align-middle">
                         <button
                           type="button"
@@ -194,7 +195,6 @@ export default function CallDataExtendedTable({
 
                       <td className="break-words border-b border-slate-300 px-2 py-1.5 align-middle text-slate-900 font-semibold tracking-wide">
                         {call.timedata?.token || "N/A"}
-                        <WebsiteComplaintBadge call={call} />
                       </td>
                       {showCustomerColumn && <TruncatedTooltipCell value={call?.customerName} className="text-slate-900 font-medium" />}
                       
@@ -206,7 +206,7 @@ export default function CallDataExtendedTable({
                       <CompactDateTimeCell dateString={call.timedata?.endTime} isSolved={isSolved} />
 
                       <TruncatedTooltipCell value={formatDuration(call?.timedata?.duration)} className="font-medium text-slate-700" />
-                      <TruncatedTooltipCell value={call?.formdata?.description} />
+                      <TruncatedTooltipCell value={getCallDescription(call?.formdata?.description)} />
                       <TruncatedTooltipCell value={call.formdata?.incomingNumber} className="font-mono tracking-tight" />
 
                       <td className="whitespace-nowrap border-b border-slate-300 px-2 py-1.5 align-middle capitalize text-slate-900 font-bold">

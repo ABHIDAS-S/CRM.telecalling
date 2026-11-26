@@ -167,7 +167,7 @@ export function createWebsiteComplaintController({ mail = sendComplaintMail } = 
       // Website complaints deliberately omit product. It is already optional in the schema.
       license: challenge.licenceNumber, branchName: [branch.branchName],
       timedata: { startTime, token: reference, duration: "0", time: "00:00:00" },
-      formdata: { incomingNumber: payload.contactNumber, token: reference, description: `[Website complaint]\n${payload.description}`, callnote: payload.callNoteId, solution: "", status: "pending", attendedBy: [], completedBy: [] }
+      formdata: { incomingNumber: payload.contactNumber, token: reference, description: payload.description, callnote: payload.callNoteId, solution: "", status: "pending", attendedBy: [], completedBy: [] }
     } } }, { runValidators: true });
     await Customer.updateOne({ _id: customer._id, callregistration: null }, { $set: { callregistration: parentId } });
     await ComplaintVerification.updateOne({ _id: challenge._id }, { $set: { submittedAt: challenge.submittedAt || new Date() } });

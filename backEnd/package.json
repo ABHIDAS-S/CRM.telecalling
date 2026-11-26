@@ -5,13 +5,16 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon server.js"
+    "start": "nodemon server.js",
+    "worker:tally": "node tallyWorker.js",
+    "test:tally": "node --test tests/tallyAuth.test.js tests/tallyImport.test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@optiwari.india/pincode-india": "1.0.0",
     "bcrypt": "^5.1.1",
     "body-parser": "^1.20.2",
     "bson": "^6.8.0",

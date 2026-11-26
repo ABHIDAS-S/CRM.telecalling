@@ -41,7 +41,8 @@ import {
   BadgeCheck
 } from "lucide-react"
 import { all } from "axios"
-import WebsiteComplaintBadge from "../../../components/secondaryUser/WebsiteComplaintBadge"
+import { getCallDescription, isWebsiteComplaint } from "../../../utils/callDescription"
+import "../../../components/secondaryUser/WebsiteComplaintRow.css"
 
 const CallregistrationList = () => {
   const navigate = useNavigate()
@@ -975,7 +976,7 @@ show={true}
                               return (
                                 <React.Fragment key={rowKey}>
                                   <tr
-                                    className={`transition-all duration-150 ${
+                                    className={`transition-all duration-150 ${isWebsiteComplaint(item) ? "website-complaint-row" : ""} ${
                                       isTodayPending
                                         ? "bg-gradient-to-r from-amber-300 via-orange-200 to-yellow-100 hover:from-amber-400 hover:via-orange-300 hover:to-yellow-200"
                                         : "bg-gradient-to-r from-rose-300 via-red-200 to-pink-100 hover:from-rose-400 hover:via-red-300 hover:to-pink-200"
@@ -1005,7 +1006,6 @@ show={true}
                                     <td className="break-words border-b border-slate-300 px-2 py-1 align-top text-slate-900">
                                       {item.calls?.customerName?.toUpperCase() ||
                                         "N/A"}
-                                      <WebsiteComplaintBadge call={item} />
                                     </td>
 
                                     <td className="break-words border-b border-slate-300 px-2 py-1 align-top text-slate-900">
@@ -1020,13 +1020,13 @@ show={true}
                                     <td className="border-b border-slate-300 px-2 py-1 align-top text-slate-800">
                                       <div className="group relative max-w-full">
                                         <div className="truncate rounded-md px-1 py-0.5 text-slate-800 cursor-pointer">
-                                          {item?.formdata?.description || "N/A"}
+                                          {getCallDescription(item?.formdata?.description) || "N/A"}
                                         </div>
 
                                         {item?.formdata?.description && (
                                           <div className="pointer-events-none absolute left-0 top-full z-50 mt-2 w-72 translate-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-relaxed text-slate-700 opacity-0 shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100">
                                             <div className="whitespace-normal break-words text-slate-800">
-                                              {item.formdata.description}
+                                              {getCallDescription(item.formdata.description)}
                                             </div>
                                             <div className="absolute -top-1.5 left-4 h-3 w-3 rotate-45 border-l border-t border-slate-200 bg-white" />
                                           </div>
@@ -1162,7 +1162,7 @@ show={true}
 
                               return (
                                 <React.Fragment key={rowKey}>
-                                  <tr className="bg-gradient-to-r from-emerald-300 via-green-200 to-teal-100 transition-all duration-150 hover:from-emerald-400 hover:via-green-300 hover:to-teal-200">
+                                  <tr className={`bg-gradient-to-r from-emerald-300 via-green-200 to-teal-100 transition-all duration-150 hover:from-emerald-400 hover:via-green-300 hover:to-teal-200 ${isWebsiteComplaint(item) ? "website-complaint-row" : ""}`}>
                                     <td className="border-b border-slate-300 px-1 py-1 text-center align-middle">
                                       <button
                                         type="button"
@@ -1187,7 +1187,6 @@ show={true}
                                     <td className="break-words border-b border-slate-300 px-2 py-1 align-top text-slate-900">
                                       {item.calls?.customerName?.toUpperCase() ||
                                         "N/A"}
-                                      <WebsiteComplaintBadge call={item} />
                                     </td>
 
                                     <td className="break-words border-b border-slate-300 px-2 py-1 align-top text-slate-900">
@@ -1202,13 +1201,13 @@ show={true}
                                     <td className="border-b border-slate-300 px-2 py-1 align-top text-slate-800">
                                       <div className="group relative max-w-full">
                                         <div className="truncate rounded-md px-1 py-0.5 text-slate-800 cursor-pointer">
-                                          {item?.formdata?.description || "N/A"}
+                                          {getCallDescription(item?.formdata?.description) || "N/A"}
                                         </div>
 
                                         {item?.formdata?.description && (
                                           <div className="pointer-events-none absolute bottom-full left-0 z-50 mb-2 w-72 -translate-y-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-relaxed text-slate-700 opacity-0 shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100">
                                             <div className="whitespace-normal break-words text-slate-800">
-                                              {item.formdata.description}
+                                              {getCallDescription(item.formdata.description)}
                                             </div>
                                             <div className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 border-b border-r border-slate-200 bg-white" />
                                           </div>

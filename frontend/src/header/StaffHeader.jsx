@@ -330,6 +330,12 @@ export default function StaffHeader({
             control: permissions.Summary ?? false
           },
           {
+            to: "/staff/reports/assigned-customers",
+            label: "My Assigned Customers",
+            icon: FiPhoneCall,
+            control: true
+          },
+          {
             to: "/staff/reports/expiry-register",
             label: "Expiry Register",
             icon: FiCalendar,

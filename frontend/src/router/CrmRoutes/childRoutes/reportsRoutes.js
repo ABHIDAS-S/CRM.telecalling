@@ -1,4 +1,5 @@
-import ComingSoon from "../../../pages/common/ComingSoon";
+import TallyCustomers from "../../../pages/primaryUser/List/TallyCustomers";
+import TallyCallSummary from "../../../pages/primaryUser/List/TallyCallSummary";
 import Summary from "../../../pages/primaryUser/List/Summary";
 import ExpiredCustomer from "../../../pages/primaryUser/List/ExpiredCustomer";
 import AccountSearch from "../../../pages/primaryUser/List/AccountSearch";
@@ -17,7 +18,8 @@ const reportsRoutes = [
 
   { path: "/admin/reports/expiry-register", component: ExpiredCustomer },
 
-  { path: "/admin/reports/customer-contacts", component: ComingSoon },
+  { path: "/admin/reports/customer-contacts", component: TallyCustomers },
+  { path: "/admin/reports/tally-call-summary", component: TallyCallSummary },
 
   { path: "/admin/reports/account-search", component: AccountSearch },
 

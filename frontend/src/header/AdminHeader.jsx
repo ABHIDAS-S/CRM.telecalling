@@ -1694,6 +1694,8 @@ onpasswordClick,
           { to: "/admin/reports/summary", label: "Call Summary", icon: FiPhoneCall },
           { to: "/admin/reports/expiry-register", label: "Expiry Register", icon: FiCalendar },
           { to: "/admin/reports/account-search", label: "Account Search", icon: FiSearch },
+          { to: "/admin/reports/customer-contacts", label: "Customer Detail", icon: FiClipboard },
+          { to: "/admin/reports/tally-call-summary", label: "Customer Call Summary", icon: FiClipboard },
         ],
       },
       {

@@ -549,6 +549,9 @@ import productRoutes from "./routes/primaryUserRoutes/productRoutes.js"
 import bugroutes from "./routes/developer/bugroutes.js"
 import websiteComplaintRoutes from "./routes/websiteComplaintRoutes.js"
 import accuanetComplaintRoutes from "./routes/accuanetComplaintRoutes.js"
+import tallyRoutes from "./routes/tallyRoutes.js"
+import tallyReportRoutes from "./routes/tallyReportRoutes.js"
+import assignedCustomerRoutes from "./routes/assignedCustomerRoutes.js"
 /* SOCKET CONTROLLERS */
 import { ExceltoJson, ExceltoJsonProduct } from "./controller/primaryUserController/excelController.js"
 import { AttendanceExceltoJson } from "./controller/primaryUserController/attendanceExcelController.js"
@@ -576,6 +579,8 @@ app.use(cors(corsOptions))
 /* ===============================
    BODY PARSERS (ONLY ONCE)
 ================================ */
+// Authenticate integration requests before any potentially large body parsing.
+app.use("/api/integrations/tally/v1", tallyRoutes)
 app.use(express.json({ limit: "20mb" }))
 app.use(express.urlencoded({ extended: true, limit: "20mb" }))
 app.use(cookieParser())
@@ -617,6 +622,8 @@ app.use("/api/target", targetRoutes)
 app.use("/api/bugreport",bugroutes)
 app.use("/api/website-complaints", websiteComplaintRoutes)
 app.use("/api/accuanet-complaints", accuanetComplaintRoutes)
+app.use("/api/reports/tally-customers", tallyReportRoutes)
+app.use("/api/reports/assigned-customers", assignedCustomerRoutes)
 /* ===============================
    STATIC FILES
 ================================ */

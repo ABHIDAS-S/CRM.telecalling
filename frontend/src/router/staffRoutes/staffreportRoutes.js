@@ -1,4 +1,5 @@
 import ComingSoon from "../../pages/common/ComingSoon"
+import AssignedCustomers from "../../pages/common/AssignedCustomers"
 import Summary from "../../pages/primaryUser/List/Summary"
 import ExpiredCustomer from "../../pages/primaryUser/List/ExpiredCustomer"
 import AccountSearch from "../../pages/primaryUser/List/AccountSearch"
@@ -11,6 +12,7 @@ import DailyStaffActivity from "../../pages/primaryUser/List/DailyStaffActivity"
 import IncentiveReport from "../../components/primaryUser/IncentiveReport"
 import ResearchandDevelopement from "../../pages/primaryUser/dashboard/ResearchandDevelopement"
 const staffreportsRoutes = [
+  { path: "/staff/reports/assigned-customers", component: AssignedCustomers },
   { path: "/staff/reports/summary", component: Summary },
   { path: "/staff/reports/expiry-register", component: ExpiredCustomer },
 
