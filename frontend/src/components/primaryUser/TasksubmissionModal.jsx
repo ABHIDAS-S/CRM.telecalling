@@ -277,6 +277,7 @@ export default function TasksubmissionModal({
     task: task?.matchedlog?.taskId?.taskName,
     submissionDate: new Date(),
     leadDocId: task?.leadDocId,
+    activityLogId: task?.matchedlog?._id,
     allocatedTo: task?.allocatedTo,
     allocatedtomodel: task?.matchedlog?.taskallocatedToModel,
     taskfromFollowup: task?.matchedlog?.taskfromFollowup,
