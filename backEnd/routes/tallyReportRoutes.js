@@ -73,13 +73,50 @@ router.get("/", async (req, res) => {
     res.json({ data, nextCursor: hasMore ? String(data[data.length - 1]._id) : null })
   } catch { res.status(503).json({ message: "Report service is temporarily unavailable." }) }
 })
+const indiaOffset = (5 * 60 + 30) * 60 * 1000
+
+function callSummaryDateRange(period, date) {
+  // Use UTC calendar arithmetic on the India-local date.
+  const start = new Date(Date.now() + indiaOffset)
+  start.setUTCHours(0, 0, 0, 0)
+
+  switch (period) {
+    case "today": break
+    case "yesterday": start.setUTCDate(start.getUTCDate() - 1); break
+    case "this-week": start.setUTCDate(start.getUTCDate() - (start.getUTCDay() + 6) % 7); break
+    case "this-month": start.setUTCDate(1); break
+    case "month":
+    case "date": {
+      const pattern = period === "month" ? /^\d{4}-\d{2}$/ : /^\d{4}-\d{2}-\d{2}$/
+      if (typeof date !== "string" || !pattern.test(date)) return null
+      const day = period === "month" ? `${date}-01` : date
+      start.setTime(Date.parse(`${day}T00:00:00Z`))
+      if (!Number.isFinite(start.getTime()) || start.toISOString().slice(0, 10) !== day) return null
+      break
+    }
+    default: return null
+  }
+
+  const end = new Date(start)
+  if (period === "month" || period === "this-month") end.setUTCMonth(end.getUTCMonth() + 1)
+  else end.setUTCDate(end.getUTCDate() + (period === "this-week" ? 7 : 1))
+
+  return { $gte: new Date(start.getTime() - indiaOffset), $lt: new Date(end.getTime() - indiaOffset) }
+}
+
 router.get("/call-summary", async (req, res) => {
   try {
+    const { period = "all", date } = req.query
+    const pipeline = []
+    if (period !== "all") {
+      const range = callSummaryDateRange(period, date)
+      if (!range) return res.status(400).json({ message: "Choose a valid date filter." })
+      pipeline.push({ $match: { createdAt: range } })
+    }
+    pipeline.push({ $group: { _id: { staffId: "$staffId", outcome: "$outcome" }, count: { $sum: 1 } } })
     const [staff, counts] = await Promise.all([
       models.Staff.find().select("name").sort({ name: 1, _id: 1 }).lean(),
-      CustomerCall.aggregate([
-        { $group: { _id: { staffId: "$staffId", outcome: "$outcome" }, count: { $sum: 1 } } },
-      ]),
+      CustomerCall.aggregate(pipeline),
     ])
     const staffRows = new Map(staff.map(member => [
       String(member._id), { ...member, total: 0, outcomes: {} },

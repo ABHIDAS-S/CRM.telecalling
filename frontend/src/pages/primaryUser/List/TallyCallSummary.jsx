@@ -16,14 +16,40 @@ function countFor(row, outcome) {
   return (outcome ? row.outcomes[outcome] ?? 0 : row.total).toLocaleString()
 }
 
+const dateFilters = [
+  ["all", "All time"],
+  ["today", "Today"],
+  ["yesterday", "Yesterday"],
+  ["this-week", "This week"],
+  ["this-month", "This month"],
+  ["month", "Choose a month"],
+  ["date", "Choose a date"],
+]
+
 export default function TallyCallSummary() {
   const [report, setReport] = useState(null)
   const [error, setError] = useState("")
+  const [period, setPeriod] = useState("all")
+  const [date, setDate] = useState("")
+  const needsDate = period === "month" || period === "date"
+  const ready = !needsDate || Boolean(date)
+
+  function updateFilter(nextPeriod, nextDate) {
+    setReport(null)
+    setError("")
+    setPeriod(nextPeriod)
+    setDate(nextDate)
+  }
 
   useEffect(() => {
+    if (!ready) return
     const controller = new AbortController()
-    api.get("/reports/tally-customers/call-summary", { signal: controller.signal })
+    api.get("/reports/tally-customers/call-summary", {
+      params: { period, date: needsDate ? date : undefined },
+      signal: controller.signal,
+    })
       .then(({ data }) => {
+        if (controller.signal.aborted) return
         if (!Array.isArray(data?.staff) || !data.totals?.outcomes) throw new Error("Invalid call summary response.")
         setReport(data)
       })
@@ -31,12 +57,30 @@ export default function TallyCallSummary() {
         if (!controller.signal.aborted) setError(err.response?.data?.message || "Unable to load the call summary.")
       })
     return () => controller.abort()
-  }, [])
+  }, [period, date, needsDate, ready])
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-[#ADD8E6] p-4 text-slate-900 md:p-6" aria-busy={!report && !error}>
-      <h1 className="mb-4 shrink-0 text-xl font-extrabold tracking-tight text-indigo-950">Customer Call Summary</h1>
-      <dl className="mb-5 shrink-0 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <section className="h-full overflow-y-auto bg-slate-50 p-4 text-slate-900 md:p-6">
+      <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-xl font-extrabold tracking-tight text-indigo-950">Customer Call Summary</h1>
+        <div className="flex flex-wrap gap-3">
+          <label className="grid gap-1 text-xs font-semibold text-slate-700">
+            Date filter
+            <select value={period} onChange={event => updateFilter(event.target.value, "")}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+              {dateFilters.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
+          {needsDate && (
+            <label className="grid gap-1 text-xs font-semibold text-slate-700">
+              {period === "month" ? "Month" : "Date"}
+              <input type={period} value={date} onChange={event => updateFilter(period, event.target.value)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" />
+            </label>
+          )}
+        </div>
+      </header>
+      <dl className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {metrics.map(({ label, outcome, icon: Icon, tone }) => (
           <div key={label} className="flex min-w-0 items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
             <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${tone}`}><Icon aria-hidden="true" /></span>
@@ -47,9 +91,10 @@ export default function TallyCallSummary() {
           </div>
         ))}
       </dl>
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <h2 className="shrink-0 border-b border-slate-200 px-4 py-3 text-sm font-semibold">Calls by staff</h2>
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-busy={ready && !report && !error}>
+        <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-semibold">Calls by staff</h2>
         {error ? <p role="alert" className="px-4 py-6 text-sm text-red-700">{error}</p>
+          : !ready ? <p className="px-4 py-6 text-sm text-slate-600">Select a {period} to see call counts.</p>
           : !report ? <p role="status" className="px-4 py-6 text-sm text-slate-600">Loading call summary…</p>
           : !report.staff.length ? <p className="px-4 py-6 text-sm text-slate-600">No staff accounts found.</p>
           : <div className="min-h-0 flex-1 overflow-auto" tabIndex={0} role="region" aria-label="Staff call counts">
