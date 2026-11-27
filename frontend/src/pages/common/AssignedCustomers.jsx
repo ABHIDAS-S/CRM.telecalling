@@ -3,8 +3,10 @@ import { FiMail, FiMapPin, FiPhone, FiUser } from "react-icons/fi"
 import api from "../../api/api"
 
 const endpoint = "/reports/assigned-customers"
+const notYetCalledOutcome = "Not Yet Called"
 const emptyCall = { outcome: "", followUpDate: "", primeAttention: false, remarks: "" }
 const outcomeTiles = [
+  [notYetCalledOutcome, "border-slate-300 bg-slate-100 text-slate-900"],
   ["Interested", "border-emerald-200 bg-emerald-50 text-emerald-900"],
   ["Not Interested", "border-rose-200 bg-rose-50 text-rose-900"],
   ["Callback Requested", "border-violet-200 bg-violet-50 text-violet-900"],
@@ -30,7 +32,7 @@ export default function AssignedCustomers() {
   const [loadError, setLoadError] = useState("")
   const [saveError, setSaveError] = useState("")
   const [notice, setNotice] = useState("")
-  const [historyOutcome, setHistoryOutcome] = useState("")
+  const [historyOutcome, setHistoryOutcome] = useState(notYetCalledOutcome)
   const [historyCursors, setHistoryCursors] = useState([null])
   const [history, setHistory] = useState({ data: [], counts: {}, nextCursor: null })
   const [historyLoading, setHistoryLoading] = useState(true)
@@ -38,6 +40,9 @@ export default function AssignedCustomers() {
   const [historyRefresh, setHistoryRefresh] = useState(0)
   const historyCursor = historyCursors.at(-1)
   const cursor = cursors.at(-1)
+  const visibleCustomers = historyOutcome ? history.data.map(call => call.customer).filter(Boolean) : report.data
+  const visibleCustomerCount = historyOutcome ? history.counts[historyOutcome] ?? 0 : report.total
+  const showCallTable = Boolean(historyOutcome && historyOutcome !== notYetCalledOutcome)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -109,10 +114,10 @@ export default function AssignedCustomers() {
   }
 
   return (
-    <section className="h-full overflow-auto bg-gradient-to-br from-indigo-50 via-slate-50 to-teal-50 p-4 text-slate-900 md:p-6">
-      <h1 className="mb-4 text-xl font-extrabold tracking-tight text-indigo-950">My Assigned Customers</h1>
-      {notice && <p role="status" className="mb-4 text-emerald-700">{notice}</p>}
-      <div className="mb-4 grid auto-rows-fr grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" aria-label="Call outcomes">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[#ADD8E6] p-4 text-slate-900 md:p-6">
+      <h1 className="mb-4 shrink-0 text-xl font-extrabold tracking-tight text-indigo-950">My Assigned Customers</h1>
+      {notice && <p role="status" className="mb-4 shrink-0 text-emerald-700">{notice}</p>}
+      <div className="mb-4 shrink-0 grid auto-rows-fr grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" aria-label="Call outcomes">
         {outcomeTiles.map(([outcome, tone]) => (
           <button key={outcome} type="button" aria-pressed={historyOutcome === outcome}
             onClick={() => {
@@ -125,19 +130,20 @@ export default function AssignedCustomers() {
           </button>
         ))}
       </div>
-      {historyError && <p role="alert" className="mb-3 text-sm text-red-700">{historyError}</p>}
-      <div className="grid items-start gap-4 md:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {historyError && <p role="alert" className="mb-3 shrink-0 text-sm text-red-700">{historyError}</p>}
+      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <h2 className="flex items-center justify-between gap-2 bg-indigo-950 px-4 py-3 text-sm font-semibold text-white">
-            My Calling List
-            {!loadError && (!loading || report.total > 0) && <span className="rounded-full bg-indigo-700 px-2.5 py-0.5 text-xs tabular-nums">{report.total.toLocaleString()}</span>}
+            {historyOutcome ? `${historyOutcome} Customers` : "My Calling List"}
+            {!loadError && (!loading || report.total > 0) && <span className="rounded-full bg-indigo-700 px-2.5 py-0.5 text-xs tabular-nums">{visibleCustomerCount.toLocaleString()}</span>}
           </h2>
           {loadError ? <p role="alert" className="p-4 text-red-700">{loadError}</p>
+            : historyOutcome && historyLoading ? <p role="status" className="p-4">Loading customers…</p>
             : loading ? <p role="status" className="p-4">Loading customers…</p>
-            : !report.data.length ? <p className="p-4 text-slate-600">No customers on this page.</p>
-            : <ul className="max-h-[60vh] space-y-1 overflow-y-auto p-2">
-              {report.data.map((customer, index) => (
-                <li key={customer._id} className={`flex items-center justify-between gap-2 rounded-lg border-l-2 px-2.5 py-2 transition-colors ${!historyOutcome && selected?._id === customer._id ? "border-indigo-600 bg-indigo-50" : "border-transparent bg-white hover:bg-slate-50"}`}>
+            : !visibleCustomers.length ? <p className="p-4 text-slate-600">{historyOutcome ? "No customers with this outcome." : "No customers on this page."}</p>
+            : <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+              {visibleCustomers.map((customer, index) => (
+                <li key={customer._id} className={`flex items-center justify-between gap-2 rounded-lg border-l-2 px-2.5 py-2 transition-colors ${selected?._id === customer._id ? "border-indigo-600 bg-indigo-50" : "border-transparent bg-white hover:bg-slate-50"}`}>
                   <div className="flex min-w-0 items-center gap-3">
                     <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${avatarTones[index % avatarTones.length]}`}>
                       <FiUser aria-hidden="true" />
@@ -147,46 +153,50 @@ export default function AssignedCustomers() {
                       <p className="text-xs text-slate-600">{[customer.Company || (customer.Contactperson && customer.Customer), customer.Mobilenumber || customer.ContactNumber].filter(Boolean).join(" · ")}</p>
                     </div>
                   </div>
-                  <button type="button" disabled={saving} aria-pressed={!historyOutcome && selected?._id === customer._id} aria-label={`Call ${customer.Contactperson || customer.Customer}`} onClick={() => { setHistoryOutcome(""); setHistoryCursors([null]); if (selected?._id !== customer._id) openCall(customer) }} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-teal-50 text-teal-800 transition-colors hover:bg-teal-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 disabled:opacity-50">
+                  <button type="button" disabled={saving} aria-pressed={selected?._id === customer._id} aria-label={`Call ${customer.Contactperson || customer.Customer}`} onClick={() => { setHistoryOutcome(""); setHistoryCursors([null]); if (selected?._id !== customer._id) openCall(customer) }} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-teal-50 text-teal-800 transition-colors hover:bg-teal-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 disabled:opacity-50">
                     <FiPhone aria-hidden="true" />
                   </button>
                 </li>
               ))}
             </ul>}
-          {(!loading && (cursors.length > 1 || report.nextCursor)) && <div className="flex justify-between border-t px-4 py-3 text-sm">
+          {(!loading && (cursors.length > 1 || report.nextCursor)) && <div className="flex shrink-0 justify-between border-t px-4 py-3 text-sm">
             <button type="button" disabled={saving || cursors.length === 1} onClick={() => changePage(cursors.slice(0, -1))} className="text-blue-700 disabled:text-slate-400">Previous</button>
             <span>Page {cursors.length}</span>
             <button type="button" disabled={saving || !report.nextCursor || Boolean(loadError)} onClick={() => changePage([...cursors, report.nextCursor])} className="text-blue-700 disabled:text-slate-400">Next</button>
           </div>}
         </section>
 
-        {historyOutcome ? <section className="order-first min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:order-none">
-          <h2 className="border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold">{historyOutcome}</h2>
+        {showCallTable ? <section className="order-first flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:order-none">
+          <h2 className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold">{historyOutcome}</h2>
           {historyLoading ? <p role="status" className="p-4 text-sm">Loading calls…</p> : !historyError && (
-            history.data.length ? <div className="max-h-[55vh] overflow-auto">
-              <table className="w-full min-w-[440px] text-left text-sm">
+            history.data.length ? <div className="min-h-0 flex-1 overflow-auto">
+              <table className="w-full min-w-[620px] text-left text-sm">
                 <thead className="sticky top-0 bg-slate-100 text-xs text-slate-700"><tr>
                   <th scope="col" className="px-4 py-2">Customer name</th>
                   <th scope="col" className="px-4 py-2">Status</th>
                   <th scope="col" className="px-4 py-2">Follow-up date</th>
+                  <th scope="col" className="px-4 py-2">Remarks</th>
                 </tr></thead>
                 <tbody className="divide-y divide-slate-100">
                   {history.data.map(call => <tr key={call._id}>
                     <td className="px-4 py-2 font-medium">{call.customerName}</td>
                     <td className="px-4 py-2">{call.outcome}</td>
                     <td className="px-4 py-2">{call.followUpDate ? new Date(call.followUpDate).toLocaleString() : "—"}</td>
+                    <td className="max-w-xs px-4 py-2 whitespace-pre-wrap break-words text-slate-600">{call.remarks || "—"}</td>
                   </tr>)}
                 </tbody>
               </table>
             </div> : <p className="p-4 text-sm text-slate-600">No calls with this outcome.</p>
           )}
           {!historyLoading && !historyError && (historyCursors.length > 1 || history.nextCursor) && (
-            <div className="flex justify-end gap-4 border-t px-4 py-2 text-sm">
+            <div className="flex shrink-0 justify-end gap-4 border-t px-4 py-2 text-sm">
               <button type="button" disabled={historyCursors.length === 1} onClick={() => setHistoryCursors(value => value.slice(0, -1))} className="text-indigo-700 disabled:text-slate-400">Previous calls</button>
               <button type="button" disabled={!history.nextCursor} onClick={() => setHistoryCursors(value => [...value, history.nextCursor])} className="text-indigo-700 disabled:text-slate-400">Next calls</button>
             </div>
           )}
-        </section> : selected ? <section className="rounded-xl border border-slate-200 bg-white shadow-sm md:sticky md:top-0">
+        </section> : historyOutcome === notYetCalledOutcome ? <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-400 bg-white/70 px-4 py-10 text-center text-sm text-slate-700">
+          Customers in the calling list have not been contacted yet. Select a phone icon to record their first call.
+        </div> : selected ? <section className="min-h-0 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <header className="rounded-t-xl border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-teal-50 px-5 py-4">
             <div className="flex items-center gap-3">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-indigo-100 text-indigo-700"><FiUser aria-hidden="true" /></span>

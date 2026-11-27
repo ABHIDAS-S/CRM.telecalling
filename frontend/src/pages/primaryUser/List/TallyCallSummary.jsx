@@ -34,9 +34,9 @@ export default function TallyCallSummary() {
   }, [])
 
   return (
-    <section className="h-full overflow-y-auto bg-slate-50 p-4 text-slate-900 md:p-6" aria-busy={!report && !error}>
-      <h1 className="mb-4 text-xl font-extrabold tracking-tight text-indigo-950">Customer Call Summary</h1>
-      <dl className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <section className="flex h-full min-h-0 flex-col bg-[#ADD8E6] p-4 text-slate-900 md:p-6" aria-busy={!report && !error}>
+      <h1 className="mb-4 shrink-0 text-xl font-extrabold tracking-tight text-indigo-950">Customer Call Summary</h1>
+      <dl className="mb-5 shrink-0 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {metrics.map(({ label, outcome, icon: Icon, tone }) => (
           <div key={label} className="flex min-w-0 items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
             <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${tone}`}><Icon aria-hidden="true" /></span>
@@ -47,12 +47,12 @@ export default function TallyCallSummary() {
           </div>
         ))}
       </dl>
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-semibold">Calls by staff</h2>
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <h2 className="shrink-0 border-b border-slate-200 px-4 py-3 text-sm font-semibold">Calls by staff</h2>
         {error ? <p role="alert" className="px-4 py-6 text-sm text-red-700">{error}</p>
           : !report ? <p role="status" className="px-4 py-6 text-sm text-slate-600">Loading call summary…</p>
           : !report.staff.length ? <p className="px-4 py-6 text-sm text-slate-600">No staff accounts found.</p>
-          : <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Staff call counts">
+          : <div className="min-h-0 flex-1 overflow-auto" tabIndex={0} role="region" aria-label="Staff call counts">
             <table className="w-full min-w-[740px] text-sm">
               <thead className="bg-slate-100 text-xs text-slate-700"><tr>
                 <th scope="col" className="px-4 py-3 text-left">Staff member</th>

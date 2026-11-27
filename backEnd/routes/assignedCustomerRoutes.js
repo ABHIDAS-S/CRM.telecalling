@@ -10,6 +10,7 @@ import { TALLY_COMPANY } from "../config/tally.js"
 const router = express.Router()
 const isId = value => typeof value === "string" && /^[a-f0-9]{24}$/i.test(value)
 const pageSize = 50
+const noCallsOutcome = "Not Yet Called"
 const customerFields = "_id Customer Company Contactperson Mobilenumber ContactNumber Emailid Address address2 address3 location State Pincode Tallyserialno"
 
 router.use(authMiddleware, async (req, res, next) => {
@@ -45,26 +46,49 @@ router.get("/", async (req, res) => {
 
 router.get("/calls", async (req, res) => {
   const { outcome, before } = req.query
-  if ((outcome !== undefined && !callOutcomes.includes(outcome)) ||
+  if ((outcome !== undefined && outcome !== noCallsOutcome && !callOutcomes.includes(outcome)) ||
       (before !== undefined && (!outcome || !isId(before)))) {
     return res.status(400).json({ message: "Invalid call history filter." })
   }
   try {
     const staffId = new mongoose.Types.ObjectId(req.owner.userId)
-    const [counts, calls] = await Promise.all([
+    const [counts, calledCustomerIds] = await Promise.all([
       CustomerCall.aggregate([{ $match: { staffId } }, { $group: { _id: "$outcome", count: { $sum: 1 } } }]),
-      outcome ? CustomerCall.find({ staffId, outcome, ...(before ? { _id: { $lt: before } } : {}) })
-        .select("customerId outcome followUpDate")
-        .sort({ _id: -1 }).limit(pageSize + 1).lean() : [],
+      CustomerCall.distinct("customerId", { staffId }),
     ])
+    const noCallScope = { staffId, ...(calledCustomerIds.length ? { _id: { $nin: calledCustomerIds } } : {}) }
+    const noCallCount = await AssignCustomer.countDocuments(noCallScope)
+    const calls = outcome === noCallsOutcome
+      ? await AssignCustomer.find({ ...noCallScope, ...(before ? { _id: { $lt: before } } : {}) })
+        .select("_id").sort({ _id: -1 }).limit(pageSize + 1).lean()
+      : outcome ? await CustomerCall.find({ staffId, outcome, ...(before ? { _id: { $lt: before } } : {}) })
+        .select("customerId outcome followUpDate remarks").sort({ _id: -1 }).limit(pageSize + 1).lean()
+      : []
     const page = calls.slice(0, pageSize)
+    const customerIds = page.map(call => outcome === noCallsOutcome ? call._id : call.customerId)
     const customers = await Customer.find({
-      _id: { $in: page.map(call => call.customerId) }, sourceCompanyId: TALLY_COMPANY,
-    }).select("name Customer Contactperson").lean()
-    const names = new Map(customers.map(customer => [String(customer._id), customer.name || customer.Customer || customer.Contactperson]))
+      _id: { $in: customerIds }, sourceCompanyId: TALLY_COMPANY,
+    }).select(customerFields).select({ name: 1 }).lean()
+    const customersById = new Map(customers.map(customer => {
+      customer.Customer = customer.name || customer.Customer
+      return [String(customer._id), customer]
+    }))
+    const countByOutcome = Object.fromEntries(counts.map(row => [row._id, row.count]))
+    countByOutcome[noCallsOutcome] = noCallCount
     res.json({
-      counts: Object.fromEntries(counts.map(row => [row._id, row.count])),
-      data: page.map(call => ({ ...call, customerName: names.get(String(call.customerId)) || "Customer unavailable" })),
+      counts: countByOutcome,
+      data: page.map(call => {
+        const customerId = outcome === noCallsOutcome ? call._id : call.customerId
+        const customer = customersById.get(String(customerId))
+        return {
+          ...call,
+          customerId,
+          outcome: outcome === noCallsOutcome ? noCallsOutcome : call.outcome,
+          followUpDate: outcome === noCallsOutcome ? null : call.followUpDate,
+          customer,
+          customerName: customer?.Contactperson || customer?.Customer || "Customer unavailable",
+        }
+      }),
       nextCursor: calls.length > pageSize ? page.at(-1)._id : null,
     })
   } catch {

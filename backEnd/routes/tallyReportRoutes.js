@@ -61,6 +61,15 @@ router.get("/", async (req, res) => {
     const rows = await Customer.find(filter).select(projection).sort({ _id: 1 }).limit(limit + 1).lean()
     const hasMore = rows.length > limit
     const data = rows.slice(0, limit)
+    const assignments = await AssignCustomer.find({ _id: { $in: data.map(row => row._id) } })
+      .select("_id staffId").populate({ path: "staffId", select: "name" }).lean()
+    const assignmentByCustomerId = new Map(assignments.map(assignment => [
+      String(assignment._id), assignment.staffId?.name || "Assigned staff",
+    ]))
+    for (const customer of data) {
+      const assignedTo = assignmentByCustomerId.get(String(customer._id))
+      if (assignedTo) customer.assignedTo = assignedTo
+    }
     res.json({ data, nextCursor: hasMore ? String(data[data.length - 1]._id) : null })
   } catch { res.status(503).json({ message: "Report service is temporarily unavailable." }) }
 })

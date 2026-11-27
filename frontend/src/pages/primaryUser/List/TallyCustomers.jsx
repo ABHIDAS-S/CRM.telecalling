@@ -108,6 +108,7 @@ export default function TallyCustomers() {
       setSelected(new Set())
       setStart("")
       setEnd("")
+      setRefresh(value => value + 1)
     } catch (err) {
       const response = err.response
       const message = response?.data?.message
@@ -218,9 +219,12 @@ export default function TallyCustomers() {
   }, [])
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-y-auto bg-slate-50 p-3 text-xs text-slate-900 md:p-4">
+    <section className="flex h-full min-h-0 flex-col overflow-y-auto bg-[#ADD8E6] p-3 text-xs text-slate-900 md:p-4">
       <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-extrabold uppercase tracking-wide text-slate-950">Customer Detail</h1>
+        <div>
+          <h1 className="text-lg font-extrabold uppercase tracking-wide text-slate-950">Customer Detail</h1>
+          <p className="mt-0.5 text-xs font-medium text-sky-900">Allocated customers are highlighted in blue.</p>
+        </div>
         <label className="relative w-full sm:w-80">
           <FiSearch aria-hidden="true" className="pointer-events-none absolute left-2.5 top-2.5 text-slate-500" />
           <span className="sr-only">Search Tally customers</span>
@@ -257,7 +261,7 @@ export default function TallyCustomers() {
           <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-100 text-xs font-semibold text-slate-700"><tr><th scope="col" className="pl-3"><input ref={pageCheckbox} type="checkbox" className="size-4 accent-blue-700" aria-label="Select all customers on this page" disabled={loading || busy || !rows.length} checked={rows.length > 0 && pageSelected === rows.length} onChange={event => toggleSelection(rows.map(row => row._id), event.target.checked)} /></th><th scope="col" className="px-2.5 py-2">Sl. No.</th>{columns.map(([key, label]) => <th scope="col" key={key} className="whitespace-nowrap px-2.5 py-2">{label}</th>)}</tr></thead>
           <tbody>
             {loading ? <tr><td colSpan={columns.length + 2} className="p-10 text-center text-slate-500">Loading customer details…</td></tr> : rows.length ? rows.map((row, index) => (
-              <tr key={row._id} className="border-t border-slate-100 align-middle even:bg-slate-50/70 hover:bg-blue-50"><td className="py-2 pl-3"><input type="checkbox" className="size-4 accent-blue-700" aria-label={`Select ${row.Customer}`} disabled={busy} checked={selected.has(row._id)} onChange={event => toggleSelection([row._id], event.target.checked)} /></td><td className="px-2.5 py-2 tabular-nums text-slate-400">{(cursors.length - 1) * 50 + index + 1}</td>{columns.map(([key]) => <td key={key} className={`px-2.5 py-2 break-words ${key === "Address" ? "min-w-36 max-w-48 whitespace-pre-wrap text-slate-600" : key === "Customer" ? "min-w-32 max-w-44 font-semibold" : ["tin", "ContactNumber", "Mobilenumber"].includes(key) ? "font-mono text-xs whitespace-nowrap" : "min-w-20 max-w-40"}`}>{(key === "tin" ? row.tin || row.Gstno : row[key]) || <span className="text-slate-400">—</span>}</td>)}</tr>
+              <tr key={row._id} className={`border-t border-slate-100 align-middle ${row.assignedTo ? "bg-sky-100 hover:bg-sky-200" : "even:bg-slate-50/70 hover:bg-blue-50"}`}><td className="py-2 pl-3"><input type="checkbox" className="size-4 accent-blue-700" aria-label={`Select ${row.Customer}`} disabled={busy} checked={selected.has(row._id)} onChange={event => toggleSelection([row._id], event.target.checked)} /></td><td className="px-2.5 py-2 tabular-nums text-slate-400">{(cursors.length - 1) * 50 + index + 1}</td>{columns.map(([key]) => <td key={key} className={`px-2.5 py-2 break-words ${key === "Address" ? "min-w-36 max-w-48 whitespace-pre-wrap text-slate-600" : key === "Customer" ? "min-w-32 max-w-44 font-semibold" : ["tin", "ContactNumber", "Mobilenumber"].includes(key) ? "font-mono text-xs whitespace-nowrap" : "min-w-20 max-w-40"}`}>{key === "Customer" && row.assignedTo && <span className="mb-1 inline-flex rounded-full bg-sky-700 px-1.5 py-0.5 text-[10px] font-semibold text-white">Allocated: {row.assignedTo}</span>}{(key === "tin" ? row.tin || row.Gstno : row[key]) || <span className="text-slate-400">—</span>}</td>)}</tr>
             )) : <tr><td colSpan={columns.length + 2} className="p-10 text-center"><p className="font-medium">{error ? "Customer details unavailable" : search.trim() ? "No matching customers" : "No Tally customers yet"}</p><p className="mt-2 text-xs text-slate-500">{error ? "Try refreshing the report." : search.trim() ? "Try a different search term." : "Customer details will appear here after the first import is processed."}</p></td></tr>}
           </tbody>
         </table>
